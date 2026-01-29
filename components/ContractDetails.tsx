@@ -50,14 +50,7 @@ const ContractDetails: React.FC = () => {
               <span className="font-bold">PIX:</span> pix@c4marketing.com.br
             </p>
           </div>
-          <div className="flex-shrink-0">
-             <div className="flex items-center gap-2 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-200">
-                <svg className="w-5 h-5 text-brand-coral" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04 inter-2 2 0 00-1.382.723 11.958 11.958 0 00-2.028 9.213c.421 2.501 1.624 4.78 3.39 6.556a11.952 11.952 0 008.618 3.518 11.952 11.952 0 008.618-3.518c1.766-1.776 2.969-4.055 3.39-6.556a11.958 11.958 0 00-2.028-9.213 2 2 0 00-1.382-.723z" />
-                </svg>
-                <span className="text-xs font-bold uppercase text-slate-500 tracking-tighter">Assinatura Digital Válida (MP 2.200-2/2001)</span>
-             </div>
-          </div>
+
         </div>
       </div>
     </section>
