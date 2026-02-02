@@ -224,8 +224,9 @@ const ContractView: React.FC = () => {
                             </p>
                         )}
                     </div>
-                    <p className="text-sm mb-2">4.2. O atraso no pagamento acarretará multa de 2% (dois por cento) e juros de mora de 1% (um por cento) ao mês.</p>
-                    <p className="text-sm">4.3. A inadimplência superior a 10 (dez) dias permitirá a suspensão imediata dos serviços até a regularização.</p>
+                    <p className="text-sm mb-2">4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.</p>
+                    <p className="text-sm mb-2">4.3. O atraso no pagamento acarretará multa de 2% (dois por cento) e juros de mora de 1% (um por cento) ao mês.</p>
+                    <p className="text-sm">4.4. A inadimplência superior a 10 (dez) dias permitirá a suspensão imediata dos serviços até a regularização.</p>
                 </div>
 
                 {/* 5. Term and Termination */}
@@ -299,7 +300,7 @@ const ContractView: React.FC = () => {
                 </div>
 
             </div>
-        </div>
+        </div >
     );
 };
 

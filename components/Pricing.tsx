@@ -126,7 +126,7 @@ const Pricing: React.FC<PricingProps> = ({
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pagamento</p>
                   <p className="text-slate-700 font-semibold">Boleto ou PIX</p>
-                  <p className="text-xs text-brand-coral font-bold mt-1">Vencimento mensal recorrente</p>
+                  <p className="text-xs text-brand-coral font-bold mt-1">1º pagamento: 7 dias úteis após o aceite</p>
                 </div>
               </div>
             </div>
