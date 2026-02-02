@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
   return (
     <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/dashboard')}>
           <img src="/logo.png" alt="C4 Marketing" className="h-8 dark:brightness-0 dark:invert" />
           <span className="text-slate-300 dark:text-slate-600">|</span>
           <h1 className="font-bold text-slate-700 dark:text-slate-300 text-sm tracking-wide">DASHBOARD</h1>

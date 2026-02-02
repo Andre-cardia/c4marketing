@@ -4,6 +4,8 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import ProposalView from './pages/ProposalView';
 import Users from './pages/Users';
+import CreateProposal from './pages/CreateProposal';
+import ContractView from './pages/ContractView';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App: React.FC = () => {
@@ -12,6 +14,7 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/p/:slug" element={<ProposalView />} />
+        <Route path="/p/:slug/contract" element={<ContractView />} />
         <Route
           path="/dashboard"
           element={
@@ -25,6 +28,14 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <Users />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proposals/new"
+          element={
+            <ProtectedRoute>
+              <CreateProposal />
             </ProtectedRoute>
           }
         />

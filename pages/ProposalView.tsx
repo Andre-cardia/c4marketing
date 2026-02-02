@@ -19,6 +19,7 @@ interface Proposal {
     media_limit: number;
     created_at: string;
     contract_duration: number;
+    services?: { id: string; price: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
 }
 
 const ProposalView: React.FC = () => {
@@ -160,6 +161,15 @@ const ProposalView: React.FC = () => {
                         Aceitar Proposta
                     </button>
                 )}
+                <button
+                    onClick={() => window.open(`/p/${slug}/contract`, '_blank')}
+                    className="bg-white text-slate-700 p-4 rounded-full shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2 font-bold border border-slate-200"
+                    title="Ver Minuta do Contrato"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </button>
             </div>
 
             <Header />
@@ -170,23 +180,21 @@ const ProposalView: React.FC = () => {
                     responsibleName={proposal.responsible_name}
                     createdAt={proposal.created_at}
                     contractDuration={proposal.contract_duration}
+                    services={proposal.services}
                 />
 
                 <div id="services">
-                    <Services />
+                    <Services services={proposal.services} />
                 </div>
 
                 <div id="pricing">
                     <Pricing
-                        monthlyFee={proposal.monthly_fee}
-                        setupFee={proposal.setup_fee}
-                        mediaLimit={proposal.media_limit}
-                        contractDuration={proposal.contract_duration}
+                        services={proposal.services}
                     />
                 </div>
 
                 <div id="contract">
-                    <ContractDetails />
+                    <ContractDetails services={proposal.services} />
                 </div>
             </main>
 

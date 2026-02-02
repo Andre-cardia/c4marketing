@@ -1,25 +1,43 @@
+
 import React from 'react';
 
 interface PricingProps {
-  monthlyFee?: number;
-  setupFee?: number;
-  mediaLimit?: number;
-  contractDuration?: number;
+  services?: { id: string; price: number }[] | string[];
 }
 
 const Pricing: React.FC<PricingProps> = ({
-  monthlyFee = 2500,
-  setupFee = 700,
-  mediaLimit = 5000,
-  contractDuration = 6
+  services = []
 }) => {
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  const monthlyFeeFormatted = formatCurrency(monthlyFee);
-  const [currencySymbol, amount] = monthlyFeeFormatted.split(/\s(.+)/);
-  const [mainAmount, centAmount] = amount.split(',');
+  // Helper to normalize services input
+  const normalizedServices = Array.isArray(services)
+    ? services.map(s => typeof s === 'string' ? { id: s, price: 0 } : s)
+    : [];
+
+  // Calculate Recurring Total (Traffic + Hosting)
+  const recurringServices = normalizedServices.filter(s => ['traffic_management', 'hosting'].includes(s.id));
+  const recurringTotal = recurringServices.reduce((acc, curr) => acc + curr.price, 0);
+
+  // Calculate One-Time Total (Website, LP, etc)
+  const oneTimeServices = normalizedServices.filter(s => !['traffic_management', 'hosting'].includes(s.id));
+  const oneTimeTotal = oneTimeServices.reduce((acc, curr) => acc + curr.price, 0);
+
+  const recurringFormatted = formatCurrency(recurringTotal);
+  const [currencySymbol, amount] = recurringFormatted.split(/\s(.+)/);
+  const safeAmount = amount || '0,00';
+  const [mainAmount, centAmount] = safeAmount.split(',');
+
+  const serviceLabels: Record<string, string> = {
+    'traffic_management': 'Gestão de Tráfego',
+    'hosting': 'Hospedagem',
+    'landing_page': 'Landing Page',
+    'website': 'Web Site',
+    'ecommerce': 'E-commerce',
+    'consulting': 'Consultoria'
+  };
 
   return (
     <section className="py-20 bg-white">
@@ -32,7 +50,7 @@ const Pricing: React.FC<PricingProps> = ({
             <div>
               <h2 className="text-3xl lg:text-4xl font-black mb-6">Investimento Mensal em <span className="text-brand-coral">Alta Performance</span></h2>
               <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-                Nossa remuneração é justa e focada em resultados. O valor de agência cobre a gestão de mídia paga para investimentos de até {formatCurrency(mediaLimit)} mensais nas plataformas.
+                Nossa remuneração é justa e focada em resultados. Abaixo você encontra o detalhamento dos valores recorrentes e investimentos pontuais.
               </p>
 
               <div className="space-y-6">
@@ -54,7 +72,7 @@ const Pricing: React.FC<PricingProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold">Ciclo de Renovação</h4>
-                    <p className="text-sm text-slate-400">Contrato inicial de {contractDuration} meses para maturação das estratégias.</p>
+                    <p className="text-sm text-slate-400">Contrato de fidelidade para maturação das estratégias.</p>
                   </div>
                 </div>
               </div>
@@ -66,38 +84,45 @@ const Pricing: React.FC<PricingProps> = ({
               </div>
 
               <div className="mb-8">
-                <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-2">Mensalidade Fixa</p>
+                <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-2">Mensalidade Total</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-5xl font-black font-montserrat">{currencySymbol} {mainAmount}<span className="text-lg font-medium">,{centAmount}</span></span>
                   <span className="text-slate-500 font-medium">/mês</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-2">Valor integral de agência para gestão estratégica.</p>
-              </div>
-
-              <div className="border-t border-slate-100 pt-8 mb-8 space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Gestão de Canais (Google + Meta)</span>
-                  <span className="font-bold text-green-600">Incluso</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Otimização Semanal</span>
-                  <span className="font-bold text-green-600">Incluso</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Relatórios de Métricas</span>
-                  <span className="font-bold text-green-600">Incluso</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Teto de Mídia Gerenciada</span>
-                  <span className="font-bold">{formatCurrency(mediaLimit)}</span>
+                <div className="mt-4 space-y-2">
+                  {recurringServices.length > 0 ? (
+                    recurringServices.map(service => (
+                      <div key={service.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
+                        <span className="text-slate-600 font-medium">{serviceLabels[service.id]}</span>
+                        <span className="font-bold text-slate-900">{formatCurrency(service.price)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400">Nenhum serviço recorrente selecionado.</p>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center">
-                  <span className="font-bold text-slate-700">Landing Page (Setup)</span>
-                  <span className="font-bold text-brand-coral">{formatCurrency(setupFee)}</span>
+              <div className="space-y-4 pt-6 border-t border-slate-200">
+                <div className="p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-slate-700">Investimento Único (Setup & Projetos)</span>
+                    <span className="font-bold text-brand-coral text-lg">{formatCurrency(oneTimeTotal)}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {oneTimeServices.length > 0 ? (
+                      oneTimeServices.map(service => (
+                        <div key={service.id} className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500">{serviceLabels[service.id]}</span>
+                          <span className="font-semibold text-slate-700">{formatCurrency(service.price)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400">Nenhum projeto pontual selecionado.</p>
+                    )}
+                  </div>
                 </div>
+
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pagamento</p>
                   <p className="text-slate-700 font-semibold">Boleto ou PIX</p>

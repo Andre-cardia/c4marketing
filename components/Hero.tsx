@@ -5,17 +5,38 @@ interface HeroProps {
   responsibleName?: string;
   createdAt?: string;
   contractDuration?: number;
+  services?: { id: string; price: number }[] | string[];
 }
 
 const Hero: React.FC<HeroProps> = ({
   companyName = "Amplexo Diesel Service",
   responsibleName = "Marcos Fachinetto",
   createdAt,
-  contractDuration = 6
+  contractDuration = 6,
+  services = []
 }) => {
   const displayDate = createdAt
     ? new Date(createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Normalize services
+  const serviceIds = Array.isArray(services)
+    ? services.map((s: any) => typeof s === 'string' ? s : s.id)
+    : [];
+
+  const hasTraffic = serviceIds.includes('traffic_management');
+  const hasSiteOrLP = serviceIds.includes('website') || serviceIds.includes('landing_page') || serviceIds.includes('ecommerce');
+
+  let introText = "";
+  if (hasTraffic && hasSiteOrLP) {
+    introText = "Esta proposta apresenta a estratégia completa de aceleração de vendas, combinando autoridade digital através de uma nova presença web e anúncios segmentados no Google e Meta.";
+  } else if (hasTraffic) {
+    introText = "Esta proposta apresenta a estratégia de aceleração de vendas e autoridade digital através de anúncios segmentados no Google e Meta, além de uma estrutura otimizada de conversão.";
+  } else if (hasSiteOrLP) {
+    introText = "Esta proposta apresenta o projeto de desenvolvimento da sua nova presença digital, focada em design premium, alta performance e otimização para conversão de visitantes em clientes.";
+  } else {
+    introText = "Esta proposta apresenta soluções estratégicas personalizadas para o crescimento do seu negócio no ambiente digital.";
+  }
 
   return (
     <section className="relative overflow-hidden bg-white py-16 lg:py-24">
@@ -54,7 +75,7 @@ const Hero: React.FC<HeroProps> = ({
           </div>
 
           <p className="text-xl text-slate-600 leading-relaxed max-w-2xl mb-10">
-            Esta proposta apresenta a estratégia de aceleração de vendas e autoridade digital através de anúncios segmentados no <span className="font-bold text-slate-800">Google e Meta</span>, além de uma estrutura otimizada de conversão.
+            {introText}
           </p>
         </div>
       </div>
