@@ -118,7 +118,13 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
               <div className="mt-auto pt-4 border-t border-white/10">
                 <span className="text-xs text-slate-400 block mb-1">Item Adicional</span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold text-brand-coral font-montserrat">Incluso</span>
+                  <span className="text-2xl font-bold text-brand-coral font-montserrat">
+                    {(() => {
+                      const s = Array.isArray(services) ? services.find((i) => (typeof i === 'string' ? i === 'landing_page' : i.id === 'landing_page')) : null;
+                      const price = (s && typeof s !== 'string') ? s.price : 0;
+                      return price > 0 ? price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Incluso';
+                    })()}
+                  </span>
                 </div>
               </div>
             </div>

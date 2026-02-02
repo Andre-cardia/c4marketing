@@ -129,7 +129,7 @@ const ContractView: React.FC = () => {
                     <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">1. Das Partes Contratantes</h2>
                     <div className="bg-slate-50 p-6 rounded-lg text-sm border border-slate-100">
                         <p className="mb-4">
-                            <strong>CONTRATADA:</strong> <span className="uppercase">C4 Marketing (HAC ASSESSORIA E CONSULTORIA LTDA)</span>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 48.005.917/0001-57, com sede em Florianópolis/SC.
+                            <strong>CONTRATADA:</strong> <span className="uppercase">C4 Marketing (HAC ASSESSORIA E CONSULTORIA LTDA)</span>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 24.043.876/0001-83, com sede em Florianópolis/SC.
                         </p>
                         <p>
                             <strong>CONTRATANTE:</strong> <span className="uppercase">{proposal.company_name}</span>, neste ato representada por seu responsável legal <strong>{proposal.responsible_name}</strong>{proposal.cnpj ? `, inscrita no CNPJ/MF sob o nº ${proposal.cnpj}` : ''}.
