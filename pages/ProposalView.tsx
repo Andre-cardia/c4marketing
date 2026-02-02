@@ -106,7 +106,7 @@ const ProposalView: React.FC = () => {
                         cpf: formData.cpf,
                         company_name: formData.companyName,
                         cnpj: formData.cnpj,
-                        // We can add a proposal_id reference later if needed
+                        proposal_id: proposal.id
                     }
                 ]);
 

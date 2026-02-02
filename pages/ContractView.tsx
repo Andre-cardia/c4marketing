@@ -17,6 +17,7 @@ interface Proposal {
     contract_duration: number;
     created_at: string;
     services?: { id: string; price: number }[] | string[];
+    accepted_at?: string;
 }
 
 interface ContractTemplate {
@@ -63,6 +64,27 @@ const ContractView: React.FC = () => {
 
                 if (templatesError) throw templatesError;
                 setTemplates(templatesData || []);
+            }
+
+            // 4. Fetch Acceptance Data (Client Details have priority)
+            const { data: acceptanceData } = await supabase
+                .from('acceptances')
+                .select('*')
+                .eq('proposal_id', proposalData.id)
+                .order('timestamp', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (acceptanceData) {
+                // Override proposal defaults with actual accepted data
+                setProposal(prev => prev ? ({
+                    ...prev,
+                    company_name: acceptanceData.company_name || prev.company_name,
+                    responsible_name: acceptanceData.name || prev.responsible_name,
+                    cnpj: acceptanceData.cnpj || prev.cnpj,
+                    cpf: acceptanceData.cpf || prev.cpf,
+                    accepted_at: acceptanceData.timestamp
+                }) : null);
             }
 
         } catch (error) {
@@ -264,7 +286,11 @@ const ContractView: React.FC = () => {
                         <div className="border-t border-slate-900 w-3/4 mx-auto mb-2"></div>
                         <p className="font-bold text-sm">{proposal.company_name}</p>
                         <p className="text-xs text-slate-500">{proposal.responsible_name}</p>
-                        <p className="text-xs text-slate-400 mt-1">Aceite Digital em {today}</p>
+                        {proposal.accepted_at && (
+                            <p className="text-xs text-slate-400 mt-1">
+                                Aceite Digital em {new Date(proposal.accepted_at).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                        )}
                     </div>
                 </div>
 
