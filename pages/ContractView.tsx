@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import logo from '../assets/logo.png';
 
 interface Proposal {
     id: number;
@@ -209,10 +210,8 @@ const ContractView: React.FC = () => {
             <div id="contract-content" className="max-w-4xl mx-auto bg-white p-12 md:p-16 my-8 shadow-xl print:shadow-none print:my-0 print:p-0 text-slate-900 leading-relaxed text-justify">
 
                 {/* Header */}
+                {/* Header */}
                 <div className="text-center border-b border-slate-200 pb-8 mb-12">
-                    import logo from '../assets/logo.png';
-
-                    // ... (inside component)
                     <img src={logo} alt="C4 Marketing" className="h-12 mx-auto mb-6" />
                     <h1 className="text-2xl font-black uppercase tracking-wide mb-2">Contrato de Prestação de Serviços de Marketing e Tecnologia</h1>
                     <p className="text-slate-500 font-medium text-sm">Instrumento Particular de Contrato</p>
