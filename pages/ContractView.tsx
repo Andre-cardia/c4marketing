@@ -209,7 +209,7 @@ const ContractView: React.FC = () => {
 
                 {/* Header */}
                 <div className="text-center border-b border-slate-200 pb-8 mb-12">
-                    <img src="https://crm.c4marketing.com.br/assets/logo-c4.png" alt="C4 Marketing" className="h-12 mx-auto mb-6" />
+                    <img src="/logo.png" alt="C4 Marketing" className="h-12 mx-auto mb-6" />
                     <h1 className="text-2xl font-black uppercase tracking-wide mb-2">Contrato de Prestação de Serviços de Marketing e Tecnologia</h1>
                     <p className="text-slate-500 font-medium text-sm">Instrumento Particular de Contrato</p>
                 </div>
