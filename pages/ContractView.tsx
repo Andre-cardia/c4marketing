@@ -301,7 +301,7 @@ const ContractView: React.FC = () => {
                             <>
                                 {proposal.monthly_fee > 0 && (
                                     <p className="mb-2 text-sm">
-                                        <strong>a) Honorários Mensais (Recorrente):</strong> {proposal.monthly_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a serem pagos mensalmente via Boleto Bancário ou PIX até o dia 10 de cada mês.
+                                        <strong>a) Honorários Mensais (Recorrente):</strong> {proposal.monthly_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a serem pagos mensalmente via Boleto Bancário ou PIX (chave: pix2@c4marketing.com.br) até o dia 10 de cada mês.
                                     </p>
                                 )}
 
