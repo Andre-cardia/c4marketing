@@ -100,6 +100,26 @@ const ContractView: React.FC = () => {
                 if (acceptanceData) acceptanceInfo = acceptanceData;
             }
 
+            // If we have acceptance info but no proposal data (e.g. restored record), create comprehensive placeholder
+            if (!proposalData && acceptanceInfo) {
+                console.log('Generating placeholder proposal from acceptance data');
+                proposalData = {
+                    id: 0, // Placeholder ID
+                    slug: '',
+                    company_name: acceptanceInfo.company_name,
+                    responsible_name: acceptanceInfo.name,
+                    cnpj: acceptanceInfo.cnpj,
+                    cpf: acceptanceInfo.cpf,
+                    monthly_fee: 0,
+                    setup_fee: 0,
+                    contract_duration: 0,
+                    created_at: acceptanceInfo.timestamp,
+                    accepted_at: acceptanceInfo.timestamp,
+                    services: ["Contrato Restaurado / Legacy"], // Placaholder service
+                    is_legacy: true // Flag to render simplified view
+                };
+            }
+
             if (!proposalData) throw new Error("Contract data not found");
 
             // Apply Acceptance Overrides (Final Client Details)
@@ -117,7 +137,8 @@ const ContractView: React.FC = () => {
             setProposal(proposalData);
 
             // Load templates if not already loaded from snapshot
-            if (loadedTemplates.length === 0 && proposalData.services) {
+            // Skip for legacy/placeholder proposals which don't have real service IDs
+            if (loadedTemplates.length === 0 && proposalData.services && !proposalData.is_legacy) {
                 const serviceIds = Array.isArray(proposalData.services)
                     ? proposalData.services.map((s: any) => typeof s === 'string' ? s : s.id)
                     : [];
@@ -135,6 +156,7 @@ const ContractView: React.FC = () => {
 
         } catch (error) {
             console.error('Error fetching contract data:', error);
+            // Only alert if we really couldn't get ANY data
             alert('Erro ao carregar dados do contrato. Pode ter sido excluído.');
         } finally {
             setLoading(false);
@@ -212,10 +234,20 @@ const ContractView: React.FC = () => {
                 <div className="mb-8">
                     <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">2. Do Objeto do Contrato</h2>
                     <p className="mb-4 text-sm">
-                        2.1. O presente contrato tem por objeto a prestação de serviços especializados descritos detalhadamente abaixo, conforme selecionado na Proposta Comercial nº {proposal.id.toString().padStart(6, '0')}:
+                        2.1. O presente contrato tem por objeto a prestação de serviços especializados descritos detalhadamente abaixo, conforme selecionado na Proposta Comercial{proposal.id > 0 ? ` nº ${proposal.id.toString().padStart(6, '0')}` : ''}:
                     </p>
 
-                    {templates.length > 0 ? (
+                    {(proposal as any).is_legacy ? (
+                        <div className="bg-orange-50 border-l-4 border-orange-400 p-4 text-orange-700">
+                            <p className="font-bold">Certificado de Aceite Digital e Acordo Comercial</p>
+                            <p className="text-sm mt-1">
+                                Este registro comprova o aceite digital e a vigência do acordo comercial entre as partes.
+                                O detalhamento técnico original dos serviços não está disponível nesta visualização recuperada,
+                                mas a validade jurídica do aceite permanece inalterada conforme dados de identificação e timestamp
+                                registrados.
+                            </p>
+                        </div>
+                    ) : templates.length > 0 ? (
                         <div className="space-y-6">
                             {templates.map((template, index) => (
                                 <div key={template.id} className="pl-4 border-l-2 border-slate-200">
