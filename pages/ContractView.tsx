@@ -18,6 +18,7 @@ interface Proposal {
     created_at: string;
     services?: { id: string; price: number }[] | string[];
     accepted_at?: string;
+    is_legacy?: boolean;
 }
 
 interface ContractTemplate {
@@ -209,9 +210,9 @@ const ContractView: React.FC = () => {
 
                 {/* Header */}
                 <div className="text-center border-b border-slate-200 pb-8 mb-12">
-import logo from '../assets/logo.png';
+                    import logo from '../assets/logo.png';
 
-// ... (inside component)
+                    // ... (inside component)
                     <img src={logo} alt="C4 Marketing" className="h-12 mx-auto mb-6" />
                     <h1 className="text-2xl font-black uppercase tracking-wide mb-2">Contrato de Prestação de Serviços de Marketing e Tecnologia</h1>
                     <p className="text-slate-500 font-medium text-sm">Instrumento Particular de Contrato</p>
@@ -240,7 +241,7 @@ import logo from '../assets/logo.png';
                         2.1. O presente contrato tem por objeto a prestação de serviços especializados descritos detalhadamente abaixo, conforme selecionado na Proposta Comercial{proposal.id > 0 ? ` nº ${proposal.id.toString().padStart(6, '0')}` : ''}:
                     </p>
 
-                    {(proposal as any).is_legacy ? (
+                    {(proposal.is_legacy || proposal.id === 0) ? (
                         <div className="bg-orange-50 border-l-4 border-orange-400 p-4 text-orange-700">
                             <p className="font-bold">Certificado de Aceite Digital e Acordo Comercial</p>
                             <p className="text-sm mt-1">
@@ -293,16 +294,24 @@ import logo from '../assets/logo.png';
                     <p className="mb-2 text-sm">4.1. Pelos serviços prestados, a CONTRATANTE pagará à CONTRATADA:</p>
 
                     <div className="bg-slate-50 p-4 rounded border border-slate-100 mb-4">
-                        {proposal.monthly_fee > 0 && (
-                            <p className="mb-2 text-sm">
-                                <strong>a) Honorários Mensais (Recorrente):</strong> {proposal.monthly_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a serem pagos mensalmente via Boleto Bancário ou PIX até o dia 10 de cada mês.
+                        {(proposal.is_legacy || proposal.id === 0) ? (
+                            <p className="text-sm italic text-slate-500">
+                                * Valores e condições de pagamento estão arquivados no registro financeiro original e não constam nesta visualização recuperada.
                             </p>
-                        )}
+                        ) : (
+                            <>
+                                {proposal.monthly_fee > 0 && (
+                                    <p className="mb-2 text-sm">
+                                        <strong>a) Honorários Mensais (Recorrente):</strong> {proposal.monthly_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a serem pagos mensalmente via Boleto Bancário ou PIX até o dia 10 de cada mês.
+                                    </p>
+                                )}
 
-                        {proposal.setup_fee > 0 && (
-                            <p className="mb-0 text-sm">
-                                <strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.
-                            </p>
+                                {proposal.setup_fee > 0 && (
+                                    <p className="mb-0 text-sm">
+                                        <strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.
+                                    </p>
+                                )}
+                            </>
                         )}
                     </div>
                     <p className="text-sm mb-2">4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.</p>
