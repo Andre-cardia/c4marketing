@@ -28,7 +28,7 @@ interface ContractTemplate {
 }
 
 const ContractView: React.FC = () => {
-    const { slug } = useParams<{ slug: string }>();
+    const { slug, id } = useParams<{ slug?: string; id?: string }>();
     const navigate = useNavigate();
     const [proposal, setProposal] = useState<Proposal | null>(null);
     const [templates, setTemplates] = useState<ContractTemplate[]>([]);
@@ -40,56 +40,102 @@ const ContractView: React.FC = () => {
 
     const fetchContractData = async () => {
         try {
-            // 1. Fetch Proposal
-            const { data: proposalData, error: proposalError } = await supabase
-                .from('proposals')
-                .select('*')
-                .eq('slug', slug)
-                .single();
+            let proposalData = null;
+            let loadedTemplates: ContractTemplate[] = [];
+            let acceptanceInfo = null;
 
-            if (proposalError) throw proposalError;
+            // CASE 1: Viewing via Acceptance ID (Snapshot or Linked Proposal)
+            if (id) {
+                const { data: acceptance, error: accError } = await supabase
+                    .from('acceptances')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (accError) throw accError;
+                acceptanceInfo = acceptance;
+
+                if (acceptance.contract_snapshot) {
+                    // Use Snapshot Data (Independent)
+                    console.log('Using Contract Snapshot');
+                    proposalData = acceptance.contract_snapshot.proposal;
+                    loadedTemplates = acceptance.contract_snapshot.templates || [];
+
+                    // Override with accurate acceptance data just in case
+                    if (proposalData) {
+                        proposalData.accepted_at = acceptance.timestamp;
+                    }
+
+                } else if (acceptance.proposal_id) {
+                    // Fallback to Live Proposal (for old records)
+                    const { data: liveProposal, error: propError } = await supabase
+                        .from('proposals')
+                        .select('*')
+                        .eq('id', acceptance.proposal_id)
+                        .single();
+
+                    if (!propError) proposalData = liveProposal;
+                }
+            }
+            // CASE 2: Viewing via Proposal Slug (Live Proposal)
+            else if (slug) {
+                const { data: liveProposal, error: propError } = await supabase
+                    .from('proposals')
+                    .select('*')
+                    .eq('slug', slug)
+                    .single();
+
+                if (propError) throw propError;
+                proposalData = liveProposal;
+
+                // Check if it has been accepted to show accurate data
+                const { data: acceptanceData } = await supabase
+                    .from('acceptances')
+                    .select('*')
+                    .eq('proposal_id', liveProposal.id)
+                    .order('timestamp', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (acceptanceData) acceptanceInfo = acceptanceData;
+            }
+
+            if (!proposalData) throw new Error("Contract data not found");
+
+            // Apply Acceptance Overrides (Final Client Details)
+            if (acceptanceInfo) {
+                proposalData = {
+                    ...proposalData,
+                    company_name: acceptanceInfo.company_name || proposalData.company_name,
+                    responsible_name: acceptanceInfo.name || proposalData.responsible_name,
+                    cnpj: acceptanceInfo.cnpj || proposalData.cnpj,
+                    cpf: acceptanceInfo.cpf || proposalData.cpf,
+                    accepted_at: acceptanceInfo.timestamp
+                };
+            }
+
             setProposal(proposalData);
 
-            // 2. Identify Services
-            const serviceIds = Array.isArray(proposalData.services)
-                ? proposalData.services.map((s: any) => typeof s === 'string' ? s : s.id)
-                : [];
+            // Load templates if not already loaded from snapshot
+            if (loadedTemplates.length === 0 && proposalData.services) {
+                const serviceIds = Array.isArray(proposalData.services)
+                    ? proposalData.services.map((s: any) => typeof s === 'string' ? s : s.id)
+                    : [];
 
-            if (serviceIds.length > 0) {
-                // 3. Fetch Matching Templates
-                const { data: templatesData, error: templatesError } = await supabase
-                    .from('contract_templates')
-                    .select('*')
-                    .in('service_id', serviceIds);
+                if (serviceIds.length > 0) {
+                    const { data: templatesData } = await supabase
+                        .from('contract_templates')
+                        .select('*')
+                        .in('service_id', serviceIds);
 
-                if (templatesError) throw templatesError;
-                setTemplates(templatesData || []);
+                    if (templatesData) loadedTemplates = templatesData;
+                }
             }
-
-            // 4. Fetch Acceptance Data (Client Details have priority)
-            const { data: acceptanceData } = await supabase
-                .from('acceptances')
-                .select('*')
-                .eq('proposal_id', proposalData.id)
-                .order('timestamp', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (acceptanceData) {
-                // Override proposal defaults with actual accepted data
-                setProposal(prev => prev ? ({
-                    ...prev,
-                    company_name: acceptanceData.company_name || prev.company_name,
-                    responsible_name: acceptanceData.name || prev.responsible_name,
-                    cnpj: acceptanceData.cnpj || prev.cnpj,
-                    cpf: acceptanceData.cpf || prev.cpf,
-                    accepted_at: acceptanceData.timestamp
-                }) : null);
-            }
+            setTemplates(loadedTemplates);
 
         } catch (error) {
             console.error('Error fetching contract data:', error);
-            alert('Erro ao carregar dados do contrato.');
+            alert('Erro ao carregar dados do contrato. Pode ter sido excluído.');
         } finally {
             setLoading(false);
         }
@@ -123,8 +169,8 @@ const ContractView: React.FC = () => {
             <div className="print:hidden">
                 <Header />
                 <div className="max-w-4xl mx-auto px-8 py-6 flex justify-between items-center">
-                    <button onClick={() => navigate(`/p/${slug}`)} className="flex items-center gap-2 text-slate-600 hover:text-brand-coral">
-                        <ArrowLeft className="w-5 h-5" /> Voltar para Proposta
+                    <button onClick={() => navigate(slug ? `/p/${slug}` : '/')} className="flex items-center gap-2 text-slate-600 hover:text-brand-coral">
+                        <ArrowLeft className="w-5 h-5" /> {slug ? 'Voltar para Proposta' : 'Voltar'}
                     </button>
                     <div className="flex gap-4">
                         <button onClick={handlePrint} className="flex items-center gap-2 bg-white text-slate-700 px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 font-bold shadow-sm">

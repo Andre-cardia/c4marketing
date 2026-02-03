@@ -293,6 +293,7 @@ const Dashboard: React.FC = () => {
                                         <th className="p-5 font-bold">Cliente</th>
                                         <th className="p-5 font-bold">Empresa</th>
                                         <th className="p-5 font-bold">Documentos</th>
+                                        <th className="p-5 font-bold">Contrato</th>
                                         <th className="p-5 font-bold">Status</th>
                                         <th className="p-5 font-bold text-right">Ações</th>
                                     </tr>
@@ -332,6 +333,18 @@ const Dashboard: React.FC = () => {
                                                 <div className="pl-6 text-xs text-slate-400">CPF: {acc.cpf}</div>
                                             </td>
                                             <td className="p-5">
+                                                <a
+                                                    href={`/contracts/${acc.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 text-xs font-bold text-brand-coral hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-brand-coral/20 hover:border-brand-coral"
+                                                    title="Visualizar Contrato"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    Visualizar
+                                                </a>
+                                            </td>
+                                            <td className="p-5">
                                                 <select
                                                     value={acc.status || 'Inativo'}
                                                     onChange={(e) => handleStatusChange(acc.id, e.target.value)}
@@ -344,7 +357,7 @@ const Dashboard: React.FC = () => {
                                                     <option value="Finalizado">Finalizado</option>
                                                 </select>
                                             </td>
-                                            <td className="p-5 text-right">
+                                            <td className="p-5 text-right flex items-center justify-end gap-2">
                                                 <button
                                                     onClick={() => handleDeleteAcceptance(acc.id)}
                                                     className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"

@@ -97,6 +97,28 @@ const ProposalView: React.FC = () => {
 
         setIsSubmitting(true);
         try {
+
+            // 1. Fetch Contract Templates for Snapshot
+            const serviceIds = Array.isArray(proposal.services)
+                ? proposal.services.map((s: any) => typeof s === 'string' ? s : s.id)
+                : [];
+
+            let templatesSnapshot = [];
+            if (serviceIds.length > 0) {
+                const { data: templatesData } = await supabase
+                    .from('contract_templates')
+                    .select('*')
+                    .in('service_id', serviceIds);
+                templatesSnapshot = templatesData || [];
+            }
+
+            // 2. Create Contract Snapshot
+            const contractSnapshot = {
+                proposal: proposal,
+                templates: templatesSnapshot,
+                generated_at: new Date().toISOString()
+            };
+
             const { error } = await supabase
                 .from('acceptances')
                 .insert([
@@ -106,7 +128,8 @@ const ProposalView: React.FC = () => {
                         cpf: formData.cpf,
                         company_name: formData.companyName,
                         cnpj: formData.cnpj,
-                        proposal_id: proposal.id
+                        proposal_id: proposal.id,
+                        contract_snapshot: contractSnapshot
                     }
                 ]);
 
