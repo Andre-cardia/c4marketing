@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { Users as UsersIcon, Plus, Mail, Phone, Shield, Trash2, Edit, Bell, X } from 'lucide-react';
@@ -46,6 +47,7 @@ const Users: React.FC = () => {
         name: '',
         email: '',
         phone: '',
+        password: '',
         role: 'leitor' as 'leitor' | 'comercial' | 'gestor'
     });
     const [creating, setCreating] = useState(false);
@@ -84,7 +86,7 @@ const Users: React.FC = () => {
         setCreating(true);
 
         try {
-            // Check if user already exists
+            // Check if user already exists in profile table
             const { data: existing } = await supabase.from('app_users').select('id').eq('email', newUser.email).single();
             if (existing) {
                 alert('Este e-mail já está cadastrado.');
@@ -92,22 +94,54 @@ const Users: React.FC = () => {
                 return;
             }
 
-            const { error } = await supabase.from('app_users').insert([{
-                name: newUser.name,
+            // Create a temporary client to sign up the new user without logging out the admin
+            const tempSupabase = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY,
+                {
+                    auth: {
+                        persistSession: false,
+                        autoRefreshToken: false,
+                        detectSessionInUrl: false
+                    }
+                }
+            );
+
+            // Sign up the new user in Supabase Auth
+            const { data: authData, error: authError } = await tempSupabase.auth.signUp({
                 email: newUser.email,
-                phone: newUser.phone,
-                role: newUser.role
-            }]);
+                password: newUser.password,
+                options: {
+                    data: {
+                        full_name: newUser.name,
+                    }
+                }
+            });
 
-            if (error) throw error;
+            if (authError) throw authError;
 
-            setShowModal(false);
-            setNewUser({ name: '', email: '', phone: '', role: 'leitor' });
-            fetchUsers();
-            alert('Usuário cadastrado com sucesso!');
-        } catch (error) {
+            // Create the user profile in app_users using the admin's client
+            if (authData.user) {
+                const { error: dbError } = await supabase.from('app_users').insert([{
+                    // Use the auth user id if possible, though our RBAC relies on email matching
+                    // If app_users.id is a uuid primary key, we can let it auto-gen or set it
+                    // Ideally we sync them, but safe to just insert for now based on current schema usage
+                    name: newUser.name,
+                    email: newUser.email,
+                    phone: newUser.phone,
+                    role: newUser.role
+                }]);
+
+                if (dbError) throw dbError;
+
+                setShowModal(false);
+                setNewUser({ name: '', email: '', phone: '', password: '', role: 'leitor' });
+                fetchUsers();
+                alert('Usuário cadastrado com sucesso! As credenciais de acesso foram criadas.');
+            }
+        } catch (error: any) {
             console.error('Error creating user:', error);
-            alert('Erro ao criar usuário.');
+            alert(error.message || 'Erro ao criar usuário.');
         } finally {
             setCreating(false);
         }
@@ -337,6 +371,21 @@ const Users: React.FC = () => {
                                     />
                                 </div>
                             </div>
+
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Senha de Acesso</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={newUser.password}
+                                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
+                                    placeholder="••••••••"
+                                    minLength={6}
+                                />
+                                <p className="text-xs text-slate-400 mt-1">Mínimo de 6 caracteres.</p>
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Nível de Acesso</label>
                                 <select
