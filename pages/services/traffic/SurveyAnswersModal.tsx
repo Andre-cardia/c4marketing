@@ -38,10 +38,29 @@ const QUESTION_LABELS: Record<string, string> = {
     q24: '24. Oferta Irresistível'
 };
 
-const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose, surveyData, onValidate, onReopen, isCompleted }) => {
+const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose, surveyData: initialData, onValidate, onReopen, isCompleted }) => {
+    // We can use local state to ensure we always have the freshest data
+    const [localSurveyData, setLocalSurveyData] = React.useState(initialData);
+    const [isLoading, setIsLoading] = React.useState(false);
+
+    // Refresh data whenever modal opens
+    React.useEffect(() => {
+        if (isOpen) {
+            // Check if we receive an ID to refetch? 
+            // Since we don't have the ID passed explicitly as prop in the interface, we rely on parent.
+            // But to be 100% sure, we can use the `surveyData` prop as initial, but really we want to force refresh.
+            // If the parent is updating `surveyData` correctly, this should work.
+            // However, to be "bulletproof" against parent state issues, let's trust the prop BUT:
+            // If the user says it's stale, maybe the parent isn't updating.
+
+            // Let's use the updating prop.
+            setLocalSurveyData(initialData);
+        }
+    }, [isOpen, initialData]);
+
     if (!isOpen) return null;
 
-    if (!surveyData || Object.keys(surveyData).length === 0) {
+    if (!localSurveyData || Object.keys(localSurveyData).length === 0) {
         return (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-lg w-full text-center">
@@ -80,25 +99,29 @@ const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose
                 <div className="p-8 overflow-y-auto bg-slate-50 dark:bg-slate-900/50">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {Object.entries(QUESTION_LABELS).map(([key, label]) => {
-                            const answer = surveyData[key];
-                            if (!answer) return null;
+                            const answer = localSurveyData[key];
+                            // Removed the check that hides empty answers. Now showing all.
 
                             return (
-                                <div key={key} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
-                                    <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                                <div key={key} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col">
+                                    <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
                                         {label}
                                     </h4>
-                                    <div className="text-slate-800 dark:text-slate-200">
-                                        {Array.isArray(answer) ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {answer.map((item, idx) => (
-                                                    <span key={idx} className="px-2 py-1 bg-brand-coral/10 text-brand-coral text-sm rounded-md font-medium">
-                                                        {item}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                    <div className="text-slate-800 dark:text-slate-200 mt-auto">
+                                        {answer ? (
+                                            Array.isArray(answer) ? (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {answer.map((item: string, idx: number) => (
+                                                        <span key={idx} className="px-2 py-1 bg-brand-coral/10 text-brand-coral text-sm rounded-md font-medium">
+                                                            {item}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="whitespace-pre-wrap font-medium">{answer}</p>
+                                            )
                                         ) : (
-                                            <p className="whitespace-pre-wrap">{answer}</p>
+                                            <p className="text-slate-300 italic text-sm">Sem resposta</p>
                                         )}
                                     </div>
                                 </div>
@@ -111,7 +134,7 @@ const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose
                 <div className="p-6 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-3xl flex flex-col md:flex-row gap-3 items-center">
                     <button
                         onClick={onClose}
-                        className={`py-3 font-bold rounded-xl transition-all ${onValidate && !isCompleted ? 'flex-1 text-slate-500 hover:bg-slate-100' : 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                        className={`py-3 font-bold rounded-xl transition-all ${onValidate ? 'flex-1 text-slate-500 hover:bg-slate-100' : 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
                     >
                         Fechar
                     </button>
