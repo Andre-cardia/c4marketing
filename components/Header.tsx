@@ -3,16 +3,13 @@ import { LogOut, Moon, Sun, Users as UsersIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useUserRole } from '../lib/UserRoleContext';
+import { useTheme } from '../lib/ThemeContext';
 
-interface HeaderProps {
-  darkMode: boolean;
-  setDarkMode: (value: boolean) => void;
-}
-
-const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
+const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { userRole, loading } = useUserRole();
+  const { darkMode, setDarkMode } = useTheme();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

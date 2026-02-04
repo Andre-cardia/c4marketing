@@ -45,12 +45,6 @@ const Dashboard: React.FC = () => {
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
-    const [darkMode, setDarkMode] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('darkMode') === 'true';
-        }
-        return false;
-    });
 
     const clientStatusCounts = {
         onboarding: acceptances.filter(a => !a.status || a.status === 'Onboarding').length,
@@ -62,16 +56,6 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, []);
-
-    useEffect(() => {
-        if (darkMode) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('darkMode', 'true');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('darkMode', 'false');
-        }
-    }, [darkMode]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -130,7 +114,7 @@ const Dashboard: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
             {/* Header */}
-            <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+            <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
