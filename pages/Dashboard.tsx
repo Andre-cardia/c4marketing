@@ -124,36 +124,34 @@ const Dashboard: React.FC = () => {
                                 const endDate = new Date();
 
                                 let current = new Date(startDate);
-                                while (current <= endDate) {
+                                while (current <= endDate || (current.getMonth() === endDate.getMonth() && current.getFullYear() === endDate.getFullYear())) {
                                     months.push(new Date(current));
                                     current.setMonth(current.getMonth() + 1);
                                 }
 
+                                const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
                                 return months.map((date, index) => {
                                     const monthKey = date.toLocaleString('default', { month: 'short' });
-                                    const yearStats = date.getFullYear();
-                                    const monthStats = date.getMonth();
+                                    const mKey = getMonthKey(date);
 
-                                    const createdCount = proposals.filter(p => {
-                                        const pDate = new Date(p.created_at);
-                                        return pDate.getMonth() === monthStats && pDate.getFullYear() === yearStats;
-                                    }).length;
+                                    const createdCount = proposals.filter(p => getMonthKey(new Date(p.created_at)) === mKey).length;
+                                    const acceptedCount = acceptances.filter(a => getMonthKey(new Date(a.timestamp)) === mKey).length;
 
-                                    const acceptedCount = acceptances.filter(a => {
-                                        const aDate = new Date(a.timestamp);
-                                        return aDate.getMonth() === monthStats && aDate.getFullYear() === yearStats;
-                                    }).length;
+                                    // Calculate global max (simple approximation for scope)
+                                    // ideally would be calculated outside mapping
+                                    const maxVal = 10; // Fallback if dynamic calc is too complex for inline, but let's try dynamic
 
-                                    // Max value for scaling (min 10 to avoid huge bars for small numbers)
-                                    const maxVal = Math.max(10, ...months.map(m => {
-                                        const mStats = m.getMonth();
-                                        const yStats = m.getFullYear();
-                                        const c = proposals.filter(p => new Date(p.created_at).getMonth() === mStats && new Date(p.created_at).getFullYear() === yStats).length;
-                                        return c;
-                                    }));
+                                    const allCounts = months.map(m => {
+                                        const k = getMonthKey(m);
+                                        const p = proposals.filter(prop => getMonthKey(new Date(prop.created_at)) === k).length;
+                                        const a = acceptances.filter(acc => getMonthKey(new Date(acc.timestamp)) === k).length;
+                                        return Math.max(p, a);
+                                    });
+                                    const dynamicMax = Math.max(10, ...allCounts);
 
-                                    const hCreated = Math.max(4, (createdCount / maxVal) * 100);
-                                    const hAccepted = Math.max(4, (acceptedCount / maxVal) * 100);
+                                    const hCreated = (createdCount / dynamicMax) * 100;
+                                    const hAccepted = (acceptedCount / dynamicMax) * 100;
 
                                     return (
                                         <div key={index} className="flex flex-col items-center flex-1 group">
@@ -166,12 +164,12 @@ const Dashboard: React.FC = () => {
                                                 {/* Bar Created */}
                                                 <div
                                                     className="w-3 sm:w-6 bg-slate-300 dark:bg-slate-700 rounded-t-sm transition-all duration-500"
-                                                    style={{ height: `${hCreated}%` }}
+                                                    style={{ height: `${Math.max(4, hCreated)}%`, opacity: hCreated > 0 ? 1 : 0.3 }}
                                                 ></div>
                                                 {/* Bar Accepted */}
                                                 <div
                                                     className="w-3 sm:w-6 bg-brand-coral rounded-t-sm transition-all duration-500 opacity-90"
-                                                    style={{ height: `${hAccepted}%` }}
+                                                    style={{ height: `${Math.max(4, hAccepted)}%`, opacity: hAccepted > 0 ? 1 : 0.3 }}
                                                 ></div>
                                             </div>
                                             <span className="mt-3 text-xs font-bold text-slate-400 uppercase">{monthKey}</span>
