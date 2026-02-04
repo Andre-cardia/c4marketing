@@ -46,7 +46,20 @@ const Dashboard: React.FC = () => {
     };
 
     useEffect(() => {
-        fetchData();
+        const checkAuthAndFetch = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('AUTH SESSION:', session);
+            console.log('User:', session?.user?.email);
+
+            if (session) {
+                await fetchData();
+            } else {
+                console.error('No active session - user not authenticated!');
+                setLoading(false);
+            }
+        };
+
+        checkAuthAndFetch();
     }, []);
 
     useEffect(() => {
