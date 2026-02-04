@@ -38,7 +38,7 @@ const QUESTION_LABELS: Record<string, string> = {
     q24: '24. Oferta Irresistível'
 };
 
-const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose, surveyData }) => {
+const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose, surveyData, onValidate, isCompleted }) => {
     if (!isOpen) return null;
 
     if (!surveyData || Object.keys(surveyData).length === 0) {
