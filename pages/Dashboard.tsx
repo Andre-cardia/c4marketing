@@ -38,7 +38,7 @@ interface Notice {
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { userRole } = useUserRole();
+    const { userRole, loading: roleLoading } = useUserRole();
 
     const [totalUsers, setTotalUsers] = useState<number>(0);
     const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
@@ -114,6 +114,18 @@ const Dashboard: React.FC = () => {
         await supabase.auth.signOut();
         navigate('/');
     };
+
+    // Show loading while role is being fetched
+    if (roleLoading) {
+        return (
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-coral mx-auto mb-4"></div>
+                    <p className="text-slate-600 dark:text-slate-400">Carregando...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
