@@ -141,6 +141,15 @@ const TrafficSurvey: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
+                {/* Intro Disclaimer */}
+                {currentSection === 0 && (
+                    <div className="mb-8 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
+                        <p className="text-blue-800 text-sm">
+                            <strong>Importante:</strong> As respostas desta pesquisa são referentes ao <strong>seu Negócio (Cliente)</strong> como um todo.
+                            Essas informações servirão de base para todos os serviços contratados (Tráfego, Social, Web, etc), garantindo uma estratégia unificada.
+                        </p>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <img src="/logo.png" alt="Logo" className="h-10 mx-auto mb-6" /> {/* Placeholder Logo */}

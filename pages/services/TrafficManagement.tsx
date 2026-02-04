@@ -424,6 +424,8 @@ const TrafficManagement: React.FC = () => {
                 isOpen={showSurveyModal}
                 onClose={() => setShowSurveyModal(false)}
                 surveyData={trafficProject?.survey_data || {}}
+                isCompleted={trafficProject?.survey_status === 'completed'}
+                onValidate={() => handleUpdateStatus('survey_status', 'completed')}
             />
         </div>
     );
