@@ -8,6 +8,12 @@ import CreateProposal from './pages/CreateProposal';
 import Proposals from './pages/Proposals';
 import Projects from './pages/Projects';
 import ContractView from './pages/ContractView';
+import TrafficManagement from './pages/services/TrafficManagement';
+import Hosting from './pages/services/Hosting';
+import LandingPage from './pages/services/LandingPage';
+import Website from './pages/services/Website';
+import Ecommerce from './pages/services/Ecommerce';
+import Consulting from './pages/services/Consulting';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
 
@@ -57,6 +63,54 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <Projects />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/traffic"
+            element={
+              <ProtectedRoute>
+                <TrafficManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/hosting"
+            element={
+              <ProtectedRoute>
+                <Hosting />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/lp"
+            element={
+              <ProtectedRoute>
+                <LandingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/website"
+            element={
+              <ProtectedRoute>
+                <Website />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/ecommerce"
+            element={
+              <ProtectedRoute>
+                <Ecommerce />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects/:id/consulting"
+            element={
+              <ProtectedRoute>
+                <Consulting />
               </ProtectedRoute>
             }
           />
