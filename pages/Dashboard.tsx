@@ -178,15 +178,11 @@ const Dashboard: React.FC = () => {
                                         return aKey === mKey;
                                     }).length;
 
-                                    // DEBUG: Log for first month only
-                                    if (index === 0) {
-                                        console.log('=== CHART DEBUG ===');
-                                        console.log('Month:', monthKey, 'Key:', mKey);
-                                        console.log('Created Count:', createdCount);
-                                        console.log('Accepted Count:', acceptedCount);
-                                        console.log('Proposals:', proposals.map(p => ({ date: p.created_at, key: getMonthKey(p.created_at) })));
-                                        console.log('Acceptances:', acceptances.map(a => ({ date: a.timestamp, key: getMonthKey(a.timestamp) })));
-                                    }
+                                    // DEBUG: Log all months
+                                    console.log('=== CHART DEBUG ===');
+                                    console.log('Month:', monthKey, 'Key:', mKey);
+                                    console.log('Created Count:', createdCount);
+                                    console.log('Accepted Count:', acceptedCount);
 
                                     // Calculate max across all months
                                     const allCounts = months.map(m => {
@@ -197,13 +193,15 @@ const Dashboard: React.FC = () => {
                                     });
                                     const dynamicMax = Math.max(10, ...allCounts);
 
-                                    const hCreated = (createdCount / dynamicMax) * 100;
-                                    const hAccepted = (acceptedCount / dynamicMax) * 100;
+                                    // Convert to pixels (h-48 = 192px)
+                                    const maxHeight = 192;
+                                    const hCreatedPx = (createdCount / dynamicMax) * maxHeight;
+                                    const hAcceptedPx = (acceptedCount / dynamicMax) * maxHeight;
 
-                                    if (index === 0) {
+                                    if (index === 0 || index === 1) {
                                         console.log('Dynamic Max:', dynamicMax);
-                                        console.log('Height Created:', hCreated, '%');
-                                        console.log('Height Accepted:', hAccepted, '%');
+                                        console.log('Height Created:', hCreatedPx, 'px');
+                                        console.log('Height Accepted:', hAcceptedPx, 'px');
                                     }
 
                                     return (
