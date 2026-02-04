@@ -32,7 +32,7 @@ const TrafficManagement: React.FC = () => {
     const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
 
-    const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
+
 
     // Shared Fetch Function
     const loadProjectData = async () => {
