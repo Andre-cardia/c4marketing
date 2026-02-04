@@ -30,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
             onClick={() => navigate('/dashboard')}
             className={`text-sm font-medium transition-colors ${location.pathname === '/dashboard' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
           >
-            Propostas
+            Dashboard
           </button>
           {/* Placeholder for role check - for now visible to all or we'll control logic later */}
           <button

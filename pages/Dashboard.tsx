@@ -120,10 +120,13 @@ const Dashboard: React.FC = () => {
                         <div className="flex items-end justify-between h-48 gap-2 sm:gap-4 mt-auto w-full px-2">
                             {(() => {
                                 const months = [];
-                                for (let i = 5; i >= 0; i--) {
-                                    const d = new Date();
-                                    d.setMonth(d.getMonth() - i);
-                                    months.push(d);
+                                const startDate = new Date(2026, 0, 1); // Jan 1, 2026
+                                const endDate = new Date();
+
+                                let current = new Date(startDate);
+                                while (current <= endDate) {
+                                    months.push(new Date(current));
+                                    current.setMonth(current.getMonth() + 1);
                                 }
 
                                 return months.map((date, index) => {
