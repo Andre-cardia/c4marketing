@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 
-type UserRole = 'leitor' | 'comercial' | 'gestor' | null;
+type UserRole = 'leitor' | 'comercial' | 'gestor' | 'operacional' | null;
 
 interface UserRoleContextType {
     userRole: UserRole;
