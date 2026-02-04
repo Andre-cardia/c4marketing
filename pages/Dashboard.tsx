@@ -65,16 +65,6 @@ const Dashboard: React.FC = () => {
         setLoading(false);
     };
 
-    useEffect(() => {
-        if (!loading) {
-            console.log('DEBUG: Proposals:', proposals);
-            console.log('DEBUG: Acceptances:', acceptances);
-            if (proposals.length > 0) {
-                console.log('DEBUG: Sample Proposal Date:', proposals[0].created_at, 'Parsed:', new Date(proposals[0].created_at).toISOString());
-            }
-        }
-    }, [loading, proposals, acceptances]);
-
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         if (data) setAcceptances(data);
@@ -130,7 +120,7 @@ const Dashboard: React.FC = () => {
                         <div className="flex items-end justify-between h-48 gap-2 sm:gap-4 mt-auto w-full px-2">
                             {(() => {
                                 const months = [];
-                                const startDate = new Date(2026, 0, 1); // Jan 1, 2026
+                                const startDate = new Date(2026, 0, 1);
                                 const endDate = new Date();
 
                                 let current = new Date(startDate);
@@ -139,30 +129,35 @@ const Dashboard: React.FC = () => {
                                     current.setMonth(current.getMonth() + 1);
                                 }
 
-                                const getMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                                // Use UTC to avoid timezone issues
+                                const getMonthKey = (dateStr: string) => {
+                                    const d = new Date(dateStr);
+                                    // Extract year and month from the ISO string to avoid timezone shifts
+                                    const isoStr = d.toISOString(); // e.g., "2026-02-03T18:50:42.906Z"
+                                    return isoStr.substring(0, 7); // Returns "2026-02"
+                                };
+
+                                const getLocalMonthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
                                 return months.map((date, index) => {
                                     const monthKey = date.toLocaleString('default', { month: 'short' });
-                                    const mKey = getMonthKey(date);
+                                    const mKey = getLocalMonthKey(date);
 
                                     const createdCount = proposals.filter(p => {
-                                        const pKey = getMonthKey(new Date(p.created_at));
-                                        if (index === 0) console.log(`DEBUG FILTER: PropDate: ${p.created_at} -> Key: ${pKey} vs Target: ${mKey}`);
+                                        const pKey = getMonthKey(p.created_at);
                                         return pKey === mKey;
                                     }).length;
 
-                                    const acceptedCount = acceptances.filter(a => getMonthKey(new Date(a.timestamp)) === mKey).length;
+                                    const acceptedCount = acceptances.filter(a => {
+                                        const aKey = getMonthKey(a.timestamp);
+                                        return aKey === mKey;
+                                    }).length;
 
-                                    if (index === 0) console.log(`DEBUG CHART: Month ${monthKey} (${mKey}) -> Created: ${createdCount}, Accepted: ${acceptedCount}`);
-
-                                    // Calculate global max (simple approximation for scope)
-                                    // ideally would be calculated outside mapping
-                                    const maxVal = 10; // Fallback if dynamic calc is too complex for inline, but let's try dynamic
-
+                                    // Calculate max across all months
                                     const allCounts = months.map(m => {
-                                        const k = getMonthKey(m);
-                                        const p = proposals.filter(prop => getMonthKey(new Date(prop.created_at)) === k).length;
-                                        const a = acceptances.filter(acc => getMonthKey(new Date(acc.timestamp)) === k).length;
+                                        const k = getLocalMonthKey(m);
+                                        const p = proposals.filter(prop => getMonthKey(prop.created_at) === k).length;
+                                        const a = acceptances.filter(acc => getMonthKey(acc.timestamp) === k).length;
                                         return Math.max(p, a);
                                     });
                                     const dynamicMax = Math.max(10, ...allCounts);
