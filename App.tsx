@@ -14,6 +14,8 @@ import LandingPage from './pages/services/LandingPage';
 import Website from './pages/services/Website';
 import Ecommerce from './pages/services/Ecommerce';
 import Consulting from './pages/services/Consulting';
+import StrategyMeeting from './pages/services/traffic/StrategyMeeting';
+import CampaignStage from './pages/services/traffic/CampaignStage';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
 
