@@ -96,6 +96,19 @@ const TrafficManagement: React.FC = () => {
         }
     };
 
+    const handleDeleteCampaign = async (campaignId: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+
+        const { error } = await supabase
+            .from('traffic_campaigns')
+            .delete()
+            .eq('id', campaignId);
+
+        if (!error) {
+            setCampaigns(campaigns.filter(c => c.id !== campaignId));
+        }
+    };
+
     const handleCreateCampaign = async () => {
         if (!trafficProject) return;
 
