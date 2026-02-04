@@ -80,83 +80,6 @@ const Dashboard: React.FC = () => {
         if (count !== null) setTotalUsers(count);
     };
 
-    const handleDeleteAcceptance = async (id: number) => {
-        if (!window.confirm('Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.')) {
-            return;
-        }
-
-        try {
-            const { error } = await supabase
-                .from('acceptances')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-
-            setAcceptances(prev => prev.filter(acc => acc.id !== id));
-            alert('Registro excluído com sucesso.');
-        } catch (error) {
-            console.error('Error deleting acceptance:', error);
-            alert('Erro ao excluir. Verifique se você tem permissão de administrador.');
-        }
-    };
-
-    const handleDeleteProposal = async (id: number) => {
-        if (!window.confirm('Tem certeza que deseja excluir esta proposta? Esta ação não pode ser desfeita.')) {
-            return;
-        }
-
-        try {
-            const { error } = await supabase
-                .from('proposals')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-
-            setProposals(prev => prev.filter(prop => prop.id !== id));
-            alert('Proposta excluída com sucesso.');
-        } catch (error) {
-            console.error('Error deleting proposal:', error);
-            alert('Erro ao excluir proposta.');
-        }
-    };
-
-    const handleStatusChange = async (id: number, newStatus: string) => {
-        setAcceptances(prev => prev.map(acc =>
-            acc.id === id ? { ...acc, status: newStatus } : acc
-        ));
-
-        try {
-            const { error } = await supabase
-                .from('acceptances')
-                .update({ status: newStatus })
-                .eq('id', id);
-
-            if (error) throw error;
-        } catch (error) {
-            console.error('Error updating status:', error);
-            alert('Erro ao atualizar status.');
-            fetchAcceptances();
-        }
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'Ativo': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
-            case 'Suspenso': return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
-            case 'Cancelado': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-            case 'Finalizado': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
-            default: return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
-        }
-    };
-
-    const copyLink = (slug: string) => {
-        const url = `${window.location.origin}/p/${slug}`;
-        navigator.clipboard.writeText(url);
-        alert('Link copiado para a área de transferência!');
-    };
-
     const handleLogout = async () => {
         await supabase.auth.signOut();
         navigate('/');
@@ -171,206 +94,171 @@ const Dashboard: React.FC = () => {
 
                 {/* Main Navigation & KPIs */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-                    {/* KPI Box: Performance */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-brand-coral" />
-                            Desempenho Geral
-                        </h3>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
-                                <span className="text-sm text-slate-500 dark:text-slate-400">Propostas Criadas</span>
-                                <span className="text-xl font-black text-slate-800 dark:text-white">{proposals.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                                <span className="text-sm text-green-600 dark:text-green-400">Propostas Aceitas</span>
-                                <span className="text-xl font-black text-green-700 dark:text-green-400">{acceptances.length}</span>
-                            </div>
-
-                            {/* Conversion Progress Bar */}
-                            <div className="pt-2">
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-slate-400">Taxa de Conversão</span>
-                                    <span className="font-bold text-brand-coral">{proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%</span>
-                                </div>
-                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-brand-coral transition-all duration-1000 ease-out rounded-full"
-                                        style={{ width: `${proposals.length > 0 ? (acceptances.length / proposals.length) * 100 : 0}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* KPI Box: Clients Status */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Users className="w-5 h-5 text-brand-coral" />
-                            Status de Clientes
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
-                                <span className="block text-2xl font-black text-slate-800 dark:text-white">{clientStatusCounts.onboarding}</span>
-                                <span className="text-xs text-slate-500 font-bold uppercase">Onboarding</span>
-                            </div>
-                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-center">
-                                <span className="block text-2xl font-black text-green-700 dark:text-green-400">{clientStatusCounts.active}</span>
-                                <span className="text-xs text-green-600 dark:text-green-400 font-bold uppercase">Ativos</span>
-                            </div>
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
-                                <span className="block text-2xl font-black text-blue-700 dark:text-blue-400">{clientStatusCounts.development}</span>
-                                <span className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">Em Dev</span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
-                                <span className="block text-2xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
-                                <span className="text-xs text-slate-500 font-bold uppercase">Usuários</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Navigation Actions */}
-                    <div className="flex flex-col gap-4">
-                        <button
-                            onClick={() => navigate('/proposals/new')}
-                            className="flex-1 bg-brand-coral hover:bg-brand-coral/90 text-white p-4 rounded-2xl font-bold text-left transition-all shadow-lg hover:shadow-brand-coral/25 flex items-center justify-between group"
-                        >
+                    {/* KPI Box: Performance Graph */}
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-6">
                             <div>
-                                <span className="block text-xs uppercase opacity-80 mb-1">Ação Rápida</span>
-                                <span className="text-xl">Nova Proposta</span>
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-brand-coral" />
+                                    Desempenho Comercial
+                                </h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Comparativo semestral de propostas</p>
                             </div>
-                            <Plus className="w-8 h-8 group-hover:scale-110 transition-transform" />
-                        </button>
-
-                        <div className="grid grid-cols-2 gap-4 flex-1">
-                            <button
-                                onClick={() => navigate('/clients')}
-                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl hover:border-brand-coral dark:hover:border-brand-coral transition-colors flex flex-col justify-center items-center gap-2 group"
-                            >
-                                <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
-                                    <Users className="w-6 h-6" />
+                            <div className="flex gap-4 text-xs font-bold">
+                                <div className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                                    <span className="text-slate-600 dark:text-slate-300">Criadas</span>
                                 </div>
-                                <span className="font-bold text-slate-700 dark:text-slate-300">Gestão de Clientes</span>
-                            </button>
-
-                            <button
-                                onClick={() => navigate('/users')}
-                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl hover:border-brand-coral dark:hover:border-brand-coral transition-colors flex flex-col justify-center items-center gap-2 group"
-                            >
-                                <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
-                                    <Users className="w-6 h-6" />
+                                <div className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded-full bg-brand-coral"></div>
+                                    <span className="text-slate-600 dark:text-slate-300">Aceitas</span>
                                 </div>
-                                <span className="font-bold text-slate-700 dark:text-slate-300">Gestão de Usuários</span>
-                            </button>
+                            </div>
+                        </div>
+
+                        {/* CSS Bar Chart */}
+                        <div className="flex items-end justify-between h-48 gap-2 sm:gap-4 mt-auto w-full px-2">
+                            {(() => {
+                                const months = [];
+                                for (let i = 5; i >= 0; i--) {
+                                    const d = new Date();
+                                    d.setMonth(d.getMonth() - i);
+                                    months.push(d);
+                                }
+
+                                return months.map((date, index) => {
+                                    const monthKey = date.toLocaleString('default', { month: 'short' });
+                                    const yearStats = date.getFullYear();
+                                    const monthStats = date.getMonth();
+
+                                    const createdCount = proposals.filter(p => {
+                                        const pDate = new Date(p.created_at);
+                                        return pDate.getMonth() === monthStats && pDate.getFullYear() === yearStats;
+                                    }).length;
+
+                                    const acceptedCount = acceptances.filter(a => {
+                                        const aDate = new Date(a.timestamp);
+                                        return aDate.getMonth() === monthStats && aDate.getFullYear() === yearStats;
+                                    }).length;
+
+                                    // Max value for scaling (min 10 to avoid huge bars for small numbers)
+                                    const maxVal = Math.max(10, ...months.map(m => {
+                                        const mStats = m.getMonth();
+                                        const yStats = m.getFullYear();
+                                        const c = proposals.filter(p => new Date(p.created_at).getMonth() === mStats && new Date(p.created_at).getFullYear() === yStats).length;
+                                        return c;
+                                    }));
+
+                                    const hCreated = Math.max(4, (createdCount / maxVal) * 100);
+                                    const hAccepted = Math.max(4, (acceptedCount / maxVal) * 100);
+
+                                    return (
+                                        <div key={index} className="flex flex-col items-center flex-1 group">
+                                            <div className="relative flex justify-center items-end w-full gap-1 h-full">
+                                                {/* Tooltip */}
+                                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs p-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg border border-slate-700">
+                                                    {createdCount} Criadas | {acceptedCount} Aceitas
+                                                </div>
+
+                                                {/* Bar Created */}
+                                                <div
+                                                    className="w-3 sm:w-6 bg-slate-300 dark:bg-slate-700 rounded-t-sm transition-all duration-500"
+                                                    style={{ height: `${hCreated}%` }}
+                                                ></div>
+                                                {/* Bar Accepted */}
+                                                <div
+                                                    className="w-3 sm:w-6 bg-brand-coral rounded-t-sm transition-all duration-500 opacity-90"
+                                                    style={{ height: `${hAccepted}%` }}
+                                                ></div>
+                                            </div>
+                                            <span className="mt-3 text-xs font-bold text-slate-400 uppercase">{monthKey}</span>
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* KPI Box: Clients Status & Conversion */}
+                    <div className="flex flex-col gap-6">
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                <Users className="w-5 h-5 text-brand-coral" />
+                                Status de Clientes
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                                    <span className="block text-2xl font-black text-slate-800 dark:text-white">{clientStatusCounts.onboarding}</span>
+                                    <span className="text-xs text-slate-500 font-bold uppercase">Onboarding</span>
+                                </div>
+                                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-center">
+                                    <span className="block text-2xl font-black text-green-700 dark:text-green-400">{clientStatusCounts.active}</span>
+                                    <span className="text-xs text-green-600 dark:text-green-400 font-bold uppercase">Ativos</span>
+                                </div>
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
+                                    <span className="block text-2xl font-black text-blue-700 dark:text-blue-400">{clientStatusCounts.development}</span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">Em Dev</span>
+                                </div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                                    <span className="block text-2xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
+                                    <span className="text-xs text-slate-500 font-bold uppercase">Usuários</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm text-slate-500">Taxa de Conversão</span>
+                                <span className="font-bold text-brand-coral">{proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-brand-coral transition-all duration-1000 ease-out rounded-full"
+                                    style={{ width: `${proposals.length > 0 ? (acceptances.length / proposals.length) * 100 : 0}%` }}
+                                ></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Propostas Aceitas</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Contratos ativos e finalizados.</p>
-                </div>
-
-                {/* Stats - REMOVED (Replaced by top KPIs) */}
-
-
-                {/* Table */}
-                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
-                    {loading ? (
-                        <div className="p-8 text-center text-slate-400">Carregando dados...</div>
-                    ) : acceptances.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400">Nenhum aceite registrado ainda.</div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
-                                        <th className="p-5 font-bold">Data</th>
-                                        <th className="p-5 font-bold">Cliente</th>
-                                        <th className="p-5 font-bold">Empresa</th>
-                                        <th className="p-5 font-bold">Documentos</th>
-                                        <th className="p-5 font-bold">Contrato</th>
-                                        <th className="p-5 font-bold">Status</th>
-                                        <th className="p-5 font-bold text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    {acceptances.map((acc) => (
-                                        <tr key={acc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span className="font-medium text-slate-700 dark:text-slate-200">
-                                                        {new Date(acc.timestamp).toLocaleDateString('pt-BR')}
-                                                    </span>
-                                                </div>
-                                                <span className="text-xs text-slate-400 pl-6">
-                                                    {new Date(acc.timestamp).toLocaleTimeString('pt-BR')}
-                                                </span>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <Users className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span className="font-bold text-slate-800 dark:text-white">{acc.name}</span>
-                                                </div>
-                                                {acc.email && <div className="text-xs text-slate-400 pl-6">{acc.email}</div>}
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span>{acc.company_name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <FileText className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500 dark:text-slate-300">{acc.cnpj}</span>
-                                                </div>
-                                                <div className="pl-6 text-xs text-slate-400">CPF: {acc.cpf}</div>
-                                            </td>
-                                            <td className="p-5">
-                                                <a
-                                                    href={`/contracts/${acc.id}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 text-xs font-bold text-brand-coral hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-brand-coral/20 hover:border-brand-coral"
-                                                    title="Visualizar Contrato"
-                                                >
-                                                    <FileText className="w-4 h-4" />
-                                                    Visualizar
-                                                </a>
-                                            </td>
-                                            <td className="p-5">
-                                                <select
-                                                    value={acc.status || 'Inativo'}
-                                                    onChange={(e) => handleStatusChange(acc.id, e.target.value)}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors ${getStatusColor(acc.status || 'Inativo')}`}
-                                                >
-                                                    <option value="Inativo">Inativo</option>
-                                                    <option value="Ativo">Ativo</option>
-                                                    <option value="Suspenso">Suspenso</option>
-                                                    <option value="Cancelado">Cancelado</option>
-                                                    <option value="Finalizado">Finalizado</option>
-                                                </select>
-                                            </td>
-                                            <td className="p-5 text-right flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleDeleteAcceptance(acc.id)}
-                                                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"
-                                                    title="Excluir Registro"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                {/* Primary Navigation Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <button
+                        onClick={() => navigate('/clients')}
+                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left"
+                    >
+                        <div className="bg-brand-coral/10 w-12 h-12 flex items-center justify-center rounded-2xl text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors mb-4">
+                            <Users className="w-6 h-6" />
                         </div>
-                    )}
+                        <span className="block text-lg font-bold text-slate-800 dark:text-white mb-1">Gestão de Clientes</span>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">Acompanhar projetos e status</span>
+                    </button>
+
+                    <button
+                        onClick={() => navigate('/proposals')}
+                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left"
+                    >
+                        <div className="bg-blue-50 dark:bg-blue-900/20 w-12 h-12 flex items-center justify-center rounded-2xl text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors mb-4">
+                            <FileText className="w-6 h-6" />
+                        </div>
+                        <span className="block text-lg font-bold text-slate-800 dark:text-white mb-1">Gestão de Propostas</span>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">Criar e visualizar propostas</span>
+                    </button>
+
+                    <button
+                        onClick={() => navigate('/users')}
+                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left"
+                    >
+                        <div className="bg-slate-100 dark:bg-slate-700 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-300 group-hover:bg-slate-800 dark:group-hover:bg-slate-600 group-hover:text-white transition-colors mb-4">
+                            <Users className="w-6 h-6" />
+                        </div>
+                        <span className="block text-lg font-bold text-slate-800 dark:text-white mb-1">Gestão de Usuários</span>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">Administrar equipe e acesso</span>
+                    </button>
                 </div>
+
             </main>
-        </div >
+        </div>
     );
 };
 
