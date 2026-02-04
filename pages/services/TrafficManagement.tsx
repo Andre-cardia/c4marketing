@@ -426,6 +426,7 @@ const TrafficManagement: React.FC = () => {
                 surveyData={trafficProject?.survey_data || {}}
                 isCompleted={trafficProject?.survey_status === 'completed'}
                 onValidate={() => handleUpdateStatus('survey_status', 'completed')}
+                onReopen={() => handleUpdateStatus('survey_status', 'pending')}
             />
         </div>
     );
