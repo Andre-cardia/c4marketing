@@ -208,11 +208,12 @@ const TrafficManagement: React.FC = () => {
                                     onClick={() => {
                                         const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
                                         navigator.clipboard.writeText(url);
-                                        alert('Link copiado: ' + url);
+                                        alert('Link copiado para a área de transferência!');
                                     }}
-                                    className="w-full py-2.5 px-4 bg-white border-2 border-blue-500 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors"
+                                    className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                                 >
-                                    Copiar Link
+                                    <Send size={16} />
+                                    Enviar Pesquisa
                                 </button>
                                 <button
                                     onClick={() => {
