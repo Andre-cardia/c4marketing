@@ -46,20 +46,7 @@ const Dashboard: React.FC = () => {
     };
 
     useEffect(() => {
-        const checkAuthAndFetch = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            console.log('AUTH SESSION:', session);
-            console.log('User:', session?.user?.email);
-
-            if (session) {
-                await fetchData();
-            } else {
-                console.error('No active session - user not authenticated!');
-                setLoading(false);
-            }
-        };
-
-        checkAuthAndFetch();
+        fetchData();
     }, []);
 
     useEffect(() => {
@@ -79,20 +66,12 @@ const Dashboard: React.FC = () => {
     };
 
     const fetchAcceptances = async () => {
-        const { data, error } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
-        console.log('FETCH Acceptances - Data:', data, 'Error:', error);
-        if (error) {
-            console.error('Acceptances Error Details:', JSON.stringify(error, null, 2));
-        }
+        const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         if (data) setAcceptances(data);
     };
 
     const fetchProposals = async () => {
-        const { data, error } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
-        console.log('FETCH Proposals - Data:', data, 'Error:', error);
-        if (error) {
-            console.error('Proposals Error Details:', JSON.stringify(error, null, 2));
-        }
+        const { data } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
         if (data) setProposals(data);
     };
 
@@ -178,11 +157,6 @@ const Dashboard: React.FC = () => {
                                         return aKey === mKey;
                                     }).length;
 
-                                    // DEBUG: Log all months
-                                    console.log('=== CHART DEBUG ===');
-                                    console.log('Month:', monthKey, 'Key:', mKey);
-                                    console.log('Created Count:', createdCount);
-                                    console.log('Accepted Count:', acceptedCount);
 
                                     // Calculate max across all months
                                     const allCounts = months.map(m => {
@@ -193,16 +167,9 @@ const Dashboard: React.FC = () => {
                                     });
                                     const dynamicMax = Math.max(10, ...allCounts);
 
-                                    // Convert to pixels (h-48 = 192px)
                                     const maxHeight = 192;
                                     const hCreatedPx = (createdCount / dynamicMax) * maxHeight;
                                     const hAcceptedPx = (acceptedCount / dynamicMax) * maxHeight;
-
-                                    if (index === 0 || index === 1) {
-                                        console.log('Dynamic Max:', dynamicMax);
-                                        console.log('Height Created:', hCreatedPx, 'px');
-                                        console.log('Height Accepted:', hAcceptedPx, 'px');
-                                    }
 
                                     return (
                                         <div key={index} className="flex flex-col items-center flex-1 group">
