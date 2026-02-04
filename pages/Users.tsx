@@ -249,7 +249,7 @@ const Users: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="p-5">
-                                                {currentUserRole === 'gestor' ? (
+                                                {userRole === 'gestor' ? (
                                                     <select
                                                         value={user.role}
                                                         onChange={(e) => handleUpdateRole(user.id, e.target.value)}
@@ -425,8 +425,8 @@ const Users: React.FC = () => {
                                             type="button"
                                             onClick={() => setNewNotice({ ...newNotice, priority: 'normal' })}
                                             className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'normal'
-                                                    ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 ring-2 ring-slate-400'
-                                                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                                ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 ring-2 ring-slate-400'
+                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300'
                                                 }`}
                                         >
                                             Normal
@@ -435,8 +435,8 @@ const Users: React.FC = () => {
                                             type="button"
                                             onClick={() => setNewNotice({ ...newNotice, priority: 'importante' })}
                                             className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'importante'
-                                                    ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600 ring-2 ring-amber-500'
-                                                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+                                                ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600 ring-2 ring-amber-500'
+                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
                                                 }`}
                                         >
                                             Importante
@@ -445,8 +445,8 @@ const Users: React.FC = () => {
                                             type="button"
                                             onClick={() => setNewNotice({ ...newNotice, priority: 'urgente' })}
                                             className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'urgente'
-                                                    ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600 ring-2 ring-red-500'
-                                                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-red-300'
+                                                ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600 ring-2 ring-red-500'
+                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-red-300'
                                                 }`}
                                         >
                                             Urgente
