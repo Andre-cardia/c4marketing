@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import ProposalView from './pages/ProposalView';
 import Users from './pages/Users';
 import CreateProposal from './pages/CreateProposal';
+import Proposals from './pages/Proposals';
 import ContractView from './pages/ContractView';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -37,6 +38,14 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute>
               <CreateProposal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proposals"
+          element={
+            <ProtectedRoute>
+              <Proposals />
             </ProtectedRoute>
           }
         />

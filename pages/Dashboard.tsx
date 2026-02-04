@@ -186,8 +186,19 @@ const Dashboard: React.FC = () => {
                                 <span className="text-sm text-green-600 dark:text-green-400">Propostas Aceitas</span>
                                 <span className="text-xl font-black text-green-700 dark:text-green-400">{acceptances.length}</span>
                             </div>
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                                <p className="text-xs text-slate-400 text-center">Taxa de Conversão: {proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%</p>
+
+                            {/* Conversion Progress Bar */}
+                            <div className="pt-2">
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-slate-400">Taxa de Conversão</span>
+                                    <span className="font-bold text-brand-coral">{proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-brand-coral transition-all duration-1000 ease-out rounded-full"
+                                        style={{ width: `${proposals.length > 0 ? (acceptances.length / proposals.length) * 100 : 0}%` }}
+                                    ></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -239,7 +250,7 @@ const Dashboard: React.FC = () => {
                                 <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
                                     <Users className="w-6 h-6" />
                                 </div>
-                                <span className="font-bold text-slate-700 dark:text-slate-300">Clientes</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">Gestão de Clientes</span>
                             </button>
 
                             <button
@@ -249,115 +260,15 @@ const Dashboard: React.FC = () => {
                                 <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
                                     <Users className="w-6 h-6" />
                                 </div>
-                                <span className="font-bold text-slate-700 dark:text-slate-300">Usuários</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">Gestão de Usuários</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Existing Proposals Section */}
-                <div className="mb-12">
-                    <div className="flex justify-between items-end mb-6">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Últimas Propostas</h2>
-                        </div>
-                        <button
-                            onClick={() => navigate('/proposals')} // Assuming you might want a full list page later, or just scroll
-                            className="text-brand-coral font-bold text-sm hover:underline"
-                        >
-                            Ver todas
-                        </button>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
-                        {loading ? (
-                            <div className="p-8 text-center text-slate-400">Carregando propostas...</div>
-                        ) : proposals.length === 0 ? (
-                            <div className="p-12 text-center text-slate-400">
-                                <Plus className="w-12 h-12 mb-4 mx-auto opacity-20" />
-                                <p className="mb-4">Nenhuma proposta criada ainda.</p>
-                                <button
-                                    onClick={() => navigate('/proposals/new')}
-                                    className="text-brand-coral font-bold hover:underline"
-                                >
-                                    Criar minha primeira proposta
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
-                                            <th className="p-5 font-bold">Data</th>
-                                            <th className="p-5 font-bold">Empresa</th>
-                                            <th className="p-5 font-bold">Responsável</th>
-                                            <th className="p-5 font-bold">Link</th>
-                                            <th className="p-5 font-bold text-right">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                        {proposals.slice(0, 5).map((proposal) => (
-                                            <tr key={proposal.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                                <td className="p-5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                        <span className="font-medium text-slate-700 dark:text-slate-200">
-                                                            {new Date(proposal.created_at).toLocaleDateString('pt-BR')}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                        <span className="font-bold text-slate-800 dark:text-white">{proposal.company_name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Users className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                        <span>{proposal.responsible_name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <button
-                                                            onClick={() => copyLink(proposal.slug)}
-                                                            className="text-slate-400 hover:text-brand-coral p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                                                            title="Copiar Link"
-                                                        >
-                                                            <LinkIcon className="w-4 h-4" />
-                                                        </button>
-                                                        <a
-                                                            href={`/p/${proposal.slug}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-xs font-bold text-brand-coral flex items-center gap-1 hover:underline"
-                                                        >
-                                                            Visualizar <ExternalLink className="w-3 h-3" />
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                                <td className="p-5 text-right">
-                                                    <button
-                                                        onClick={() => handleDeleteProposal(proposal.id)}
-                                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"
-                                                        title="Excluir Proposta"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
                 <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Últimos Aceites</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Visualize e gerencie os acordos firmados.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Propostas Aceitas</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Contratos ativos e finalizados.</p>
                 </div>
 
                 {/* Stats - REMOVED (Replaced by top KPIs) */}
