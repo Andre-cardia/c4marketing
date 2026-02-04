@@ -65,6 +65,16 @@ const Dashboard: React.FC = () => {
         setLoading(false);
     };
 
+    useEffect(() => {
+        if (!loading) {
+            console.log('DEBUG: Proposals:', proposals);
+            console.log('DEBUG: Acceptances:', acceptances);
+            if (proposals.length > 0) {
+                console.log('DEBUG: Sample Proposal Date:', proposals[0].created_at, 'Parsed:', new Date(proposals[0].created_at).toISOString());
+            }
+        }
+    }, [loading, proposals, acceptances]);
+
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         if (data) setAcceptances(data);
