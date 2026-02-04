@@ -44,6 +44,12 @@ const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
           >
             Projetos
           </button>
+          <button
+            onClick={() => navigate('/users')}
+            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/users') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+          >
+            Usuários
+          </button>
 
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
 
