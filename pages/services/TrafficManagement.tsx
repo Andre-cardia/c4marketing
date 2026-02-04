@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, TrendingUp, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import SurveyAnswersModal from './traffic/SurveyAnswersModal';
 
 interface TrafficProject {
     id: string;
@@ -10,6 +11,7 @@ interface TrafficProject {
     survey_status: 'pending' | 'completed';
     account_setup_status: 'pending' | 'completed';
     strategy_meeting_notes: string | null;
+    survey_data?: any;
 }
 
 interface Campaign {
@@ -27,6 +29,7 @@ const TrafficManagement: React.FC = () => {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCampaignModal, setShowCampaignModal] = useState(false);
+    const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
 
     // Fetch Data
@@ -192,20 +195,33 @@ const TrafficManagement: React.FC = () => {
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
                                     <CheckCircle size={14} /> Concluído
                                 </span>
-                                <button className="block w-full text-center py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                                <button
+                                    onClick={() => setShowSurveyModal(true)}
+                                    className="block w-full text-center py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                                >
                                     Ver Respostas
                                 </button>
                             </div>
                         ) : (
                             <div className="space-y-3 relative z-10">
-                                <button className="w-full py-2.5 px-4 bg-white border-2 border-blue-500 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link copiado: ' + url);
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-white border-2 border-blue-500 text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors"
+                                >
                                     Copiar Link
                                 </button>
                                 <button
-                                    onClick={() => handleUpdateStatus('survey_status', 'completed')}
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
+                                        window.open(url, '_blank');
+                                    }}
                                     className="w-full text-xs text-slate-400 hover:text-slate-600 underline"
                                 >
-                                    Simular Resposta (Dev)
+                                    Abrir Pesquisa (Teste)
                                 </button>
                             </div>
                         )}
@@ -382,6 +398,12 @@ const TrafficManagement: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Survey Modal */}
+            <SurveyAnswersModal
+                isOpen={showSurveyModal}
+                onClose={() => setShowSurveyModal(false)}
+                surveyData={trafficProject?.survey_data || {}}
+            />
         </div>
     );
 };

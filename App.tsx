@@ -16,6 +16,7 @@ import Ecommerce from './pages/services/Ecommerce';
 import Consulting from './pages/services/Consulting';
 import StrategyMeeting from './pages/services/traffic/StrategyMeeting';
 import CampaignStage from './pages/services/traffic/CampaignStage';
+import TrafficSurvey from './pages/external/TrafficSurvey';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectionRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
