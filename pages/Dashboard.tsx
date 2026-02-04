@@ -145,8 +145,15 @@ const Dashboard: React.FC = () => {
                                     const monthKey = date.toLocaleString('default', { month: 'short' });
                                     const mKey = getMonthKey(date);
 
-                                    const createdCount = proposals.filter(p => getMonthKey(new Date(p.created_at)) === mKey).length;
+                                    const createdCount = proposals.filter(p => {
+                                        const pKey = getMonthKey(new Date(p.created_at));
+                                        if (index === 0) console.log(`DEBUG FILTER: PropDate: ${p.created_at} -> Key: ${pKey} vs Target: ${mKey}`);
+                                        return pKey === mKey;
+                                    }).length;
+
                                     const acceptedCount = acceptances.filter(a => getMonthKey(new Date(a.timestamp)) === mKey).length;
+
+                                    if (index === 0) console.log(`DEBUG CHART: Month ${monthKey} (${mKey}) -> Created: ${createdCount}, Accepted: ${acceptedCount}`);
 
                                     // Calculate global max (simple approximation for scope)
                                     // ideally would be calculated outside mapping
