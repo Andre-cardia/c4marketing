@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
+import NoticeCard from '../components/NoticeCard';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building, FileText, Calendar, LogOut, Plus, Link as LinkIcon, ExternalLink, Trash2, Moon, Sun } from 'lucide-react';
+import { Users, Building, FileText, Calendar, LogOut, Plus, Link as LinkIcon, ExternalLink, Trash2, Moon, Sun, Bell } from 'lucide-react';
+import { useUserRole } from '../lib/UserRoleContext';
 
 interface Acceptance {
     id: number;
@@ -25,11 +27,23 @@ interface Proposal {
     services?: { id: string; price: number }[];
 }
 
+interface Notice {
+    id: string;
+    message: string;
+    author_name: string;
+    author_email: string;
+    priority: 'normal' | 'importante' | 'urgente';
+    created_at: string;
+}
+
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
+    const { userRole } = useUserRole();
+
     const [totalUsers, setTotalUsers] = useState<number>(0);
     const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
     const [proposals, setProposals] = useState<Proposal[]>([]);
+    const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -61,7 +75,7 @@ const Dashboard: React.FC = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        await Promise.all([fetchAcceptances(), fetchProposals(), fetchUsersCount()]);
+        await Promise.all([fetchAcceptances(), fetchProposals(), fetchUsersCount(), fetchNotices()]);
         setLoading(false);
     };
 
@@ -78,6 +92,22 @@ const Dashboard: React.FC = () => {
     const fetchUsersCount = async () => {
         const { count } = await supabase.from('app_users').select('*', { count: 'exact', head: true });
         if (count !== null) setTotalUsers(count);
+    };
+
+    const fetchNotices = async () => {
+        const { data } = await supabase
+            .from('notices')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+        if (data) setNotices(data);
+    };
+
+    const handleDeleteNotice = async (id: string) => {
+        const { error } = await supabase.from('notices').delete().eq('id', id);
+        if (!error) {
+            setNotices(notices.filter(n => n.id !== id));
+        }
     };
 
     const handleLogout = async () => {
@@ -238,6 +268,42 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Mural de Avisos (Notice Board) */}
+                <div className="mb-12">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            <Bell className="w-6 h-6 text-brand-coral" />
+                            Mural de Avisos
+                        </h2>
+                    </div>
+
+                    {loading ? (
+                        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 text-center text-slate-400">
+                            Carregando avisos...
+                        </div>
+                    ) : notices.length === 0 ? (
+                        <div className="bg-white dark:bg-slate-800 p-12 rounded-3xl border border-slate-200 dark:border-slate-700 text-center">
+                            <Bell className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                            <p className="text-slate-500 dark:text-slate-400">Nenhum aviso no momento</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {notices.map(notice => (
+                                <NoticeCard
+                                    key={notice.id}
+                                    id={notice.id}
+                                    message={notice.message}
+                                    authorName={notice.author_name}
+                                    timestamp={notice.created_at}
+                                    priority={notice.priority}
+                                    canDelete={userRole === 'gestor'}
+                                    onDelete={handleDeleteNotice}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Primary Navigation Buttons */}
