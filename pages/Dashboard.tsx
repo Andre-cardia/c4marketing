@@ -27,15 +27,15 @@ interface Proposal {
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
-    const [proposals, setProposals] = useState<Proposal[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [darkMode, setDarkMode] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('darkMode') === 'true';
-        }
-        return false;
-    });
+    const [totalUsers, setTotalUsers] = useState<number>(0);
+
+    const clientStatusCounts = {
+        onboarding: acceptances.filter(a => !a.status || a.status === 'Onboarding').length,
+        active: acceptances.filter(a => a.status === 'Ativo').length,
+        suspended: acceptances.filter(a => a.status === 'Suspenso').length,
+        development: acceptances.filter(a => ['Em Desenvolvimento', 'LP', 'Site', 'E-commerce'].includes(a.status || '')).length,
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -52,7 +52,7 @@ const Dashboard: React.FC = () => {
 
     const fetchData = async () => {
         setLoading(true);
-        await Promise.all([fetchAcceptances(), fetchProposals()]);
+        await Promise.all([fetchAcceptances(), fetchProposals(), fetchUsersCount()]);
         setLoading(false);
     };
 
@@ -64,6 +64,11 @@ const Dashboard: React.FC = () => {
     const fetchProposals = async () => {
         const { data } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
         if (data) setProposals(data);
+    };
+
+    const fetchUsersCount = async () => {
+        const { count } = await supabase.from('app_users').select('*', { count: 'exact', head: true });
+        if (count !== null) setTotalUsers(count);
     };
 
     const handleDeleteAcceptance = async (id: number) => {
@@ -154,22 +159,105 @@ const Dashboard: React.FC = () => {
             <Header darkMode={darkMode} setDarkMode={setDarkMode} />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Proposals Section */}
+
+                {/* Main Navigation & KPIs */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                    {/* KPI Box: Performance */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-brand-coral" />
+                            Desempenho Geral
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+                                <span className="text-sm text-slate-500 dark:text-slate-400">Propostas Criadas</span>
+                                <span className="text-xl font-black text-slate-800 dark:text-white">{proposals.length}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                                <span className="text-sm text-green-600 dark:text-green-400">Propostas Aceitas</span>
+                                <span className="text-xl font-black text-green-700 dark:text-green-400">{acceptances.length}</span>
+                            </div>
+                            <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                                <p className="text-xs text-slate-400 text-center">Taxa de Conversão: {proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KPI Box: Clients Status */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Users className="w-5 h-5 text-brand-coral" />
+                            Status de Clientes
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                                <span className="block text-2xl font-black text-slate-800 dark:text-white">{clientStatusCounts.onboarding}</span>
+                                <span className="text-xs text-slate-500 font-bold uppercase">Onboarding</span>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-center">
+                                <span className="block text-2xl font-black text-green-700 dark:text-green-400">{clientStatusCounts.active}</span>
+                                <span className="text-xs text-green-600 dark:text-green-400 font-bold uppercase">Ativos</span>
+                            </div>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-center">
+                                <span className="block text-2xl font-black text-blue-700 dark:text-blue-400">{clientStatusCounts.development}</span>
+                                <span className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">Em Dev</span>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
+                                <span className="block text-2xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
+                                <span className="text-xs text-slate-500 font-bold uppercase">Usuários</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Navigation Actions */}
+                    <div className="flex flex-col gap-4">
+                        <button
+                            onClick={() => navigate('/proposals/new')}
+                            className="flex-1 bg-brand-coral hover:bg-brand-coral/90 text-white p-4 rounded-2xl font-bold text-left transition-all shadow-lg hover:shadow-brand-coral/25 flex items-center justify-between group"
+                        >
+                            <div>
+                                <span className="block text-xs uppercase opacity-80 mb-1">Ação Rápida</span>
+                                <span className="text-xl">Nova Proposta</span>
+                            </div>
+                            <Plus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                        </button>
+
+                        <div className="grid grid-cols-2 gap-4 flex-1">
+                            <button
+                                onClick={() => navigate('/clients')}
+                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl hover:border-brand-coral dark:hover:border-brand-coral transition-colors flex flex-col justify-center items-center gap-2 group"
+                            >
+                                <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">Clientes</span>
+                            </button>
+
+                            <button
+                                onClick={() => navigate('/users')}
+                                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl hover:border-brand-coral dark:hover:border-brand-coral transition-colors flex flex-col justify-center items-center gap-2 group"
+                            >
+                                <div className="bg-brand-coral/10 p-2 rounded-full text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">Usuários</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Existing Proposals Section */}
                 <div className="mb-12">
                     <div className="flex justify-between items-end mb-6">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Propostas Comerciais</h2>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm">Gerencie links personalizados para seus clientes.</p>
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Últimas Propostas</h2>
                         </div>
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => navigate('/proposals/new')}
-                                className="bg-brand-coral hover:bg-brand-coral/90 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-brand-coral/25 flex items-center gap-2"
-                            >
-                                <Plus size={20} />
-                                Nova Proposta
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => navigate('/proposals')} // Assuming you might want a full list page later, or just scroll
+                            className="text-brand-coral font-bold text-sm hover:underline"
+                        >
+                            Ver todas
+                        </button>
                     </div>
 
                     <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
@@ -199,7 +287,7 @@ const Dashboard: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                        {proposals.map((proposal) => (
+                                        {proposals.slice(0, 5).map((proposal) => (
                                             <tr key={proposal.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                                 <td className="p-5">
                                                     <div className="flex items-center gap-2">
@@ -259,24 +347,12 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Aceites Recentes</h2>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Últimos Aceites</h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">Visualize e gerencie os acordos firmados.</p>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-xl text-green-600 dark:text-green-400">
-                                <Users className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Total de Aceites</p>
-                                <p className="text-2xl font-black text-slate-800 dark:text-white">{acceptances.length}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {/* Stats - REMOVED (Replaced by top KPIs) */}
+
 
                 {/* Table */}
                 <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
