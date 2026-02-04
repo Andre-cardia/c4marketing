@@ -2,6 +2,7 @@ import React from 'react';
 import { LogOut, Moon, Sun, Users as UsersIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useUserRole } from '../lib/UserRoleContext';
 
 interface HeaderProps {
   darkMode: boolean;
@@ -11,6 +12,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { userRole, loading } = useUserRole();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -32,24 +34,33 @@ const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
           >
             Dashboard
           </button>
-          <button
-            onClick={() => navigate('/proposals')}
-            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-          >
-            Propostas
-          </button>
+
+          {/* Propostas - only for gestor and comercial */}
+          {!loading && (userRole === 'gestor' || userRole === 'comercial') && (
+            <button
+              onClick={() => navigate('/proposals')}
+              className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              Propostas
+            </button>
+          )}
+
           <button
             onClick={() => navigate('/projects')}
             className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/projects') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
           >
             Projetos
           </button>
-          <button
-            onClick={() => navigate('/users')}
-            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/users') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-          >
-            Usuários
-          </button>
+
+          {/* Usuários - only for gestor */}
+          {!loading && userRole === 'gestor' && (
+            <button
+              onClick={() => navigate('/users')}
+              className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/users') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              Usuários
+            </button>
+          )}
 
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
 

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { Users as UsersIcon, Plus, Mail, Phone, Shield, Trash2, Edit } from 'lucide-react';
+import { useUserRole } from '../lib/UserRoleContext';
 
 interface AppUser {
     id: string; // generated uuid
@@ -13,6 +15,9 @@ interface AppUser {
 }
 
 const Users: React.FC = () => {
+    const navigate = useNavigate();
+    const { userRole, loading: roleLoading } = useUserRole();
+
     // Shared State for Theme
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -35,7 +40,6 @@ const Users: React.FC = () => {
     const [users, setUsers] = useState<AppUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [currentUserRole, setCurrentUserRole] = useState<string>('');
 
     // Form State
     const [newUser, setNewUser] = useState({
@@ -46,18 +50,18 @@ const Users: React.FC = () => {
     });
     const [creating, setCreating] = useState(false);
 
+    // Access control - redirect if not gestor
     useEffect(() => {
-        fetchCurrentUserRole();
-        fetchUsers();
-    }, []);
-
-    const fetchCurrentUserRole = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email) {
-            const { data } = await supabase.from('app_users').select('role').eq('email', session.user.email).single();
-            if (data) setCurrentUserRole(data.role);
+        if (!roleLoading && userRole !== 'gestor') {
+            navigate('/dashboard');
         }
-    };
+    }, [userRole, roleLoading, navigate]);
+
+    useEffect(() => {
+        if (userRole === 'gestor') {
+            fetchUsers();
+        }
+    }, [userRole]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -141,7 +145,7 @@ const Users: React.FC = () => {
                         This page is for managing users. Typically only Gestor should create users.
                         Let's verify logic later, for now allow all but maybe hide if leitor.
                     */}
-                    {currentUserRole === 'gestor' && (
+                    {userRole === 'gestor' && (
                         <button
                             onClick={() => setShowModal(true)}
                             className="bg-brand-coral text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-red-500 transition-colors shadow-lg shadow-brand-coral/20"
@@ -169,7 +173,7 @@ const Users: React.FC = () => {
                                         <th className="p-5 font-bold">Usuário</th>
                                         <th className="p-5 font-bold">Contato</th>
                                         <th className="p-5 font-bold">Nível de Acesso</th>
-                                        {currentUserRole === 'gestor' && <th className="p-5 font-bold text-right">Ações</th>}
+                                        {userRole === 'gestor' && <th className="p-5 font-bold text-right">Ações</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
@@ -208,12 +212,13 @@ const Users: React.FC = () => {
                                                 )}
                                             </td>
                                             {/* Only Gestor can delete */}
-                                            {currentUserRole === 'gestor' && (
+                                            {userRole === 'gestor' && (
                                                 <td className="p-5 text-right">
                                                     <button
                                                         onClick={() => handleDeleteUser(user.id)}
-                                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"
-                                                        title="Remover Acesso"
+                                                        disabled={userRole !== 'gestor'}
+                                                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title="Excluir usuário"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -280,21 +285,17 @@ const Users: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Nível de Acesso</label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['leitor', 'comercial', 'gestor'].map((role) => (
-                                        <button
-                                            key={role}
-                                            type="button"
-                                            onClick={() => setNewUser({ ...newUser, role: role as any })}
-                                            className={`px-4 py-3 rounded-xl border text-sm font-bold capitalize transition-all ${newUser.role === role
-                                                    ? 'bg-brand-coral text-white border-brand-coral shadow-lg shadow-brand-coral/20'
-                                                    : 'bg-white dark:bg-slate-700 text-slate-500 border-slate-200 dark:border-slate-600 hover:border-brand-coral/50'
-                                                }`}
-                                        >
-                                            {role}
-                                        </button>
-                                    ))}
-                                </div>
+                                <select
+                                    value={newUser.role}
+                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'leitor' | 'comercial' | 'gestor' })}
+                                    disabled={userRole !== 'gestor'}
+                                    className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-brand-coral focus:border-transparent dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                    required
+                                >
+                                    <option value="leitor">Leitor</option>
+                                    <option value="comercial">Comercial</option>
+                                    <option value="gestor">Gestor</option>
+                                </select>
                                 <p className="text-xs text-slate-400 mt-2 text-center">
                                     {newUser.role === 'leitor' && 'Apenas visualiza dados.'}
                                     {newUser.role === 'comercial' && 'Visualiza e cria propostas.'}
@@ -312,8 +313,8 @@ const Users: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={creating}
-                                    className="flex-1 bg-brand-coral text-white py-3 rounded-xl font-bold hover:bg-red-500 transition-colors shadow-lg shadow-brand-coral/20"
+                                    disabled={creating || userRole !== 'gestor'}
+                                    className="flex-1 bg-brand-coral text-white py-3 rounded-xl font-bold hover:bg-red-500 transition-colors shadow-lg shadow-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {creating ? 'Cadastrando...' : 'Cadastrar Usuário'}
                                 </button>

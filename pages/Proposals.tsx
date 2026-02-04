@@ -3,6 +3,7 @@ import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Users, Building, Calendar, Link as LinkIcon, ExternalLink, Trash2, Plus, Moon, Sun, FileText } from 'lucide-react';
+import { useUserRole } from '../lib/UserRoleContext';
 
 interface Proposal {
     id: number;
@@ -16,6 +17,8 @@ interface Proposal {
 
 const Proposals: React.FC = () => {
     const navigate = useNavigate();
+    const { userRole, loading: roleLoading } = useUserRole();
+
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [loading, setLoading] = useState(true);
     const [darkMode, setDarkMode] = useState(() => {
@@ -37,9 +40,18 @@ const Proposals: React.FC = () => {
         }
     }, [darkMode]);
 
+    // Access control - redirect if not gestor or comercial
     useEffect(() => {
-        fetchData();
-    }, []);
+        if (!roleLoading && userRole !== 'gestor' && userRole !== 'comercial') {
+            navigate('/dashboard');
+        }
+    }, [userRole, roleLoading, navigate]);
+
+    useEffect(() => {
+        if (userRole === 'gestor' || userRole === 'comercial') {
+            fetchData();
+        }
+    }, [userRole]);
 
     const fetchData = async () => {
         setLoading(true);

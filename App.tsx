@@ -9,57 +9,60 @@ import Proposals from './pages/Proposals';
 import Projects from './pages/Projects';
 import ContractView from './pages/ContractView';
 import ProtectedRoute from './components/ProtectedRoute';
+import { UserRoleProvider } from './lib/UserRoleContext';
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/p/:slug" element={<ProposalView />} />
-        <Route path="/p/:slug/contract" element={<ContractView />} />
-        <Route path="/contracts/:id" element={<ContractView />} />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/users"
-          element={
-            <ProtectedRoute>
-              <Users />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/proposals/new"
-          element={
-            <ProtectedRoute>
-              <CreateProposal />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/proposals"
-          element={
-            <ProtectedRoute>
-              <Proposals />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <Projects />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <UserRoleProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/p/:slug" element={<ProposalView />} />
+          <Route path="/p/:slug/contract" element={<ContractView />} />
+          <Route path="/contracts/:id" element={<ContractView />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <Users />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/proposals/new"
+            element={
+              <ProtectedRoute>
+                <CreateProposal />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/proposals"
+            element={
+              <ProtectedRoute>
+                <Proposals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/projects"
+            element={
+              <ProtectedRoute>
+                <Projects />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </UserRoleProvider>
   );
 };
 
