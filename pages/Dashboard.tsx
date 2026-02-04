@@ -118,7 +118,11 @@ const Dashboard: React.FC = () => {
 
                         {/* CSS Bar Chart */}
                         <div className="flex items-end justify-between h-48 gap-2 sm:gap-4 mt-auto w-full px-2">
-                            {(() => {
+                            {loading ? (
+                                <div className="flex items-center justify-center w-full h-full">
+                                    <span className="text-slate-400">Carregando dados...</span>
+                                </div>
+                            ) : (() => {
                                 const months = [];
                                 const startDate = new Date(2026, 0, 1);
                                 const endDate = new Date();
@@ -153,6 +157,16 @@ const Dashboard: React.FC = () => {
                                         return aKey === mKey;
                                     }).length;
 
+                                    // DEBUG: Log for first month only
+                                    if (index === 0) {
+                                        console.log('=== CHART DEBUG ===');
+                                        console.log('Month:', monthKey, 'Key:', mKey);
+                                        console.log('Created Count:', createdCount);
+                                        console.log('Accepted Count:', acceptedCount);
+                                        console.log('Proposals:', proposals.map(p => ({ date: p.created_at, key: getMonthKey(p.created_at) })));
+                                        console.log('Acceptances:', acceptances.map(a => ({ date: a.timestamp, key: getMonthKey(a.timestamp) })));
+                                    }
+
                                     // Calculate max across all months
                                     const allCounts = months.map(m => {
                                         const k = getLocalMonthKey(m);
@@ -164,6 +178,12 @@ const Dashboard: React.FC = () => {
 
                                     const hCreated = (createdCount / dynamicMax) * 100;
                                     const hAccepted = (acceptedCount / dynamicMax) * 100;
+
+                                    if (index === 0) {
+                                        console.log('Dynamic Max:', dynamicMax);
+                                        console.log('Height Created:', hCreated, '%');
+                                        console.log('Height Accepted:', hAccepted, '%');
+                                    }
 
                                     return (
                                         <div key={index} className="flex flex-col items-center flex-1 group">
