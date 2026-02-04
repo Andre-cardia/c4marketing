@@ -28,6 +28,15 @@ interface Proposal {
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const [totalUsers, setTotalUsers] = useState<number>(0);
+    const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
+    const [proposals, setProposals] = useState<Proposal[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [darkMode, setDarkMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('darkMode') === 'true';
+        }
+        return false;
+    });
 
     const clientStatusCounts = {
         onboarding: acceptances.filter(a => !a.status || a.status === 'Onboarding').length,
