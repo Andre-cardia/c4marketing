@@ -32,58 +32,67 @@ const TrafficManagement: React.FC = () => {
     const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
 
-    // Fetch Data
-    useEffect(() => {
-        const loadPageData = async () => {
-            if (!id) return;
-            try {
-                // 1. Get Company Name & CNPJ from Acceptance
-                const { data: acceptance, error: accError } = await supabase
-                    .from('acceptances')
-                    .select('company_name')
-                    .eq('id', id)
-                    .single();
+    const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
 
-                if (acceptance) setCompanyName(acceptance.company_name);
+    // Shared Fetch Function
+    const loadProjectData = async () => {
+        if (!id) return;
+        try {
+            // 1. Get Company Name
+            const { data: acceptance } = await supabase
+                .from('acceptances')
+                .select('company_name')
+                .eq('id', id)
+                .single();
 
-                // 2. Get or Create Traffic Project
-                const { data: tpData, error: tpError } = await supabase
-                    .from('traffic_projects')
+            if (acceptance) setCompanyName(acceptance.company_name);
+
+            // 2. Get Traffic Project
+            const { data: tpData } = await supabase
+                .from('traffic_projects')
+                .select('*')
+                .eq('acceptance_id', id)
+                .single();
+
+            if (tpData) {
+                setTrafficProject(tpData);
+                // 3. Fetch Campaigns
+                const { data: campData } = await supabase
+                    .from('traffic_campaigns')
                     .select('*')
-                    .eq('acceptance_id', id)
+                    .eq('traffic_project_id', tpData.id)
+                    .order('created_at', { ascending: false });
+
+                if (campData) setCampaigns(campData);
+
+            } else {
+                // Create default project if not exists
+                const { data: newTp } = await supabase
+                    .from('traffic_projects')
+                    .insert([{ acceptance_id: id }])
+                    .select()
                     .single();
 
-                if (tpData) {
-                    setTrafficProject(tpData);
-                    // 3. Fetch Campaigns if project exists
-                    const { data: campData } = await supabase
-                        .from('traffic_campaigns')
-                        .select('*')
-                        .eq('traffic_project_id', tpData.id)
-                        .order('created_at', { ascending: false });
-
-                    if (campData) setCampaigns(campData);
-
-                } else {
-                    // Create default project
-                    const { data: newTp, error: createError } = await supabase
-                        .from('traffic_projects')
-                        .insert([{ acceptance_id: id }])
-                        .select()
-                        .single();
-
-                    if (newTp) setTrafficProject(newTp);
-                }
-
-            } catch (error) {
-                console.error('Error loading data:', error);
-            } finally {
-                setLoading(false);
+                if (newTp) setTrafficProject(newTp);
             }
-        };
 
-        loadPageData();
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial Load
+    useEffect(() => {
+        loadProjectData();
     }, [id]);
+
+    // Handler to refresh data when opening modal
+    const handleOpenSurveyModal = async () => {
+        await loadProjectData(); // Refresh data first
+        setShowSurveyModal(true);
+    };
 
     // Handlers
     const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status', value: 'completed') => {
@@ -222,7 +231,7 @@ const TrafficManagement: React.FC = () => {
                                     </div>
 
                                     <button
-                                        onClick={() => setShowSurveyModal(true)}
+                                        onClick={handleOpenSurveyModal}
                                         className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                                     >
                                         Ver Respostas Recebidas
