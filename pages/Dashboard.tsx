@@ -81,12 +81,18 @@ const Dashboard: React.FC = () => {
     const fetchAcceptances = async () => {
         const { data, error } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         console.log('FETCH Acceptances - Data:', data, 'Error:', error);
+        if (error) {
+            console.error('Acceptances Error Details:', JSON.stringify(error, null, 2));
+        }
         if (data) setAcceptances(data);
     };
 
     const fetchProposals = async () => {
         const { data, error } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
         console.log('FETCH Proposals - Data:', data, 'Error:', error);
+        if (error) {
+            console.error('Proposals Error Details:', JSON.stringify(error, null, 2));
+        }
         if (data) setProposals(data);
     };
 
