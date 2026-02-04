@@ -190,42 +190,62 @@ const TrafficManagement: React.FC = () => {
                             Pesquisa Inicial
                         </h3>
 
-                        {trafficProject?.survey_status === 'completed' ? (
-                            <div className="space-y-3 relative z-10">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
-                                    <CheckCircle size={14} /> Concluído
-                                </span>
-                                <button
-                                    onClick={() => setShowSurveyModal(true)}
-                                    className="block w-full text-center py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
-                                >
-                                    Ver Respostas
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 relative z-10">
-                                <button
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
-                                        navigator.clipboard.writeText(url);
-                                        alert('Link copiado para a área de transferência!');
-                                    }}
-                                    className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Send size={16} />
-                                    Enviar Pesquisa
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
-                                        window.open(url, '_blank');
-                                    }}
-                                    className="w-full text-xs text-slate-400 hover:text-slate-600 underline"
-                                >
-                                    Abrir Pesquisa (Teste)
-                                </button>
-                            </div>
-                        )}
+                        {/* Content */}
+                        <div className="space-y-4 relative z-10">
+                            {/* Always visible: Send Link */}
+                            <button
+                                onClick={() => {
+                                    const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
+                                    navigator.clipboard.writeText(url);
+                                    alert('Link copiado para a área de transferência!');
+                                }}
+                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Send size={16} />
+                                Enviar Pesquisa
+                            </button>
+
+                            {/* Visibility Logic for Responses & Validation */}
+                            {trafficProject?.survey_data && (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+                                        {trafficProject.survey_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                                <CheckCircle size={12} /> Validado
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                Pendente
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setShowSurveyModal(true)}
+                                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                    >
+                                        Ver Respostas Recebidas
+                                    </button>
+
+                                    {trafficProject.survey_status !== 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('survey_status', 'completed')}
+                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle size={16} />
+                                            Validar & Concluir
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {!trafficProject?.survey_data && (
+                                <p className="text-xs text-center text-slate-400">
+                                    Aguardando resposta do cliente...
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     {/* 2. Account Setup */}

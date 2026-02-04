@@ -107,7 +107,7 @@ const TrafficSurvey: React.FC = () => {
                 // If the link uses acceptance_id, we need to query by acceptance_id.
                 .update({
                     survey_data: answers,
-                    survey_status: 'completed'
+                    // survey_status: 'completed' // Removed: Status is now manually updated by manager
                 })
                 .eq('id', id); // We will assume the URL links to ID directly for simplicity
 
