@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
-import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, Zap, TrendingUp, Flag } from 'lucide-react';
+import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, TrendingUp, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface TrafficProject {
@@ -283,7 +283,16 @@ const TrafficManagement: React.FC = () => {
                                             </span>
                                             <h3 className="text-lg font-bold text-slate-800 dark:text-white">{campaign.name}</h3>
                                         </div>
-                                        <span className="text-xs font-mono text-slate-500">{new Date().toLocaleDateString()}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs font-mono text-slate-500">{new Date(campaign.created_at || new Date()).toLocaleDateString()}</span>
+                                            <button
+                                                onClick={() => handleDeleteCampaign(campaign.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Excluir Campanha"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Campaign Track */}
