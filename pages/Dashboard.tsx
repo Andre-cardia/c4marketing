@@ -202,9 +202,9 @@ const Dashboard: React.FC = () => {
                                     <span className="block text-2xl font-black text-blue-700 dark:text-blue-400">{clientStatusCounts.development}</span>
                                     <span className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">Em Dev</span>
                                 </div>
-                                <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
-                                    <span className="block text-2xl font-black text-slate-800 dark:text-white">{totalUsers}</span>
-                                    <span className="text-xs text-slate-500 font-bold uppercase">Usuários</span>
+                                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl text-center">
+                                    <span className="block text-2xl font-black text-orange-700 dark:text-orange-400">{clientStatusCounts.suspended}</span>
+                                    <span className="text-xs text-orange-600 dark:text-orange-400 font-bold uppercase">Suspensos</span>
                                 </div>
                             </div>
                         </div>
