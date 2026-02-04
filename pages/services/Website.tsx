@@ -1,11 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import { ArrowLeft, Globe } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 const Website: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [companyName, setCompanyName] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchProjectDetails = async () => {
+            if (!id) return;
+            try {
+                const { data, error } = await supabase
+                    .from('acceptances')
+                    .select('company_name')
+                    .eq('id', id)
+                    .single();
+
+                if (data) {
+                    setCompanyName(data.company_name);
+                }
+            } catch (error) {
+                console.error('Error fetching project:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProjectDetails();
+    }, [id]);
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -24,7 +50,9 @@ const Website: React.FC = () => {
                         <Globe className="w-8 h-8 text-cyan-500" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Website Institucional</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mb-8">Projeto #{id}</p>
+                    <p className="text-slate-500 dark:text-slate-400 mb-8">
+                        {loading ? 'Carregando...' : companyName}
+                    </p>
 
                     <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl inline-block text-slate-400 text-sm">
                         🚧 Módulo em desenvolvimento...
