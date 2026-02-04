@@ -215,12 +215,12 @@ const Dashboard: React.FC = () => {
                                                 {/* Bar Created */}
                                                 <div
                                                     className="w-3 sm:w-6 bg-slate-300 dark:bg-slate-700 rounded-t-sm transition-all duration-500"
-                                                    style={{ height: `${Math.max(4, hCreated)}%`, opacity: hCreated > 0 ? 1 : 0.3 }}
+                                                    style={{ height: `${Math.max(4, hCreatedPx)}px`, opacity: hCreatedPx > 0 ? 1 : 0.3 }}
                                                 ></div>
                                                 {/* Bar Accepted */}
                                                 <div
                                                     className="w-3 sm:w-6 bg-brand-coral rounded-t-sm transition-all duration-500 opacity-90"
-                                                    style={{ height: `${Math.max(4, hAccepted)}%`, opacity: hAccepted > 0 ? 1 : 0.3 }}
+                                                    style={{ height: `${Math.max(4, hAcceptedPx)}px`, opacity: hAcceptedPx > 0 ? 1 : 0.3 }}
                                                 ></div>
                                             </div>
                                             <span className="mt-3 text-xs font-bold text-slate-400 uppercase">{monthKey}</span>
