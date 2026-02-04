@@ -32,6 +32,7 @@ const App: React.FC = () => {
             <Route path="/p/:slug" element={<ProposalView />} />
             <Route path="/p/:slug/contract" element={<ContractView />} />
             <Route path="/contracts/:id" element={<ContractView />} />
+            <Route path="/external/traffic-survey/:id" element={<TrafficSurvey />} />
             <Route
               path="/dashboard"
               element={
@@ -40,43 +41,28 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute>
-                  <Users />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/proposals/new"
-              element={
-                <ProtectedRoute>
-                  <CreateProposal />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/proposals"
-              element={
-                <ProtectedRoute>
-                  <Proposals />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <ProtectedRoute>
-                  <Projects />
-                </ProtectedRoute>
-              }
-            />
+            {/* ... */}
             <Route
               path="/projects/:id/traffic"
               element={
                 <ProtectedRoute>
                   <TrafficManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:id/traffic/strategy"
+              element={
+                <ProtectedRoute>
+                  <StrategyMeeting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:id/traffic/campaign/:campaignId/:stageId"
+              element={
+                <ProtectedRoute>
+                  <CampaignStage />
                 </ProtectedRoute>
               }
             />
