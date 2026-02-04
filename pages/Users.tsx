@@ -89,12 +89,12 @@ const Users: React.FC = () => {
             // Check if user already exists in profile table
             const { data: existing } = await supabase.from('app_users').select('id').eq('email', newUser.email).single();
             if (existing) {
-                alert('Este e-mail já está cadastrado.');
+                alert('Este e-mail já está cadastrado no sistema (perfil encontrado).');
                 setCreating(false);
                 return;
             }
 
-            // Create a temporary client to sign up the new user without logging out the admin
+            // Create a temporary client to interact with Auth without affecting admin session
             const tempSupabase = createClient(
                 import.meta.env.VITE_SUPABASE_URL,
                 import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -107,25 +107,46 @@ const Users: React.FC = () => {
                 }
             );
 
-            // Sign up the new user in Supabase Auth
-            const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+            let authUser = null;
+
+            // STRATEGY: Try to Log In first.
+            // If the user already exists in Auth (from previous attempts), we just need to creates their profile.
+            // This avoids "email rate limit" caused by calling signUp repeatedly on an existing user.
+            const { data: loginData, error: loginError } = await tempSupabase.auth.signInWithPassword({
                 email: newUser.email,
-                password: newUser.password,
-                options: {
-                    data: {
-                        full_name: newUser.name,
-                    }
-                }
+                password: newUser.password
             });
 
-            if (authError) throw authError;
+            if (loginData.user) {
+                console.log('User already exists in Auth, skipping creation.');
+                authUser = loginData.user;
+            } else {
+                // If login fails, try to Sign Up
+                console.log('User not found (or wrong pass), attempting creation.');
+                const { data: signUpData, error: signUpError } = await tempSupabase.auth.signUp({
+                    email: newUser.email,
+                    password: newUser.password,
+                    options: {
+                        data: { full_name: newUser.name }
+                    }
+                });
+
+                if (signUpError) {
+                    // Specific handling for common errors
+                    if (signUpError.message.includes('already registered')) {
+                        // Edge case: User exists but password provided was wrong in login attempt
+                        alert('Este usuário já possui uma conta de autenticação (Auth), mas a senha informada está incorreta. Não foi possível vincular.');
+                        throw signUpError;
+                    }
+                    throw signUpError;
+                }
+
+                authUser = signUpData.user;
+            }
 
             // Create the user profile in app_users using the admin's client
-            if (authData.user) {
+            if (authUser) {
                 const { error: dbError } = await supabase.from('app_users').insert([{
-                    // Use the auth user id if possible, though our RBAC relies on email matching
-                    // If app_users.id is a uuid primary key, we can let it auto-gen or set it
-                    // Ideally we sync them, but safe to just insert for now based on current schema usage
                     name: newUser.name,
                     email: newUser.email,
                     phone: newUser.phone,
@@ -137,11 +158,17 @@ const Users: React.FC = () => {
                 setShowModal(false);
                 setNewUser({ name: '', email: '', phone: '', password: '', role: 'leitor' });
                 fetchUsers();
-                alert('Usuário cadastrado com sucesso! As credenciais de acesso foram criadas.');
+                alert('Usuário vinculado e cadastrado com sucesso!');
             }
         } catch (error: any) {
             console.error('Error creating user:', error);
-            alert(error.message || 'Erro ao criar usuário.');
+            let msg = error.message || 'Erro ao criar usuário.';
+
+            if (msg.includes('rate limit')) {
+                msg = 'Limite de tentativas do Supabase atingido. Aguarde alguns minutos ou use outro e-mail.';
+            }
+
+            alert(msg);
         } finally {
             setCreating(false);
         }
