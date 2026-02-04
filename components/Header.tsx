@@ -32,13 +32,17 @@ const Header: React.FC<HeaderProps> = ({ darkMode, setDarkMode }) => {
           >
             Dashboard
           </button>
-          {/* Placeholder for role check - for now visible to all or we'll control logic later */}
           <button
-            onClick={() => navigate('/users')}
-            className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/users' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            onClick={() => navigate('/proposals')}
+            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
           >
-            <UsersIcon className="w-4 h-4" />
-            Usuários
+            Propostas
+          </button>
+          <button
+            onClick={() => navigate('/projects')}
+            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/projects') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+          >
+            Projetos
           </button>
 
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>

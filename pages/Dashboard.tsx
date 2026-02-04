@@ -187,7 +187,7 @@ const Dashboard: React.FC = () => {
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                                 <Users className="w-5 h-5 text-brand-coral" />
-                                Status de Clientes
+                                Status de Projetos
                             </h3>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center">
@@ -227,13 +227,13 @@ const Dashboard: React.FC = () => {
                 {/* Primary Navigation Buttons */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                     <button
-                        onClick={() => navigate('/clients')}
+                        onClick={() => navigate('/projects')}
                         className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left"
                     >
                         <div className="bg-brand-coral/10 w-12 h-12 flex items-center justify-center rounded-2xl text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors mb-4">
                             <Users className="w-6 h-6" />
                         </div>
-                        <span className="block text-lg font-bold text-slate-800 dark:text-white mb-1">Gestão de Clientes</span>
+                        <span className="block text-lg font-bold text-slate-800 dark:text-white mb-1">Gestão de Projetos</span>
                         <span className="text-sm text-slate-500 dark:text-slate-400">Acompanhar projetos e status</span>
                     </button>
 
