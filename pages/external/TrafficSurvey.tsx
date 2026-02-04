@@ -70,15 +70,46 @@ const TrafficSurvey: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [currentSection, setCurrentSection] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [completed, setCompleted] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
     const [error, setError] = useState('');
 
+    useEffect(() => {
+        const loadSurvey = async () => {
+            if (!id) return;
+            try {
+                const { data, error } = await supabase
+                    .from('traffic_projects')
+                    .select('survey_data, survey_status')
+                    .eq('id', id)
+                    .single();
+
+                if (data) {
+                    if (data.survey_data) {
+                        setAnswers(data.survey_data);
+                    }
+                    if (data.survey_status === 'completed') {
+                        setIsLocked(true);
+                        setCompleted(true);
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading survey:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadSurvey();
+    }, [id]);
+
     const handleAnswerChange = (qId: string, value: any) => {
+        if (isLocked) return;
         setAnswers(prev => ({ ...prev, [qId]: value }));
     };
 
     const handleCheckboxChange = (qId: string, option: string, checked: boolean) => {
+        if (isLocked) return;
         const current = answers[qId] || [];
         if (checked) {
             handleAnswerChange(qId, [...current, option]);
@@ -102,14 +133,10 @@ const TrafficSurvey: React.FC = () => {
         try {
             const { error: updateError } = await supabase
                 .from('traffic_projects')
-                // Using 'acceptance_id' as the public ID token for now, or the PK directly. 
-                // Assuming 'id' param is the traffic_project_id.
-                // If the link uses acceptance_id, we need to query by acceptance_id.
                 .update({
                     survey_data: answers,
-                    // survey_status: 'completed' // Removed: Status is now manually updated by manager
                 })
-                .eq('id', id); // We will assume the URL links to ID directly for simplicity
+                .eq('id', id);
 
             if (updateError) throw updateError;
             setCompleted(true);
@@ -121,15 +148,41 @@ const TrafficSurvey: React.FC = () => {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-coral"></div>
+            </div>
+        );
+    }
+
     if (completed) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full text-center">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle className="w-10 h-10 text-green-600" />
+                    <div className={`w-20 h-20 ${isLocked ? 'bg-green-100' : 'bg-blue-100'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+                        <CheckCircle className={`w-10 h-10 ${isLocked ? 'text-green-600' : 'text-blue-600'}`} />
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-800 mb-4">Pesquisa Recebida!</h1>
-                    <p className="text-slate-600 mb-8">Obrigado por dedicar seu tempo. Nossos especialistas já receberam suas respostas e estão trabalhando na sua estratégia.</p>
+
+                    <h1 className="text-3xl font-bold text-slate-800 mb-4">
+                        {isLocked ? 'Pesquisa Validada!' : 'Respostas Salvas!'}
+                    </h1>
+
+                    <p className="text-slate-600 mb-8">
+                        {isLocked
+                            ? 'As informações já foram validadas pelo gestor e estão sendo utilizadas na estratégia. Não é possível mais editar.'
+                            : 'Suas respostas foram registradas. Você pode voltar e editar se necessário enquanto nossa equipe analisa.'}
+                    </p>
+
+                    {!isLocked && (
+                        <button
+                            onClick={() => setCompleted(false)}
+                            className="px-6 py-3 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center gap-2 mx-auto"
+                        >
+                            <ArrowLeft size={18} />
+                            Revisar / Editar Respostas
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -254,7 +307,7 @@ const TrafficSurvey: React.FC = () => {
                             disabled={loading}
                             className="flex items-center gap-2 px-8 py-3 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
                         >
-                            {loading ? 'Enviando...' : currentSection === SECTIONS.length - 1 ? 'Finalizar Pesquisa' : 'Próxima Seção'}
+                            {loading ? 'Salvando...' : currentSection === SECTIONS.length - 1 ? 'Salvar & Finalizar' : 'Próxima Seção'}
                             {!loading && currentSection < SECTIONS.length - 1 && <ArrowRight size={20} />}
                         </button>
                     </div>
