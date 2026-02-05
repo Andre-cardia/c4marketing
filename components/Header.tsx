@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Moon, Sun, Users as UsersIcon } from 'lucide-react';
+import { LogOut, Moon, Sun } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useUserRole } from '../lib/UserRoleContext';
@@ -8,12 +8,22 @@ import { useTheme } from '../lib/ThemeContext';
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, loading } = useUserRole();
+  const { userRole, loading, fullName, avatarUrl, email } = useUserRole();
   const { darkMode, setDarkMode } = useTheme();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
+  };
+
+  const getUserInitials = () => {
+    if (fullName) {
+      const names = fullName.split(' ');
+      if (names.length >= 2) return `${names[0][0]}${names[1][0]}`.toUpperCase();
+      return names[0].substring(0, 2).toUpperCase();
+    }
+    if (email) return email.substring(0, 2).toUpperCase();
+    return 'U';
   };
 
   return (
@@ -61,6 +71,27 @@ const Header: React.FC = () => {
 
           <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
 
+          {/* User Profile */}
+          <div
+            onClick={() => navigate('/account')}
+            className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 p-1 rounded-full pr-3 transition-colors group"
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-600"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-brand-coral/10 text-brand-coral flex items-center justify-center text-xs font-bold border border-brand-coral/20">
+                {getUserInitials()}
+              </div>
+            )}
+            <span className="hidden md:block text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-brand-coral">
+              {fullName || email?.split('@')[0] || 'Minha Conta'}
+            </span>
+          </div>
+
           <button
             onClick={() => setDarkMode(!darkMode)}
             className="text-slate-400 hover:text-brand-coral p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
@@ -68,12 +99,13 @@ const Header: React.FC = () => {
           >
             {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
+
           <button
             onClick={handleLogout}
-            className="text-slate-500 hover:text-red-500 flex items-center gap-2 text-sm font-medium transition-colors"
+            className="text-slate-500 hover:text-red-500 p-2 rounded-full transition-colors"
+            title="Sair"
           >
-            <LogOut className="w-4 h-4" />
-            Sair
+            <LogOut className="w-5 h-5" />
           </button>
         </div>
       </div>

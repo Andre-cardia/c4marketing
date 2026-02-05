@@ -19,6 +19,7 @@ import CampaignStage from './pages/services/traffic/CampaignStage';
 import TrafficSurvey from './pages/external/TrafficSurvey';
 import LandingPageSurvey from './pages/external/LandingPageSurvey';
 import WebsiteSurvey from './pages/external/WebsiteSurvey';
+import Account from './pages/Account';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectionRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
@@ -37,6 +38,14 @@ const App: React.FC = () => {
             <Route path="/external/traffic-survey/:id" element={<TrafficSurvey />} />
             <Route path="/external/lp-survey/:id" element={<LandingPageSurvey />} />
             <Route path="/external/website-survey/:id" element={<WebsiteSurvey />} />
+            <Route
+              path="/account"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}>
+                  <Account />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dashboard"
               element={
