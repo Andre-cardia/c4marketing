@@ -4,6 +4,7 @@ import Header from '../../components/Header';
 import { ArrowLeft, Globe, Send, CheckCircle, Settings, Users, Plus, Edit, Eye, MessageSquare, Trash2, PenTool, LayoutTemplate, Share2, Activity } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './website/SurveyAnswersModal';
+import AccessGuideModal from '../../components/AccessGuideModal';
 
 interface WebsiteProject {
     id: string;
@@ -12,6 +13,7 @@ interface WebsiteProject {
     account_setup_status: 'pending' | 'completed';
     briefing_status: 'pending' | 'completed';
     survey_data?: any;
+    access_guide_data?: any;
 }
 
 interface Website {
@@ -29,6 +31,7 @@ const WebsiteManagement: React.FC = () => {
     const [websites, setWebsites] = useState<Website[]>([]);
     const [loading, setLoading] = useState(true);
     const [showSurveyModal, setShowSurveyModal] = useState(false);
+    const [showAccessGuideModal, setShowAccessGuideModal] = useState(false);
 
     // Shared Fetch Function
     const loadProjectData = async () => {
@@ -88,6 +91,11 @@ const WebsiteManagement: React.FC = () => {
     const handleOpenSurveyModal = async () => {
         await loadProjectData(); // Refresh data first
         setShowSurveyModal(true);
+    };
+
+    const handleOpenAccessGuideModal = async () => {
+        await loadProjectData();
+        setShowAccessGuideModal(true);
     };
 
     const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status' | 'briefing_status', value: 'completed' | 'pending') => {
@@ -254,25 +262,37 @@ const WebsiteManagement: React.FC = () => {
                             <Settings className="w-5 h-5 text-purple-500" />
                             Configuração
                         </h3>
-                        {webProject?.account_setup_status === 'completed' ? (
-                            <div className="relative z-10">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
-                                    <CheckCircle size={14} /> Contas Vinculadas
-                                </span>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 relative z-10">
-                                <button className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors">
-                                    Enviar Guia de Acesso
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                    className="w-full text-xs text-base text-slate-400 hover:text-purple-600 underline"
-                                >
-                                    Marcar como Feito (Dev)
-                                </button>
-                            </div>
-                        )}
+                        <div className="space-y-3 relative z-10">
+                            <button
+                                onClick={() => {
+                                    // Modified: Link to AccessGuideSurvey with type=website
+                                    const url = `${window.location.origin}/external/access-guide/${webProject?.id}?type=website`;
+                                    navigator.clipboard.writeText(url);
+                                    alert('Link do Guia de Acesso copiado!');
+                                }}
+                                className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors"
+                            >
+                                Enviar Guia de Acesso
+                            </button>
+
+                            {webProject?.account_setup_status === 'completed' ? (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 justify-center text-green-600 font-bold text-sm bg-green-50 py-1 rounded-lg">
+                                        <CheckCircle size={16} /> Dados Recebidos
+                                    </div>
+                                    <button
+                                        onClick={handleOpenAccessGuideModal}
+                                        className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
+                                    >
+                                        Ver Credenciais
+                                    </button>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-center text-slate-400 italic">
+                                    Aguardando dados de acesso...
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     {/* 3. Briefing Meeting */}
@@ -407,6 +427,13 @@ const WebsiteManagement: React.FC = () => {
                 isCompleted={webProject?.survey_status === 'completed'}
                 onValidate={() => handleUpdateStatus('survey_status', 'completed')}
                 onReopen={() => handleUpdateStatus('survey_status', 'pending')}
+            />
+
+            {/* Access Guide Modal */}
+            <AccessGuideModal
+                isOpen={showAccessGuideModal}
+                onClose={() => setShowAccessGuideModal(false)}
+                data={webProject?.access_guide_data || {}}
             />
         </div>
     );
