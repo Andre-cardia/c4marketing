@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
-import { ArrowLeft, Layout, Send, CheckCircle, Settings, Users, Plus, Edit, Eye, MessageSquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, Layout, Send, CheckCircle, Settings, Users, Plus, Edit, Eye, MessageSquare, Trash2, PenTool, LayoutTemplate, Share2, Activity } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './lp/SurveyAnswersModal';
 
@@ -146,8 +146,8 @@ const LandingPageManagement: React.FC = () => {
 
     const STATUS_FLOW = [
         { id: 'content_received', label: 'Recebimento de Conteúdos', icon: File },
-        { id: 'design', label: 'Design e Template', icon: PenTool }, // Using PenTool as icon placeholder
-        { id: 'approval', label: 'Aprovação', icon: MessagesSquare }, // Using MessagesSquare as approval placeholder
+        { id: 'design', label: 'Design e Template', icon: LayoutTemplate },
+        { id: 'approval', label: 'Aprovação', icon: MessageSquare },
         { id: 'adjustments', label: 'Ajustes', icon: Settings },
         { id: 'delivered', label: 'Entrega', icon: CheckCircle }
     ];
@@ -184,134 +184,215 @@ const LandingPageManagement: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Top Section - Account Level */}
-                <div className="flex flex-wrap gap-4 mb-12">
-                    {/* 1. Send Survey */}
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1 min-w-[250px]">
-                        <button
-                            onClick={() => {
-                                const url = `${window.location.origin}/external/lp-survey/${lpProject?.id}`;
-                                navigator.clipboard.writeText(url);
-                                alert('Link da pesquisa copiado!');
-                            }}
-                            className="w-full py-2.5 px-4 bg-white border-2 border-brand-coral text-brand-coral rounded-xl font-bold text-sm hover:bg-brand-coral hover:text-white transition-all flex items-center justify-center gap-2 mb-2"
-                        >
-                            <Send size={16} /> Enviar Pesquisa
-                        </button>
+                {/* Onboarding Section - Grid Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
 
-                        {lpProject?.survey_data && (
+                    {/* 1. Send Survey */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
+                            <Send className="w-5 h-5 text-blue-500" />
+                            Pesquisa Inicial
+                        </h3>
+
+                        <div className="space-y-4 relative z-10">
+                            {/* Send Button */}
                             <button
-                                onClick={handleOpenSurveyModal}
-                                className="w-full py-2 text-sm font-medium text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 flex items-center justify-center gap-2"
+                                onClick={() => {
+                                    const url = `${window.location.origin}/external/lp-survey/${lpProject?.id}`;
+                                    navigator.clipboard.writeText(url);
+                                    alert('Link copiado!');
+                                }}
+                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Eye size={16} /> Ver Resposta da Pesquisa
+                                <Send size={16} /> Enviar Pesquisa
                             </button>
-                        )}
-                        {!lpProject?.survey_data && (
-                            <div className="text-center text-xs text-slate-400 py-2">
-                                Aguardando resposta...
+
+                            {/* Validation Logic */}
+                            {lpProject?.survey_data && (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+                                        {lpProject.survey_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                                <CheckCircle size={12} /> Validado
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                Pendente
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={handleOpenSurveyModal}
+                                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+                                    >
+                                        Ver Respostas
+                                    </button>
+                                    {lpProject.survey_status !== 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('survey_status', 'completed')}
+                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle size={16} /> Validar
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            {!lpProject?.survey_data && (
+                                <p className="text-xs text-center text-slate-400 italic">
+                                    Aguardando resposta do cliente...
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 2. Account Setup */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-purple-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
+                            <Settings className="w-5 h-5 text-purple-500" />
+                            Configuração
+                        </h3>
+                        {lpProject?.account_setup_status === 'completed' ? (
+                            <div className="relative z-10">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
+                                    <CheckCircle size={14} /> Contas Vinculadas
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 relative z-10">
+                                <button className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors">
+                                    Enviar Guia de Acesso
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                    className="w-full text-xs text-base text-slate-400 hover:text-purple-600 underline"
+                                >
+                                    Marcar como Feito (Dev)
+                                </button>
                             </div>
                         )}
                     </div>
 
-                    {/* 2. Account Setup */}
-                    <div className={`p-4 rounded-2xl border flex-1 min-w-[250px] flex flex-col justify-center items-center gap-2 transition-all ${lpProject?.account_setup_status === 'completed' ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`font-bold ${lpProject?.account_setup_status === 'completed' ? 'text-blue-700' : 'text-slate-700'}`}>Configuração de Conta</h3>
-                        {lpProject?.account_setup_status === 'completed' ? (
-                            <CheckCircle className="text-blue-500" size={24} />
-                        ) : (
-                            <button
-                                onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                className="text-xs px-3 py-1 bg-slate-100 rounded-full hover:bg-slate-200"
-                            >
-                                Marcar como Feito
-                            </button>
-                        )}
-                    </div>
-
                     {/* 3. Briefing Meeting */}
-                    <div className={`p-4 rounded-2xl border flex-1 min-w-[250px] flex flex-col justify-center items-center gap-2 transition-all ${lpProject?.briefing_status === 'completed' ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
-                        <h3 className={`font-bold ${lpProject?.briefing_status === 'completed' ? 'text-amber-700' : 'text-slate-700'}`}>Reunião de Briefing</h3>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
+                            <Users className="w-5 h-5 text-amber-500" />
+                            Reunião de Briefing
+                        </h3>
                         {lpProject?.briefing_status === 'completed' ? (
-                            <CheckCircle className="text-amber-500" size={24} />
+                            <div className="relative z-10">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
+                                    <CheckCircle size={14} /> Briefing Realizado
+                                </span>
+                            </div>
                         ) : (
-                            <button
-                                onClick={() => handleUpdateStatus('briefing_status', 'completed')}
-                                className="text-xs px-3 py-1 bg-slate-100 rounded-full hover:bg-slate-200"
-                            >
-                                Marcar como Feito
-                            </button>
+                            <div className="space-y-3 relative z-10">
+                                <p className="text-sm text-slate-500">Alinhe as expectativas e o design da página.</p>
+                                <button
+                                    onClick={() => handleUpdateStatus('briefing_status', 'completed')}
+                                    className="w-full py-2 border border-amber-500 text-amber-600 rounded-xl font-bold text-sm hover:bg-amber-50 transition-colors"
+                                >
+                                    Confirmar Reunião
+                                </button>
+                            </div>
                         )}
                     </div>
 
-                    {/* 4. New LP Button */}
-                    <button
-                        onClick={handleCreateLandingPage}
-                        className="flex-1 min-w-[250px] p-4 rounded-2xl border-2 border-dashed border-slate-300 hover:border-brand-coral hover:bg-brand-coral/5 transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-brand-coral group"
-                    >
-                        <Plus className="group-hover:scale-110 transition-transform" />
-                        <span className="font-bold">Nova Landing Page +</span>
-                    </button>
+                    {/* 4. Action: New LP Button */}
+                    <div className="flex items-center justify-center">
+                        <button
+                            onClick={handleCreateLandingPage}
+                            className="w-full h-full min-h-[160px] rounded-2xl border-2 border-dashed border-slate-300 hover:border-brand-coral bg-slate-50 dark:bg-slate-800/50 hover:bg-brand-coral/5 transition-all flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-brand-coral group cursor-pointer"
+                        >
+                            <div className="p-3 rounded-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 group-hover:border-brand-coral transition-colors">
+                                <Plus size={24} className="group-hover:scale-110 transition-transform" />
+                            </div>
+                            <span className="font-bold text-lg">Nova Landing Page</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Landing Pages List */}
-                <div className="space-y-6">
-                    {landingPages.map(page => (
-                        <div key={page.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative pr-12">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6 border-b pb-2">{page.name}</h3>
+                <div className="space-y-8">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white border-l-4 border-green-500 pl-4">Páginas em Produção</h2>
 
-                            {/* Delete Button */}
-                            <button
-                                onClick={() => handleDeletePage(page.id)}
-                                className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                title="Apagar Landing Page"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                    {landingPages.map(page => (
+                        <div key={page.id} className="bg-white dark:bg-slate-800 p-0 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+                            {/* Page Header */}
+                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                                <div className="flex items-center gap-3">
+                                    <span className="p-2 bg-green-100 text-green-600 rounded-lg">
+                                        <Layout size={20} />
+                                    </span>
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{page.name}</h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-mono text-slate-400">{new Date(page.created_at).toLocaleDateString()}</span>
+                                    <button
+                                        onClick={() => handleDeletePage(page.id)}
+                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Apagar Landing Page"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </div>
 
                             {/* Status Flow */}
-                            <div className="flex flex-wrap gap-4 justify-between">
-                                {STATUS_FLOW.map((step, idx) => {
-                                    const currentIndex = getStatusIndex(page.status);
-                                    const isCompleted = idx <= currentIndex;
-                                    const isCurrent = idx === currentIndex;
-                                    const isNext = idx === currentIndex + 1;
+                            <div className="p-6">
+                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                                    {STATUS_FLOW.map((step, idx) => {
+                                        const currentIndex = getStatusIndex(page.status);
+                                        const isCompleted = idx <= currentIndex;
+                                        const isCurrent = idx === currentIndex;
+                                        const isNext = idx === currentIndex + 1;
 
-                                    return (
-                                        <button
-                                            key={step.id}
-                                            disabled={!isNext && !isCompleted}
-                                            onClick={() => {
-                                                if (isNext || (isCompleted && idx !== currentIndex)) { // Allow rollback or advance
-                                                    handleUpdatePageStatus(page.id, step.id as any);
-                                                }
-                                            }}
-                                            className={`flex-1 min-w-[140px] p-4 rounded-xl border transition-all flex flex-col items-center gap-2 text-center relative
-                                                ${isCurrent
-                                                    ? 'border-brand-coral bg-brand-coral text-white ring-2 ring-brand-coral ring-offset-2'
-                                                    : isCompleted
-                                                        ? 'border-green-200 bg-green-50 text-green-700'
-                                                        : 'border-slate-100 bg-slate-50 text-slate-300 cursor-default'
-                                                }
-                                                ${isNext ? 'hover:border-brand-coral hover:bg-white hover:text-brand-coral cursor-pointer border-dashed' : ''}
-                                            `}
-                                        >
-                                            {/* We need some icons here, but I'll use placeholders for now or import generic ones */}
-                                            {/* Using generic logic for icons for now */}
-                                            <div className="font-bold text-sm">
-                                                {step.label}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                                        return (
+                                            <button
+                                                key={step.id}
+                                                disabled={!isNext && !isCompleted}
+                                                onClick={() => {
+                                                    if (isNext || (isCompleted && idx !== currentIndex)) { // Allow rollback or advance
+                                                        handleUpdatePageStatus(page.id, step.id as any);
+                                                    }
+                                                }}
+                                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all group relative overflow-hidden
+                                                    ${isCurrent
+                                                        ? 'border-brand-coral/50 bg-gradient-to-br from-brand-coral/10 to-brand-coral/5'
+                                                        : isCompleted
+                                                            ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900/30'
+                                                            : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 opacity-60 cursor-default'
+                                                    }
+                                                    ${isNext ? 'hover:border-brand-coral hover:bg-white dark:hover:bg-slate-800 hover:text-brand-coral cursor-pointer border-dashed hover:shadow-md' : ''}
+                                                `}
+                                            >
+                                                <div className={`mb-3 transition-transform group-hover:scale-110 
+                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-green-500' : 'text-slate-400'}
+                                                `}>
+                                                    <step.icon size={28} />
+                                                </div>
+                                                <span className={`text-sm font-bold text-center
+                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-green-700 dark:text-green-400' : 'text-slate-400'}
+                                                `}>
+                                                    {step.label}
+                                                </span>
+
+                                                {isCurrent && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-coral"></div>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     ))}
 
                     {landingPages.length === 0 && (
-                        <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                            <p className="text-slate-400 font-medium">Nenhuma Landing Page criada.</p>
-                            <p className="text-slate-400 text-sm">Clique em "Nova Landing Page +" para começar.</p>
+                        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                            <p className="text-slate-400 font-medium mb-2">Nenhuma Landing Page criada.</p>
+                            <p className="text-slate-500 text-sm">Clique em "Nova Landing Page" acima para começar.</p>
                         </div>
                     )}
                 </div>
@@ -331,9 +412,8 @@ const LandingPageManagement: React.FC = () => {
     );
 };
 
-// Simple Icon Placeholders to avoid missing imports
-const File = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>;
-const PenTool = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><path d="M2 2l7.586 7.586" /><circle cx="11" cy="11" r="2" /></svg>;
-const MessagesSquare = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z" /><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" /></svg>;
+// Simple Icon Placeholders to avoid missing imports if lucide-react doesn't have them all 
+// But I imported them at top. If any fails, we can fallback.
+const File = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>;
 
 export default LandingPageManagement;
