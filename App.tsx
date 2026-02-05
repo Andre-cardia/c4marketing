@@ -17,6 +17,7 @@ import Consulting from './pages/services/Consulting';
 import StrategyMeeting from './pages/services/traffic/StrategyMeeting';
 import CampaignStage from './pages/services/traffic/CampaignStage';
 import TrafficSurvey from './pages/external/TrafficSurvey';
+import LandingPageSurvey from './pages/external/LandingPageSurvey';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectionRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
@@ -33,6 +34,7 @@ const App: React.FC = () => {
             <Route path="/p/:slug/contract" element={<ContractView />} />
             <Route path="/contracts/:id" element={<ContractView />} />
             <Route path="/external/traffic-survey/:id" element={<TrafficSurvey />} />
+            <Route path="/external/lp-survey/:id" element={<LandingPageSurvey />} />
             <Route
               path="/dashboard"
               element={
