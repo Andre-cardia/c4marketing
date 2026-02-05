@@ -276,17 +276,34 @@ const LandingPageManagement: React.FC = () => {
                                 Enviar Guia de Acesso
                             </button>
 
-                            {lpProject?.account_setup_status === 'completed' ? (
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 justify-center text-green-600 font-bold text-sm bg-green-50 py-1 rounded-lg">
-                                        <CheckCircle size={16} /> Dados Recebidos
+                            {lpProject?.access_guide_data ? (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+                                        {lpProject.account_setup_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                                <CheckCircle size={12} /> Validado
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                Pendente
+                                            </span>
+                                        )}
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
                                         className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
                                     >
-                                        Ver Credenciais
+                                        Ver Respostas
                                     </button>
+                                    {lpProject.account_setup_status !== 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle size={16} /> Validar
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-xs text-center text-slate-400 italic">
