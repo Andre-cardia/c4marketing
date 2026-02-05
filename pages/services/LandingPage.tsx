@@ -271,9 +271,9 @@ const LandingPageManagement: React.FC = () => {
                                     navigator.clipboard.writeText(url);
                                     alert('Link do Guia de Acesso copiado!');
                                 }}
-                                className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors"
+                                className="w-full py-2.5 px-4 bg-purple-500 text-white rounded-xl font-bold text-sm hover:bg-purple-600 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-2"
                             >
-                                Enviar Guia de Acesso
+                                <Send size={16} /> Enviar Guia de Acesso
                             </button>
 
                             {lpProject?.access_guide_data ? (
