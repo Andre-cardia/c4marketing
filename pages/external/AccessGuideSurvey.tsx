@@ -187,7 +187,7 @@ const AccessGuideSurvey: React.FC = () => {
                 .from(table)
                 .update({
                     access_guide_data: answers,
-                    account_setup_status: 'completed' // Mark as completed
+                    // account_setup_status: 'completed' // Removed auto-completion to allow manual validation
                 })
                 .eq('id', id);
 

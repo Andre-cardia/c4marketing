@@ -270,22 +270,39 @@ const WebsiteManagement: React.FC = () => {
                                     navigator.clipboard.writeText(url);
                                     alert('Link do Guia de Acesso copiado!');
                                 }}
-                                className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors"
+                                className="w-full py-2.5 px-4 bg-purple-500 text-white rounded-xl font-bold text-sm hover:bg-purple-600 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-2"
                             >
-                                Enviar Guia de Acesso
+                                <Send size={16} /> Enviar Guia de Acesso
                             </button>
 
-                            {webProject?.account_setup_status === 'completed' ? (
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 justify-center text-green-600 font-bold text-sm bg-green-50 py-1 rounded-lg">
-                                        <CheckCircle size={16} /> Dados Recebidos
+                            {webProject?.access_guide_data ? (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+                                        {webProject.account_setup_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                                <CheckCircle size={12} /> Validado
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                Pendente
+                                            </span>
+                                        )}
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
                                         className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
                                     >
-                                        Ver Credenciais
+                                        Ver Respostas
                                     </button>
+                                    {webProject.account_setup_status !== 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle size={16} /> Validar
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-xs text-center text-slate-400 italic">
