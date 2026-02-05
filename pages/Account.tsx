@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +10,13 @@ const Account: React.FC = () => {
     const [fullName, setFullName] = useState('');
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Password State
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [updatingPassword, setUpdatingPassword] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -87,6 +94,44 @@ const Account: React.FC = () => {
         }
     };
 
+    const handleUpdatePassword = async () => {
+        if (!password || !confirmPassword) {
+            setMessage({ type: 'error', text: 'Preencha os campos de senha.' });
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            setMessage({ type: 'error', text: 'As senhas não coincidem.' });
+            return;
+        }
+
+        if (password.length < 6) {
+            setMessage({ type: 'error', text: 'A senha deve ter pelo menos 6 caracteres.' });
+            return;
+        }
+
+        try {
+            setUpdatingPassword(true);
+            setMessage(null);
+
+            const { error } = await supabase.auth.updateUser({
+                password: password
+            });
+
+            if (error) throw error;
+
+            setMessage({ type: 'success', text: 'Senha alterada com sucesso!' });
+            setPassword('');
+            setConfirmPassword('');
+
+        } catch (error: any) {
+            console.error('Error updating password:', error);
+            setMessage({ type: 'error', text: 'Erro ao atualizar senha. Tente novamente.' });
+        } finally {
+            setUpdatingPassword(false);
+        }
+    };
+
     const getRoleLabel = (role: string | null) => {
         if (!role) return 'Não definido';
         return role.charAt(0).toUpperCase() + role.slice(1);
@@ -98,9 +143,10 @@ const Account: React.FC = () => {
             <main className="max-w-4xl mx-auto px-4 py-8">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-8">Minha Conta</h1>
 
-                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                {/* Profile Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden mb-8">
 
-                    {/* Header / Cover (Optional visual touch) */}
+                    {/* Header / Cover */}
                     <div className="h-32 bg-gradient-to-r from-brand-coral to-pink-600 opacity-90"></div>
 
                     <div className="px-8 pb-8">
@@ -207,6 +253,78 @@ const Account: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Password Change Section */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="p-8 border-b border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                                <Key size={24} />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Alterar Senha</h2>
+                        </div>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm ml-12">
+                            Mantenha sua conta segura. Use uma combinação de letras, números e símbolos.
+                        </p>
+                    </div>
+
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Nova Senha
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-3 text-slate-400">
+                                    <Lock size={20} />
+                                </span>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-3 text-slate-400 hover:text-brand-coral transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Confirmar Nova Senha
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-3 text-slate-400">
+                                    <Lock size={20} />
+                                </span>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all"
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-2 flex justify-end">
+                            <button
+                                onClick={handleUpdatePassword}
+                                disabled={updatingPassword}
+                                className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg shadow-slate-200 dark:shadow-none transition-all flex items-center gap-2 disabled:opacity-70"
+                            >
+                                {updatingPassword ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
+                                Atualizar Senha
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </main>
         </div>
     );
