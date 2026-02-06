@@ -50,6 +50,11 @@ const Account: React.FC = () => {
         }
     }, [contextFullName]);
 
+    const normalizeString = (str: string | undefined | null) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    };
+
     const fetchMyTasks = async (userName: string) => {
         setLoadingTasks(true);
         try {
@@ -57,20 +62,27 @@ const Account: React.FC = () => {
             const { data: projectsData } = await supabase.from('acceptances').select('id, company_name');
             const projectsMap = new Map(projectsData?.map((p: any) => [p.id, p.company_name]) || []);
 
-            // 2. Fetch Tasks assigned to user
-            // Note: This relies on exact name match. In a real app, we'd use user ID.
+            // 2. Fetch ALL pending tasks
+            // We fetch all non-done tasks and filter in memory to allow robust name matching
             const { data: tasksData, error } = await supabase
                 .from('project_tasks')
                 .select('*')
-                .eq('assignee', userName)
-                .neq('status', 'done') // Optionally hide done tasks
+                .neq('status', 'done')
                 .order('due_date', { ascending: true });
 
             if (tasksData) {
-                const enrichedTasks = tasksData.map((t: any) => ({
+                const targetName = normalizeString(userName);
+
+                const userTasks = tasksData.filter((t: any) => {
+                    const assigneeName = normalizeString(t.assignee);
+                    return assigneeName === targetName;
+                });
+
+                const enrichedTasks = userTasks.map((t: any) => ({
                     ...t,
                     project_name: projectsMap.get(t.project_id) || 'Projeto Desconhecido'
                 }));
+
                 setMyTasks(enrichedTasks);
             }
         } catch (error) {
