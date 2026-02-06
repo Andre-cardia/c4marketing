@@ -58,7 +58,6 @@ const Account: React.FC = () => {
     // Meetings State
     const [myBookings, setMyBookings] = useState<Booking[]>([]);
     const [loadingBookings, setLoadingBookings] = useState(false);
-    const [debugLog, setDebugLog] = useState<string[]>([]); // New debug state
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
 
     useEffect(() => {
@@ -518,10 +517,6 @@ const Account: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
-                                <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-900 rounded text-xs text-slate-500 font-mono">
-                                    <p className="font-bold mb-1">Debug Info:</p>
-                                    {debugLog.map((log, i) => <div key={i}>{log}</div>)}
-                                </div>
                             </div>
                         </div>
 
