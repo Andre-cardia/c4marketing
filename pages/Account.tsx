@@ -66,7 +66,6 @@ const Account: React.FC = () => {
 
     const fetchMyBookings = async () => {
         setLoadingBookings(true);
-        setDebugLog(prev => [...prev, 'Iniciando fetch...']);
         try {
             const url = `https://api.cal.com/v2/bookings?status=upcoming&limit=100`;
             const response = await fetch(url, {
@@ -78,40 +77,29 @@ const Account: React.FC = () => {
                 cache: 'no-store'
             });
 
-            setDebugLog(prev => [...prev, `Response Status: ${response.status}`]);
-
             if (response.ok) {
                 const data = await response.json();
-                setDebugLog(prev => [...prev, `Data Keys: ${Object.keys(data).join(', ')}`]);
-                setDebugLog(prev => [...prev, `data.data Type: ${typeof data.data}`]);
-                setDebugLog(prev => [...prev, `data.data isArray: ${Array.isArray(data.data)}`]);
-                setDebugLog(prev => [...prev, `data.data Content: ${JSON.stringify(data.data).substring(0, 300)}`]);
+
+                // Check for different API response structures
+                let bookingsArray: any[] = [];
 
                 if (data.data && Array.isArray(data.data)) {
-                    setDebugLog(prev => [...prev, `Bookings Found: ${data.data.length}`]);
-                    const mappedBookings = data.data.map((b: any) => ({
-                        ...b,
-                        meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
-                    }));
-                    setMyBookings(mappedBookings);
-                } else if (data.data && Array.isArray(data.data.bookings)) {
+                    bookingsArray = data.data;
+                } else if (data.data && data.data.bookings && Array.isArray(data.data.bookings)) {
                     // Correctly handle the nested structure seen in logs
-                    setDebugLog(prev => [...prev, `Bookings Found (Nested): ${data.data.bookings.length}`]);
-                    const mappedBookings = data.data.bookings.map((b: any) => ({
+                    bookingsArray = data.data.bookings;
+                }
+
+                if (bookingsArray.length > 0) {
+                    const mappedBookings = bookingsArray.map((b: any) => ({
                         ...b,
                         meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
                     }));
                     setMyBookings(mappedBookings);
-                } else {
-                    setDebugLog(prev => [...prev, 'No data array found']);
                 }
-            } else {
-                const text = await response.text();
-                setDebugLog(prev => [...prev, `Error Body: ${text}`]);
             }
         } catch (error: any) {
             console.error('Error fetching bookings:', error);
-            setDebugLog(prev => [...prev, `Fetch Exception: ${error.message}`]);
         } finally {
             setLoadingBookings(false);
         }
