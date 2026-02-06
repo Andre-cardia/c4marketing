@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import TaskModal from '../components/projects/TaskModal';
@@ -16,6 +16,21 @@ interface Task {
     assignee?: string;
     attachment_url?: string;
     project_name?: string;
+}
+
+interface Booking {
+    id: number;
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    attendees: {
+        name: string;
+        email: string;
+        timeZone: string;
+    }[];
+    status: string;
+    meetingUrl: string;
 }
 
 const Account: React.FC = () => {
@@ -39,6 +54,38 @@ const Account: React.FC = () => {
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | undefined>(undefined);
     const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+    // Meetings State
+    const [myBookings, setMyBookings] = useState<Booking[]>([]);
+    const [loadingBookings, setLoadingBookings] = useState(false);
+    const API_KEY = 'cal_live_276a08ab25424c5166241c05c48ea5c4';
+
+    useEffect(() => {
+        if (email) {
+            fetchMyBookings();
+        }
+    }, [email]);
+
+    const fetchMyBookings = async () => {
+        setLoadingBookings(true);
+        try {
+            const response = await fetch(`https://api.cal.com/v2/bookings?apiKey=${API_KEY}&status=upcoming`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.data) {
+                    // Filter for bookings where the user is an attendee
+                    const userBookings = data.data.filter((b: Booking) =>
+                        b.attendees.some(a => a.email === email)
+                    );
+                    setMyBookings(userBookings);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching bookings:', error);
+        } finally {
+            setLoadingBookings(false);
+        }
+    };
 
     useEffect(() => {
         if (contextFullName) setFullName(contextFullName);
@@ -373,8 +420,76 @@ const Account: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Right Column: Tasks */}
-                    <div className="lg:col-span-2">
+                    {/* Right Column: Meetings & Tasks */}
+                    <div className="lg:col-span-2 space-y-8">
+
+                        {/* Meetings Section */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
+                                        <Calendar size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Minhas Reuniões</h2>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">Próximos agendamentos</p>
+                                    </div>
+                                </div>
+                                <div className="text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
+                                    {myBookings.length} agendadas
+                                </div>
+                            </div>
+
+                            <div className="p-6">
+                                {loadingBookings ? (
+                                    <div className="flex items-center justify-center text-slate-400 gap-2 py-8">
+                                        <Loader2 className="animate-spin" /> Carregando agenda...
+                                    </div>
+                                ) : myBookings.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center text-slate-400 gap-2 py-8">
+                                        <Calendar size={32} className="opacity-20" />
+                                        <p>Nenhuma reunião encontrada para seu e-mail.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {myBookings.map(booking => (
+                                            <div key={booking.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-700 rounded-xl hover:border-brand-coral/50 transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                                                        <span className="text-xs font-bold text-slate-500 uppercase">
+                                                            {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
+                                                        </span>
+                                                        <span className="text-lg font-bold text-brand-coral">
+                                                            {new Date(booking.startTime).getDate()}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-800 dark:text-white text-sm">{booking.title}</h4>
+                                                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                            <Clock size={12} />
+                                                            {new Date(booking.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(booking.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {booking.meetingUrl && (
+                                                    <a
+                                                        href={booking.meetingUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="p-2 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
+                                                        title="Entrar na Reunião"
+                                                    >
+                                                        <Video size={18} />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[500px] flex flex-col">
                             <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
                                 <div className="flex items-center gap-3">
