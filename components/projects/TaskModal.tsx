@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2, Briefcase } from 'lucide-react';
+import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Task {
@@ -206,7 +206,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             </h2>
                             {displayProjectName && (
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-brand-coral mt-1">
-                                    <Briefcase size={12} />
                                     {displayProjectName}
                                 </div>
                             )}
