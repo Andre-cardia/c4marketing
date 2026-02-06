@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2 } from 'lucide-react';
+import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Task {
@@ -25,10 +25,11 @@ interface TaskModalProps {
     onClose: () => void;
     task?: Task; // If provided, we are editing
     projectId: number;
+    projectName?: string;
     onSave: () => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId, onSave }) => {
+const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId, projectName, onSave }) => {
     const [formData, setFormData] = useState<Task>({
         project_id: projectId,
         title: '',
@@ -177,6 +178,21 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         }
     };
 
+    const [fetchedProjectName, setFetchedProjectName] = useState<string>('');
+
+    useEffect(() => {
+        if (!projectName && projectId) {
+            supabase.from('acceptances').select('company_name').eq('id', projectId).single()
+                .then(({ data }) => {
+                    if (data) setFetchedProjectName(data.company_name);
+                });
+        }
+    }, [projectName, projectId]);
+
+    const displayProjectName = projectName || fetchedProjectName;
+
+    // ... (existing code)
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -184,9 +200,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                            {task ? 'Editar Tarefa' : 'Nova Tarefa'}
-                        </h2>
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                                {task ? 'Editar Tarefa' : 'Nova Tarefa'}
+                            </h2>
+                            {displayProjectName && (
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-brand-coral mt-1">
+                                    <Briefcase size={12} />
+                                    {displayProjectName}
+                                </div>
+                            )}
+                        </div>
                         <button type="button" onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
                             <X size={20} />
                         </button>
