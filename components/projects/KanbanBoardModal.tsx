@@ -44,7 +44,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
 
     // Placeholder for the shared team calendar link.
     // Replace 'c4-marketing' with your actual organization/username to enable bookings.
-    const SHARED_CAL_LINK = 'c4-marketing';
+    const SHARED_CAL_LINK = 'grupo-c4/reuniao-grupo-c4';
 
     useEffect(() => {
         if (isOpen && project) {
