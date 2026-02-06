@@ -58,6 +58,7 @@ const Account: React.FC = () => {
     // Meetings State
     const [myBookings, setMyBookings] = useState<Booking[]>([]);
     const [loadingBookings, setLoadingBookings] = useState(false);
+    const [debugLog, setDebugLog] = useState<string[]>([]); // New debug state
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
 
     useEffect(() => {
@@ -66,9 +67,10 @@ const Account: React.FC = () => {
 
     const fetchMyBookings = async () => {
         setLoadingBookings(true);
+        setDebugLog(prev => [...prev, 'Iniciando fetch...']);
         try {
-            // Added limit=100 and cache: no-store to ensure we get all recent bookings properly
-            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming&limit=100`, {
+            const url = `https://api.cal.com/v2/bookings?status=upcoming&limit=100`;
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${API_KEY}`,
@@ -77,21 +79,31 @@ const Account: React.FC = () => {
                 cache: 'no-store'
             });
 
+            setDebugLog(prev => [...prev, `Response Status: ${response.status}`]);
+
             if (response.ok) {
                 const data = await response.json();
+                setDebugLog(prev => [...prev, `Data Keys: ${Object.keys(data).join(', ')}`]);
+
                 if (data.data && Array.isArray(data.data)) {
-                    // Map to extract meetingUrl
+                    setDebugLog(prev => [...prev, `Bookings Found: ${data.data.length}`]);
+
                     const mappedBookings = data.data.map((b: any) => ({
                         ...b,
                         meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
                     }));
 
-                    // User requested to remove filter and show ALL meetings from the c4storage1 account
                     setMyBookings(mappedBookings);
+                } else {
+                    setDebugLog(prev => [...prev, 'No data array found']);
                 }
+            } else {
+                const text = await response.text();
+                setDebugLog(prev => [...prev, `Error Body: ${text}`]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching bookings:', error);
+            setDebugLog(prev => [...prev, `Fetch Exception: ${error.message}`]);
         } finally {
             setLoadingBookings(false);
         }
@@ -497,6 +509,10 @@ const Account: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                                <div className="mt-4 p-2 bg-slate-100 dark:bg-slate-900 rounded text-xs text-slate-500 font-mono">
+                                    <p className="font-bold mb-1">Debug Info:</p>
+                                    {debugLog.map((log, i) => <div key={i}>{log}</div>)}
+                                </div>
                             </div>
                         </div>
 
