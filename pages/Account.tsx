@@ -37,6 +37,7 @@ const Account: React.FC = () => {
     const { email, userRole, fullName: contextFullName, avatarUrl: contextAvatarUrl, refreshRole } = useUserRole();
 
     const [fullName, setFullName] = useState('');
+    const [calComLink, setCalComLink] = useState('');
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -61,25 +62,36 @@ const Account: React.FC = () => {
     const API_KEY = 'cal_live_276a08ab25424c5166241c05c48ea5c4';
 
     useEffect(() => {
-        if (email) {
+        if (email || calComLink) {
             fetchMyBookings();
         }
-    }, [email]);
+    }, [email, calComLink]);
 
     const fetchMyBookings = async () => {
         setLoadingBookings(true);
         try {
-            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming`, {
+            // Added limit=100 and cache: no-store to ensure we get all recent bookings properly
+            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming&limit=100`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`
-                }
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
             });
+
             if (response.ok) {
                 const data = await response.json();
-                if (data.data) {
-                    // Filter for bookings where the user is an attendee
+                if (data.data && Array.isArray(data.data)) {
+                    // Filter for bookings where the user is an attendee (case insensitive)
+                    // Use calComLink if available, otherwise use login email
+                    const targetEmail = calComLink ? calComLink : email;
+                    const normalizedEmail = targetEmail?.toLowerCase().trim();
+
+                    if (!normalizedEmail) return;
+
                     const userBookings = data.data.filter((b: Booking) =>
-                        b.attendees.some(a => a.email === email)
+                        b.attendees.some(a => a.email.toLowerCase().trim() === normalizedEmail)
                     );
                     setMyBookings(userBookings);
                 }
@@ -93,7 +105,21 @@ const Account: React.FC = () => {
 
     useEffect(() => {
         if (contextFullName) setFullName(contextFullName);
+        fetchUserProfile();
     }, [contextFullName]);
+
+    const fetchUserProfile = async () => {
+        if (!email) return;
+        const { data, error } = await supabase
+            .from('app_users')
+            .select('cal_com_link')
+            .eq('email', email)
+            .single();
+
+        if (data && data.cal_com_link) {
+            setCalComLink(data.cal_com_link);
+        }
+    };
 
     useEffect(() => {
         if (contextFullName) {
@@ -208,7 +234,8 @@ const Account: React.FC = () => {
             const { error } = await supabase
                 .from('app_users')
                 .update({
-                    full_name: fullName
+                    full_name: fullName,
+                    cal_com_link: calComLink
                 })
                 .eq('email', email);
 
@@ -357,6 +384,21 @@ const Account: React.FC = () => {
                                             disabled
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                            E-mail do Cal.com (Filtro)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={calComLink}
+                                            onChange={(e) => setCalComLink(e.target.value)}
+                                            placeholder={email || "ex: seu.email@exemplo.com"}
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Se você usa um e-mail diferente no Cal.com, informe aqui para ver suas reuniões.
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>

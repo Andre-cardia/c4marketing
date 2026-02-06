@@ -40,10 +40,15 @@ const Meetings: React.FC = () => {
             // Ideally, this should be proxied through a backend API route.
             // Using direct fetch for MVP demonstration.
 
-            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming`, {
+            // Using direct fetch for MVP demonstration.
+
+            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming&limit=100`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`
-                }
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                cache: 'no-store'
             });
 
             if (!response.ok) {
