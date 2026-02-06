@@ -59,7 +59,7 @@ const Account: React.FC = () => {
     // Meetings State
     const [myBookings, setMyBookings] = useState<Booking[]>([]);
     const [loadingBookings, setLoadingBookings] = useState(false);
-    const API_KEY = 'cal_live_276a08ab25424c5166241c05c48ea5c4';
+    const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
 
     useEffect(() => {
         if (email || calComLink) {

@@ -25,7 +25,7 @@ const Meetings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const API_KEY = 'cal_live_276a08ab25424c5166241c05c48ea5c4'; // Hardcoded for MVP as per request context
+    const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6'; // Hardcoded for MVP as per request context
 
     useEffect(() => {
         fetchBookings();
