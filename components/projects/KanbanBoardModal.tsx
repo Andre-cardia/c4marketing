@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Plus, Calendar, MoreHorizontal, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle } from 'lucide-react';
+import { X, Plus, Calendar, MoreHorizontal, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import TaskModal from './TaskModal';
 
@@ -188,19 +188,25 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                                     </p>
                                                 )}
 
-                                                <div className="flex items-center justify-between text-xs text-slate-400">
-                                                    <div className="flex items-center gap-3">
-                                                        {task.assignee && (
-                                                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">
-                                                                <User size={10} /> {task.assignee}
-                                                            </div>
-                                                        )}
-                                                        {task.due_date && (
-                                                            <div className="flex items-center gap-1 text-slate-500 dark:text-slate-300">
-                                                                <Calendar size={10} />
-                                                                {new Date(task.due_date).toLocaleDateString()}
-                                                            </div>
-                                                        )}
+                                                <div className="flex flex-col gap-2 w-full mt-3 pt-3 border-t border-slate-100 dark:border-slate-600">
+                                                    <div className="flex items-center gap-1.5 font-semibold text-slate-500 dark:text-slate-400 text-xs text-brand-coral">
+                                                        <Briefcase size={12} />
+                                                        {project.company_name}
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-xs text-slate-400 w-full">
+                                                        <div className="flex items-center gap-3">
+                                                            {task.assignee && (
+                                                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">
+                                                                    <User size={10} /> {task.assignee}
+                                                                </div>
+                                                            )}
+                                                            {task.due_date && (
+                                                                <div className="flex items-center gap-1 text-slate-500 dark:text-slate-300">
+                                                                    <Calendar size={10} />
+                                                                    {new Date(task.due_date).toLocaleDateString()}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
