@@ -40,50 +40,17 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
     const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-    const [calLink, setCalLink] = useState<string>('');
     const [showBookingModal, setShowBookingModal] = useState(false);
+
+    // Placeholder for the shared team calendar link.
+    // Replace 'c4-marketing' with your actual organization/username to enable bookings.
+    const SHARED_CAL_LINK = 'c4-marketing';
 
     useEffect(() => {
         if (isOpen && project) {
             fetchTasks();
-            fetchProjectOwner();
         }
     }, [isOpen, project]);
-
-    const fetchProjectOwner = async () => {
-        if (!project) return;
-        try {
-            // 1. Get Proposal ID and User ID
-            const { data: acc } = await supabase
-                .from('acceptances')
-                .select('proposal_id')
-                .eq('id', project.id)
-                .single();
-
-            if (!acc?.proposal_id) return;
-
-            const { data: prop } = await supabase
-                .from('proposals')
-                .select('user_id')
-                .eq('id', acc.proposal_id)
-                .single();
-
-            if (!prop?.user_id) return;
-
-            // 2. Get Cal Link
-            const { data: user } = await supabase
-                .from('app_users')
-                .select('cal_com_link')
-                .eq('id', prop.user_id)
-                .single();
-
-            if (user?.cal_com_link) {
-                setCalLink(user.cal_com_link);
-            }
-        } catch (error) {
-            console.error('Error fetching project owner:', error);
-        }
-    };
 
     const fetchTasks = async () => {
         if (!project) return;
@@ -171,14 +138,12 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                         >
                             <Plus size={20} /> Nova Tarefa
                         </button>
-                        {calLink && (
-                            <button
-                                onClick={() => setShowBookingModal(true)}
-                                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all border border-slate-200 dark:border-slate-600"
-                            >
-                                <Calendar size={20} /> <span className="hidden sm:inline">Agendar</span>
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setShowBookingModal(true)}
+                            className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all border border-slate-200 dark:border-slate-600"
+                        >
+                            <Calendar size={20} /> <span className="hidden sm:inline">Agendar</span>
+                        </button>
                         <button
                             onClick={onClose}
                             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 transition-colors"
@@ -278,7 +243,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                 <BookingModal
                     isOpen={showBookingModal}
                     onClose={() => setShowBookingModal(false)}
-                    calLink={calLink}
+                    calLink={SHARED_CAL_LINK}
                     companyName={project.company_name}
                 />
             </div>

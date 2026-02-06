@@ -21,6 +21,7 @@ import LandingPageSurvey from './pages/external/LandingPageSurvey';
 import WebsiteSurvey from './pages/external/WebsiteSurvey';
 import AccessGuideSurvey from './pages/external/AccessGuideSurvey';
 import Account from './pages/Account';
+import Meetings from './pages/Meetings';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectionRoute from './components/ProtectedRoute';
 import { UserRoleProvider } from './lib/UserRoleContext';
@@ -36,12 +37,21 @@ const App: React.FC = () => {
             <Route path="/p/:slug" element={<ProposalView />} />
             <Route path="/p/:slug/contract" element={<ContractView />} />
             <Route path="/contracts/:id" element={<ContractView />} />
+            <Route path="/projects/:id/consulting" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+            <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
+            <Route
+              path="/account"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}>
+                  <Account />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/external/traffic-survey/:id" element={<TrafficSurvey />} />
             <Route path="/external/lp-survey/:id" element={<LandingPageSurvey />} />
             <Route path="/external/website-survey/:id" element={<WebsiteSurvey />} />
             <Route path="/external/access-guide/:id" element={<AccessGuideSurvey />} />
             <Route
-              path="/account"
               element={
                 <ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}>
                   <Account />

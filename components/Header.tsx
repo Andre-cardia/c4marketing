@@ -59,6 +59,13 @@ const Header: React.FC = () => {
             Projetos
           </button>
 
+          <button
+            onClick={() => navigate('/meetings')}
+            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/meetings') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+          >
+            Agenda
+          </button>
+
           {/* Usuários - only for gestor */}
           {!loading && userRole === 'gestor' && (
             <button
