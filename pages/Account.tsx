@@ -62,22 +62,31 @@ const Account: React.FC = () => {
             const { data: projectsData } = await supabase.from('acceptances').select('id, company_name');
             const projectsMap = new Map(projectsData?.map((p: any) => [p.id, p.company_name]) || []);
 
-            // 2. Fetch ALL pending tasks
+            // 2. Fetch Pending Tasks
             const { data: tasksData, error } = await supabase
                 .from('project_tasks')
                 .select('*')
-                // .neq('status', 'done') // DEBUG: Show even done tasks
+                .neq('status', 'done')
                 .order('due_date', { ascending: true });
 
             if (tasksData) {
-                // DEBUG: REMOVE FILTERING TO SHOW ALL TASKS
-                // const targetName = normalizeString(userName);
-                // const userTasks = tasksData.filter((t: any) => {
-                //     const assigneeName = normalizeString(t.assignee);
-                //     return assigneeName === targetName;
-                // });
+                const targetName = normalizeString(userName);
 
-                const enrichedTasks = tasksData.map((t: any) => ({
+                const userTasks = tasksData.filter((t: any) => {
+                    const assigneeName = normalizeString(t.assignee);
+
+                    // Robust matching: 
+                    // 1. Exact match (normalized)
+                    // 2. Assignee contains User Name (e.g. "Andre Cardia" contains "Andre")
+                    // 3. User Name contains Assignee (e.g. "Andre Cardia" contains "Andre")
+                    if (!assigneeName || !targetName) return false;
+
+                    return assigneeName === targetName ||
+                        assigneeName.includes(targetName) ||
+                        targetName.includes(assigneeName);
+                });
+
+                const enrichedTasks = userTasks.map((t: any) => ({
                     ...t,
                     project_name: projectsMap.get(t.project_id) || 'Projeto Desconhecido'
                 }));
@@ -371,14 +380,12 @@ const Account: React.FC = () => {
                                         <ClipboardList size={20} />
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Minhas Tarefas (DEBUG MODE)</h2>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            Buscando por: <span className="text-brand-coral font-bold">"{normalizeString(contextFullName)}"</span>
-                                        </p>
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Minhas Tarefas</h2>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">Tarefas atribuídas a você</p>
                                     </div>
                                 </div>
                                 <div className="text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-                                    {myTasks.length} total
+                                    {myTasks.length} pendentes
                                 </div>
                             </div>
 
@@ -400,7 +407,6 @@ const Account: React.FC = () => {
                                             <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-700">
                                                 <th className="py-3 pl-2">Tarefa</th>
                                                 <th className="py-3">Projeto</th>
-                                                <th className="py-3 text-brand-coral">Responsável (Raw)</th>
                                                 <th className="py-3">Prazo</th>
                                                 <th className="py-3">Prioridade</th>
                                                 <th className="py-3">Status</th>
@@ -418,9 +424,6 @@ const Account: React.FC = () => {
                                                             <Briefcase size={14} className="text-slate-400" />
                                                             {task.project_name}
                                                         </div>
-                                                    </td>
-                                                    <td className="py-3 font-bold text-brand-coral">
-                                                        "{task.assignee}"
                                                     </td>
                                                     <td className="py-3 text-slate-600 dark:text-slate-400">
                                                         <div className={`flex items-center gap-2 ${new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}`}>
