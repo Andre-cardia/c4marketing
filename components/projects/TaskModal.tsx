@@ -141,6 +141,31 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         setFormData(prev => ({ ...prev, attachment_url: '' }));
     };
 
+    const handleDelete = async () => {
+        if (!task?.id) return;
+
+        if (!window.confirm('Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.')) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('project_tasks')
+                .delete()
+                .eq('id', task.id);
+
+            if (error) throw error;
+
+            onSave();
+            onClose();
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            alert('Erro ao excluir tarefa');
+            setLoading(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -356,21 +381,36 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     </div>
 
                     {/* Footer */}
-                    <div className="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading || uploading}
-                            className="px-8 py-2 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
-                        >
-                            {loading ? 'Salvando...' : 'Salvar'}
-                        </button>
+                    <div className="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
+                        <div>
+                            {task?.id && (
+                                <button
+                                    type="button"
+                                    onClick={handleDelete}
+                                    disabled={loading || uploading}
+                                    className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors flex items-center gap-2 font-bold text-sm"
+                                >
+                                    <Trash2 size={18} />
+                                    Excluir
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-6 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading || uploading}
+                                className="px-8 py-2 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
+                            >
+                                {loading ? 'Salvando...' : 'Salvar'}
+                            </button>
+                        </div>
                     </div>
 
                 </form>
