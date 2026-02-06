@@ -59,8 +59,15 @@ const Meetings: React.FC = () => {
             console.log('Cal.com API Response:', data);
 
             // Transform data if necessary, API v2 structure might vary, adapting to common structure
+            let bookingsArray: any[] = [];
             if (data.data && Array.isArray(data.data)) {
-                const mappedBookings = data.data.map((b: any) => ({
+                bookingsArray = data.data;
+            } else if (data.data && data.data.bookings && Array.isArray(data.data.bookings)) {
+                bookingsArray = data.data.bookings;
+            }
+
+            if (bookingsArray.length > 0) {
+                const mappedBookings = bookingsArray.map((b: any) => ({
                     ...b,
                     meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
                 }));

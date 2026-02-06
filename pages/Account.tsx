@@ -84,15 +84,24 @@ const Account: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 setDebugLog(prev => [...prev, `Data Keys: ${Object.keys(data).join(', ')}`]);
+                setDebugLog(prev => [...prev, `data.data Type: ${typeof data.data}`]);
+                setDebugLog(prev => [...prev, `data.data isArray: ${Array.isArray(data.data)}`]);
+                setDebugLog(prev => [...prev, `data.data Content: ${JSON.stringify(data.data).substring(0, 300)}`]);
 
                 if (data.data && Array.isArray(data.data)) {
                     setDebugLog(prev => [...prev, `Bookings Found: ${data.data.length}`]);
-
                     const mappedBookings = data.data.map((b: any) => ({
                         ...b,
                         meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
                     }));
-
+                    setMyBookings(mappedBookings);
+                } else if (data.data && Array.isArray(data.data.bookings)) {
+                    // Correctly handle the nested structure seen in logs
+                    setDebugLog(prev => [...prev, `Bookings Found (Nested): ${data.data.bookings.length}`]);
+                    const mappedBookings = data.data.bookings.map((b: any) => ({
+                        ...b,
+                        meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
+                    }));
                     setMyBookings(mappedBookings);
                 } else {
                     setDebugLog(prev => [...prev, 'No data array found']);
