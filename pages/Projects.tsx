@@ -249,7 +249,12 @@ const Projects: React.FC = () => {
                                     {sortedProjects.map((project) => (
                                         <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                             <td className="p-5">
-                                                <div className="font-bold text-slate-800 dark:text-white">{project.company_name}</div>
+                                                <div
+                                                    className="font-bold text-slate-800 dark:text-white cursor-pointer hover:text-brand-coral transition-colors"
+                                                    onClick={() => setSelectedProjectForKanban(project)}
+                                                >
+                                                    {project.company_name}
+                                                </div>
                                                 <div className="md:hidden text-xs text-slate-400">{project.responsible_name}</div>
                                             </td>
                                             <td className="p-5 hidden md:table-cell">

@@ -122,7 +122,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                 <div className="bg-white dark:bg-slate-800 px-8 py-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                            <span className="text-brand-coral">Kanban:</span> {project.company_name}
+                            {project.company_name}
                         </h2>
                     </div>
                     <div className="flex items-center gap-4">
