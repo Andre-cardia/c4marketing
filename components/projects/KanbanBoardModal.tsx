@@ -224,6 +224,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                     onClose={() => setShowTaskModal(false)}
                     projectId={project.id}
                     task={editingTask}
+                    projectName={project.company_name}
                     onSave={fetchTasks}
                 />
             </div>

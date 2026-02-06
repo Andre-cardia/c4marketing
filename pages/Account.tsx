@@ -461,6 +461,7 @@ const Account: React.FC = () => {
                         onClose={handleCloseTaskModal}
                         projectId={selectedProjectId}
                         task={selectedTask}
+                        projectName={selectedTask?.project_name}
                         onSave={handleCloseTaskModal}
                     />
                 )}
