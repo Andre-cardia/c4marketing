@@ -37,7 +37,6 @@ const Account: React.FC = () => {
     const { email, userRole, fullName: contextFullName, avatarUrl: contextAvatarUrl, refreshRole } = useUserRole();
 
     const [fullName, setFullName] = useState('');
-    const [calComLink, setCalComLink] = useState('');
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -62,10 +61,8 @@ const Account: React.FC = () => {
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
 
     useEffect(() => {
-        if (email || calComLink) {
-            fetchMyBookings();
-        }
-    }, [email, calComLink]);
+        fetchMyBookings();
+    }, []);
 
     const fetchMyBookings = async () => {
         setLoadingBookings(true);
@@ -89,17 +86,8 @@ const Account: React.FC = () => {
                         meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
                     }));
 
-                    // Filter for bookings where the user is an attendee (case insensitive)
-                    // Use calComLink if available, otherwise use login email
-                    const targetEmail = calComLink ? calComLink : email;
-                    const normalizedEmail = targetEmail?.toLowerCase().trim();
-
-                    if (!normalizedEmail) return;
-
-                    const userBookings = mappedBookings.filter((b: Booking) =>
-                        b.attendees.some(a => a.email.toLowerCase().trim() === normalizedEmail)
-                    );
-                    setMyBookings(userBookings);
+                    // User requested to remove filter and show ALL meetings from the c4storage1 account
+                    setMyBookings(mappedBookings);
                 }
             }
         } catch (error) {
@@ -111,21 +99,7 @@ const Account: React.FC = () => {
 
     useEffect(() => {
         if (contextFullName) setFullName(contextFullName);
-        fetchUserProfile();
     }, [contextFullName]);
-
-    const fetchUserProfile = async () => {
-        if (!email) return;
-        const { data, error } = await supabase
-            .from('app_users')
-            .select('cal_com_link')
-            .eq('email', email)
-            .single();
-
-        if (data && data.cal_com_link) {
-            setCalComLink(data.cal_com_link);
-        }
-    };
 
     useEffect(() => {
         if (contextFullName) {
@@ -240,8 +214,7 @@ const Account: React.FC = () => {
             const { error } = await supabase
                 .from('app_users')
                 .update({
-                    full_name: fullName,
-                    cal_com_link: calComLink
+                    full_name: fullName
                 })
                 .eq('email', email);
 
@@ -392,21 +365,6 @@ const Account: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                                            E-mail do Cal.com (Filtro)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={calComLink}
-                                            onChange={(e) => setCalComLink(e.target.value)}
-                                            placeholder={email || "ex: seu.email@exemplo.com"}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
-                                        />
-                                        <p className="text-xs text-slate-400 mt-1">
-                                            Se você usa um e-mail diferente no Cal.com, informe aqui para ver suas reuniões.
-                                        </p>
-                                    </div>
-                                    <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>
                                         <input
                                             type="text"
@@ -483,8 +441,8 @@ const Account: React.FC = () => {
                                         <Calendar size={20} />
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Minhas Reuniões</h2>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Próximos agendamentos</p>
+                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Agenda (c4storage1)</h2>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">Todos os agendamentos</p>
                                     </div>
                                 </div>
                                 <div className="text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
