@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search } from 'lucide-react';
+import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, KanbanSquare } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 
 interface Project {
     id: number;
@@ -31,6 +32,7 @@ const Projects: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
+    const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('darkMode') === 'true';
@@ -240,6 +242,7 @@ const Projects: React.FC = () => {
                                             </div>
                                         </th>
                                         <th className="p-5 font-bold">Serviços Contratados</th>
+                                        <th className="p-5 font-bold text-center">Tarefas</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
@@ -284,6 +287,15 @@ const Projects: React.FC = () => {
                                                     )}
                                                 </div>
                                             </td>
+                                            <td className="p-5 text-center">
+                                                <button
+                                                    onClick={() => setSelectedProjectForKanban(project)}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 hover:bg-brand-coral hover:text-white text-brand-coral rounded-lg transition-all font-bold text-xs"
+                                                >
+                                                    <KanbanSquare size={16} />
+                                                    <span className="hidden xl:inline">Ver Tarefas</span>
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -292,6 +304,12 @@ const Projects: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            <KanbanBoardModal
+                isOpen={!!selectedProjectForKanban}
+                onClose={() => setSelectedProjectForKanban(null)}
+                project={selectedProjectForKanban}
+            />
         </div>
     );
 };
