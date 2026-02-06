@@ -60,7 +60,11 @@ const Meetings: React.FC = () => {
 
             // Transform data if necessary, API v2 structure might vary, adapting to common structure
             if (data.data && Array.isArray(data.data)) {
-                setBookings(data.data);
+                const mappedBookings = data.data.map((b: any) => ({
+                    ...b,
+                    meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
+                }));
+                setBookings(mappedBookings);
             } else {
                 console.warn('Unexpected API format:', data);
                 setBookings([]);

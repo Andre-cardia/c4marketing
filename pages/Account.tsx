@@ -83,6 +83,12 @@ const Account: React.FC = () => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.data && Array.isArray(data.data)) {
+                    // Map to extract meetingUrl
+                    const mappedBookings = data.data.map((b: any) => ({
+                        ...b,
+                        meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
+                    }));
+
                     // Filter for bookings where the user is an attendee (case insensitive)
                     // Use calComLink if available, otherwise use login email
                     const targetEmail = calComLink ? calComLink : email;
@@ -90,7 +96,7 @@ const Account: React.FC = () => {
 
                     if (!normalizedEmail) return;
 
-                    const userBookings = data.data.filter((b: Booking) =>
+                    const userBookings = mappedBookings.filter((b: Booking) =>
                         b.attendees.some(a => a.email.toLowerCase().trim() === normalizedEmail)
                     );
                     setMyBookings(userBookings);
