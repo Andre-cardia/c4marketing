@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Header from '../components/Header';
 import NoticeCard from '../components/NoticeCard';
+import TaskModal from '../components/projects/TaskModal';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
     Users, Building, FileText, Calendar, LogOut, Plus, Link as LinkIcon,
     ExternalLink, Trash2, Moon, Sun, Bell, DollarSign, TrendingUp,
-    Briefcase, AlertTriangle, CheckCircle, Clock, Activity, Target
+    Briefcase, AlertTriangle, CheckCircle, Clock, Activity, Target,
+    X, ArrowRight
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 
@@ -19,7 +21,6 @@ interface Acceptance {
     cnpj: string;
     timestamp: string;
     status?: string;
-    // For revenue calculation
     contract_snapshot?: any;
     proposal_id?: number | null;
 }
@@ -32,7 +33,7 @@ interface Proposal {
     created_at: string;
     contract_duration: number;
     services?: { id: string; price: number }[];
-    status?: string; // 'pending', 'accepted', 'rejected'
+    status?: string;
 }
 
 interface Notice {
@@ -51,6 +52,11 @@ interface Task {
     priority: string;
     due_date: string;
     project_id: number;
+    description?: string;
+    assignee?: string;
+    attachment_url?: string;
+    // Enriched field
+    project_name?: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -68,18 +74,26 @@ const Dashboard: React.FC = () => {
     const [revenue, setRevenue] = useState(0);
     const [criticalTasks, setCriticalTasks] = useState<Task[]>([]);
 
+    // Modal States
+    const [showCriticalListModal, setShowCriticalListModal] = useState(false);
+    const [tasksToView, setTasksToView] = useState<Task[]>([]); // For the list modal
+    const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | undefined>(undefined);
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
     useEffect(() => {
         fetchData();
     }, []);
 
     const fetchData = async () => {
         setLoading(true);
+        // Sequential fetch to ensure acceptances (projects) are loaded before task enrichment
+        const acceptancesData = await fetchAcceptances();
         await Promise.all([
-            fetchAcceptances(),
             fetchProposals(),
             fetchUsersCount(),
             fetchNotices(),
-            fetchAllTasks()
+            fetchAllTasks(acceptancesData)
         ]);
         setLoading(false);
     };
@@ -89,20 +103,15 @@ const Dashboard: React.FC = () => {
         if (data) {
             setAcceptances(data);
             calculateRevenue(data);
+            return data;
         }
+        return [];
     };
 
     const calculateRevenue = async (acceptancesData: Acceptance[]) => {
         let total = 0;
-        // This is a simplified calculation. Ideally, we fetch services for each acceptance from the DB or snapshot.
-        // For now, we'll try to use available snapshots or fetch related proposals.
-        // To avoid N+1 queries in the loop for fetched proposals, we can rely on what we have or fetch proposals separately.
-
-        // We will do a robust matching after proposals are fetched, or use a separate loop here if needed.
-        // For speed, let's assume we can get prices from contract_snapshot if available.
-
         for (const acc of acceptancesData) {
-            if (acc.status === 'Ativo' || acc.status === 'Onboarding' || !acc.status) { // Assume active if status missing for legacy
+            if (acc.status === 'Ativo' || acc.status === 'Onboarding' || !acc.status) {
                 if (acc.contract_snapshot?.proposal?.services) {
                     acc.contract_snapshot.proposal.services.forEach((s: any) => {
                         total += Number(s.price || 0);
@@ -128,11 +137,19 @@ const Dashboard: React.FC = () => {
         if (data) setNotices(data);
     };
 
-    const fetchAllTasks = async () => {
+    const fetchAllTasks = async (loadedAcceptances?: Acceptance[]) => {
         const { data } = await supabase.from('project_tasks').select('*');
         if (data) {
-            setTasks(data);
-            setCriticalTasks(data.filter((t: Task) => t.priority === 'high' && t.status !== 'done'));
+            // Enrich with Project Name
+            const projectsMap = new Map(loadedAcceptances?.map(a => [a.id, a.company_name]) || acceptances.map(a => [a.id, a.company_name]));
+
+            const enrichedTasks = data.map((t: any) => ({
+                ...t,
+                project_name: projectsMap.get(t.project_id) || 'Projeto Desconhecido'
+            }));
+
+            setTasks(enrichedTasks);
+            setCriticalTasks(enrichedTasks.filter((t: Task) => t.priority === 'high' && t.status !== 'done'));
         }
     };
 
@@ -141,6 +158,26 @@ const Dashboard: React.FC = () => {
         if (!error) {
             setNotices(notices.filter(n => n.id !== id));
         }
+    };
+
+    // Interaction Handlers
+    const handleOpenCriticalList = () => {
+        setTasksToView(criticalTasks);
+        setShowCriticalListModal(true);
+    };
+
+    const handleOpenTask = (task: Task) => {
+        setSelectedTaskForEdit(task);
+        setSelectedProjectId(task.project_id);
+        setShowTaskModal(true);
+    };
+
+    const handleCloseTaskModal = () => {
+        setShowTaskModal(false);
+        setSelectedTaskForEdit(undefined);
+        setSelectedProjectId(null);
+        // Refresh tasks to update list if changed
+        fetchAllTasks();
     };
 
     const clientStatusCounts = useMemo(() => ({
@@ -228,7 +265,10 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* Critical Tasks Card */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group cursor-pointer hover:border-red-300 dark:hover:border-red-900 transition-colors" onClick={() => navigate('/projects')}>
+                    <div
+                        className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group cursor-pointer hover:border-red-300 dark:hover:border-red-900 transition-colors"
+                        onClick={handleOpenCriticalList}
+                    >
                         <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-red-500/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
@@ -240,8 +280,8 @@ const Dashboard: React.FC = () => {
                             <div className="text-3xl font-black text-slate-800 dark:text-white">
                                 {criticalTasks.length}
                             </div>
-                            <div className="text-xs text-red-500 font-bold mt-2">
-                                Requerem atenção imediata
+                            <div className="text-xs text-red-500 font-bold mt-2 flex items-center gap-1 text-left">
+                                Clique para visualizar <ArrowRight size={12} />
                             </div>
                         </div>
                     </div>
@@ -252,7 +292,7 @@ const Dashboard: React.FC = () => {
 
                     {/* Left Column: Charts & Analysis */}
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Commercial Performance Chart (Existing but refined) */}
+                        {/* Commercial Performance Chart */}
                         <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -290,7 +330,7 @@ const Dashboard: React.FC = () => {
                                         return (
                                             <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group">
                                                 <div className="w-full flex justify-center items-end gap-1 h-full pb-2 relative">
-                                                    <div className="absolute -top-8 bg-slate-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="absolute -top-8 bg-slate-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                                                         {created} / {accepted}
                                                     </div>
                                                     <div style={{ height: `${(created / max) * 100}%` }} className="w-3 md:w-6 bg-slate-200 dark:bg-slate-700 rounded-t-lg transition-all duration-500 hover:bg-slate-300"></div>
@@ -311,7 +351,7 @@ const Dashboard: React.FC = () => {
                                     <Activity className="w-5 h-5 text-red-500" />
                                     Prioridades
                                 </h3>
-                                <button onClick={() => navigate('/projects')} className="text-xs text-brand-coral font-bold hover:underline">Ver Todas</button>
+                                <button onClick={handleOpenCriticalList} className="text-xs text-brand-coral font-bold hover:underline">Ver Todas</button>
                             </div>
 
                             {criticalTasks.length === 0 ? (
@@ -319,16 +359,25 @@ const Dashboard: React.FC = () => {
                             ) : (
                                 <div className="space-y-3">
                                     {criticalTasks.slice(0, 5).map(task => (
-                                        <div key={task.id} className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl">
+                                        <div
+                                            key={task.id}
+                                            className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors group"
+                                            onClick={() => handleOpenTask(task)}
+                                        >
                                             <div>
                                                 <h4 className="font-bold text-slate-800 dark:text-slate-200">{task.title}</h4>
                                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                                    <span className="font-semibold text-slate-600 dark:text-slate-400">{task.project_name}</span>
+                                                    <span>•</span>
                                                     <Clock size={12} /> Prazo: {new Date(task.due_date).toLocaleDateString()}
                                                 </div>
                                             </div>
-                                            <span className="px-3 py-1 bg-white dark:bg-slate-800 text-red-500 text-xs font-bold rounded-full shadow-sm">
-                                                Urgente
-                                            </span>
+                                            <div className="flex items-center gap-4">
+                                                <span className="px-3 py-1 bg-white dark:bg-slate-800 text-red-500 text-xs font-bold rounded-full shadow-sm">
+                                                    Urgente
+                                                </span>
+                                                <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -338,7 +387,6 @@ const Dashboard: React.FC = () => {
 
                     {/* Right Column: Operational Stats & Notices */}
                     <div className="space-y-8">
-
                         {/* Global Task Status */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
@@ -377,7 +425,7 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Notices (Simplified) */}
+                        {/* Notices */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -424,7 +472,7 @@ const Dashboard: React.FC = () => {
                             <span className="text-xs text-slate-500 dark:text-slate-400">Gerenciar entregas</span>
                         </div>
                     </button>
-
+                    {/* ... other buttons ... */}
                     <button
                         onClick={() => navigate('/proposals')}
                         className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
@@ -451,6 +499,71 @@ const Dashboard: React.FC = () => {
                         </div>
                     </button>
                 </div>
+
+                {/* Critical Tasks List Modal */}
+                {showCriticalListModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-2xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                            <div className="bg-white dark:bg-slate-800 px-8 py-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                    <AlertTriangle className="text-red-500" />
+                                    Tarefas Críticas
+                                </h2>
+                                <button
+                                    onClick={() => setShowCriticalListModal(false)}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto">
+                                {tasksToView.length === 0 ? (
+                                    <p className="text-center text-slate-400">Nenhuma tarefa crítica encontrada.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {tasksToView.map(task => (
+                                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center group">
+                                                <div>
+                                                    <h4 className="font-bold text-slate-800 dark:text-slate-200 text-lg">{task.title}</h4>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-500 mt-1">
+                                                        <span className="font-bold text-brand-coral">{task.project_name}</span>
+                                                        <span className="hidden sm:inline">•</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <Clock size={14} />
+                                                            Prazo: {new Date(task.due_date).toLocaleDateString()}
+                                                        </div>
+                                                        <span className="hidden sm:inline">•</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <Users size={14} />
+                                                            {task.assignee || 'Sem responsável'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleOpenTask(task)}
+                                                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-brand-coral hover:text-white text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm transition-all flex items-center gap-2 whitespace-nowrap"
+                                                >
+                                                    Visualizar <ExternalLink size={16} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Task Modal */}
+                {selectedProjectId && (
+                    <TaskModal
+                        isOpen={showTaskModal}
+                        onClose={handleCloseTaskModal}
+                        projectId={selectedProjectId}
+                        task={selectedTaskForEdit}
+                        onSave={handleCloseTaskModal} // Refresh list on save
+                    />
+                )}
 
             </main>
         </div>
