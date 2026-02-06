@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, AlignLeft, Flag, Paperclip } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Task {
@@ -11,6 +11,7 @@ interface Task {
     priority: 'low' | 'medium' | 'high';
     assignee: string;
     due_date: string;
+    attachment_url?: string;
 }
 
 interface UserSummary {
@@ -35,10 +36,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         status: 'backlog',
         priority: 'medium',
         assignee: '',
-        due_date: ''
+        due_date: '',
+        attachment_url: ''
     });
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [assigneeOptions, setAssigneeOptions] = useState<UserSummary[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -65,7 +69,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         if (task) {
             setFormData({
                 ...task,
-                due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : ''
+                due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
+                attachment_url: task.attachment_url || ''
             });
         } else {
             // Reset for new task
@@ -76,10 +81,64 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                 status: 'backlog',
                 priority: 'medium',
                 assignee: '',
-                due_date: ''
+                due_date: '',
+                attachment_url: ''
             });
         }
     }, [task, projectId, isOpen]);
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            // 1MB limit check
+            if (file.size > 1024 * 1024) {
+                alert('O arquivo deve ter no máximo 1MB.');
+                return;
+            }
+
+            setUploading(true);
+
+            // Create unique filename
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${projectId}/${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // Upload to Supabase Storage 'task-attachments' bucket
+            const { error: uploadError } = await supabase.storage
+                .from('task-attachments')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                console.error('Storage error:', uploadError);
+                throw uploadError;
+            }
+
+            // Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('task-attachments')
+                .getPublicUrl(filePath);
+
+            setFormData(prev => ({ ...prev, attachment_url: publicUrl }));
+            alert('Arquivo anexado com sucesso!');
+
+        } catch (error: any) {
+            console.error('Upload Error:', error);
+            if (error.message && error.message.includes('Bucket not found')) {
+                alert('Erro: Bucket de armazenamento "task-attachments" não encontrado. Contate o administrador.');
+            } else {
+                alert('Erro ao fazer upload do arquivo.');
+            }
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveAttachment = () => {
+        setFormData(prev => ({ ...prev, attachment_url: '' }));
+    };
 
     if (!isOpen) return null;
 
@@ -209,12 +268,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo</label>
                                 <div className="relative">
-                                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
                                     <input
                                         type="date"
                                         value={formData.due_date}
                                         onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
+                                        onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer"
                                     />
                                 </div>
                             </div>
@@ -234,10 +294,50 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             />
                         </div>
 
-                        {/* Attachment Placeholder */}
-                        <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                            <Paperclip size={20} />
-                            <span>Anexar arquivo...</span>
+                        {/* File Upload */}
+                        <div className="space-y-2">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleFileUpload}
+                                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                            />
+
+                            {formData.attachment_url ? (
+                                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <Paperclip size={18} className="text-brand-coral flex-shrink-0" />
+                                        <a href={formData.attachment_url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 dark:text-slate-200 truncate hover:underline">
+                                            {formData.attachment_url.split('/').pop()}
+                                        </a>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleRemoveAttachment}
+                                        className="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full text-red-500"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <Loader2 size={20} className="animate-spin" />
+                                            <span>Enviando arquivo... (Máx 1MB)</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Paperclip size={20} />
+                                            <span>Anexar arquivo (Máx 1MB)...</span>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                     </div>
@@ -253,7 +353,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || uploading}
                             className="px-8 py-2 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
                         >
                             {loading ? 'Salvando...' : 'Salvar'}
