@@ -26,11 +26,11 @@ interface KanbanBoardModalProps {
 }
 
 const COLUMNS = [
-    { id: 'backlog', title: 'Backlog', icon: AlertCircle, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800' },
-    { id: 'in_progress', title: 'Em Execução', icon: PlayCircle, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { id: 'approval', title: 'Aprovação', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-    { id: 'done', title: 'Finalizado', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20' },
-    { id: 'paused', title: 'Pausado', icon: PauseCircle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { id: 'backlog', title: 'Backlog', icon: AlertCircle, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300' },
+    { id: 'in_progress', title: 'Em Execução', icon: PlayCircle, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-300' },
+    { id: 'approval', title: 'Aprovação', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-300' },
+    { id: 'done', title: 'Finalizado', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-300' },
+    { id: 'paused', title: 'Pausado', icon: PauseCircle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-300' },
 ];
 
 const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, project }) => {
@@ -38,6 +38,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const [loading, setLoading] = useState(true);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen && project) {
@@ -66,6 +67,49 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const handleEditTask = (task: Task) => {
         setEditingTask(task);
         setShowTaskModal(true);
+    };
+
+    // Drag and Drop Handlers
+    const handleDragStart = (e: React.DragEvent, taskId: string) => {
+        setDraggedTaskId(taskId);
+        e.dataTransfer.effectAllowed = 'move';
+        // Transparent ghost image if needed, or default browser behavior
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow dropping
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+        e.preventDefault();
+
+        if (!draggedTaskId) return;
+
+        const taskToMove = tasks.find(t => t.id === draggedTaskId);
+        if (!taskToMove || taskToMove.status === targetStatus) {
+            setDraggedTaskId(null);
+            return;
+        }
+
+        // Optimistic UI Update
+        const updatedTasks = tasks.map(t =>
+            t.id === draggedTaskId ? { ...t, status: targetStatus as any } : t
+        );
+        setTasks(updatedTasks);
+        setDraggedTaskId(null);
+
+        // Update in Supabase
+        const { error } = await supabase
+            .from('project_tasks')
+            .update({ status: targetStatus })
+            .eq('id', draggedTaskId);
+
+        if (error) {
+            console.error('Error moving task:', error);
+            alert('Erro ao mover tarefa.');
+            fetchTasks(); // Revert on error
+        }
     };
 
     if (!isOpen || !project) return null;
@@ -103,7 +147,13 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                         {COLUMNS.map(col => {
                             const colTasks = tasks.filter(t => t.status === col.id);
                             return (
-                                <div key={col.id} className="w-80 flex flex-col h-full rounded-2xl bg-white dark:bg-slate-800 border-t-4" style={{ borderColor: col.id === 'done' ? '#10b981' : col.id === 'backlog' ? '#cbd5e1' : col.id === 'in_progress' ? '#3b82f6' : col.id === 'approval' ? '#a855f7' : '#f59e0b' }}>
+                                <div
+                                    key={col.id}
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, col.id)}
+                                    className={`w-80 flex flex-col h-full rounded-2xl bg-white dark:bg-slate-800 border-t-4 transition-colors ${colTasks.length === 0 && 'opacity-80'}`}
+                                    style={{ borderColor: col.id === 'done' ? '#10b981' : col.id === 'backlog' ? '#cbd5e1' : col.id === 'in_progress' ? '#3b82f6' : col.id === 'approval' ? '#a855f7' : '#f59e0b' }}
+                                >
 
                                     {/* Column Header */}
                                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
@@ -121,8 +171,10 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                         {colTasks.map(task => (
                                             <div
                                                 key={task.id}
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, task.id)}
                                                 onClick={() => handleEditTask(task)}
-                                                className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 cursor-pointer hover:shadow-md hover:border-brand-coral transition-all group relative"
+                                                className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-coral transition-all group relative animate-in fade-in zoom-in duration-200"
                                             >
                                                 {task.priority === 'high' && (
                                                     <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" title="Prioridade Alta"></div>
