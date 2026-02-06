@@ -178,18 +178,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         }
     };
 
-    const [fetchedProjectName, setFetchedProjectName] = useState<string>('');
 
-    useEffect(() => {
-        if (!projectName && projectId) {
-            supabase.from('acceptances').select('company_name').eq('id', projectId).single()
-                .then(({ data }) => {
-                    if (data) setFetchedProjectName(data.company_name);
-                });
-        }
-    }, [projectName, projectId]);
-
-    const displayProjectName = projectName || fetchedProjectName;
 
     // ... (existing code)
 
@@ -204,11 +193,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                                 {task ? 'Editar Tarefa' : 'Nova Tarefa'}
                             </h2>
-                            {displayProjectName && (
+                            {projectName && (
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-brand-coral mt-1">
-                                    {displayProjectName}
+                                    {projectName}
                                 </div>
                             )}
+
                         </div>
                         <button type="button" onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
                             <X size={20} />
