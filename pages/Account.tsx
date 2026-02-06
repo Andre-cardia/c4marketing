@@ -22,6 +22,7 @@ const Account: React.FC = () => {
     const { email, userRole, fullName: contextFullName, avatarUrl: contextAvatarUrl, refreshRole } = useUserRole();
 
     const [fullName, setFullName] = useState('');
+    const [calComLink, setCalComLink] = useState('');
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -42,7 +43,21 @@ const Account: React.FC = () => {
 
     useEffect(() => {
         if (contextFullName) setFullName(contextFullName);
+        fetchUserProfile();
     }, [contextFullName]);
+
+    const fetchUserProfile = async () => {
+        if (!email) return;
+        const { data, error } = await supabase
+            .from('app_users')
+            .select('cal_com_link')
+            .eq('email', email)
+            .single();
+
+        if (data) {
+            setCalComLink(data.cal_com_link || '');
+        }
+    };
 
     useEffect(() => {
         if (contextFullName) {
@@ -156,7 +171,10 @@ const Account: React.FC = () => {
 
             const { error } = await supabase
                 .from('app_users')
-                .update({ full_name: fullName })
+                .update({
+                    full_name: fullName,
+                    cal_com_link: calComLink
+                })
                 .eq('email', email);
 
             if (error) throw error;
@@ -304,6 +322,21 @@ const Account: React.FC = () => {
                                             disabled
                                             className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                            Link do Cal.com (opcional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={calComLink}
+                                            onChange={(e) => setCalComLink(e.target.value)}
+                                            placeholder="ex: cal.com/seu-usuario"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Permite que outros usuários agendem reuniões com você nos projetos.
+                                        </p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>
