@@ -13,6 +13,12 @@ interface Task {
     due_date: string;
 }
 
+interface UserSummary {
+    id: string;
+    name: string;
+    role: string;
+}
+
 interface TaskModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -32,6 +38,28 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         due_date: ''
     });
     const [loading, setLoading] = useState(false);
+    const [assigneeOptions, setAssigneeOptions] = useState<UserSummary[]>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchAssignees();
+        }
+    }, [isOpen]);
+
+    const fetchAssignees = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('app_users')
+                .select('id, name, role')
+                .in('role', ['gestor', 'operacional'])
+                .order('name');
+
+            if (error) throw error;
+            if (data) setAssigneeOptions(data);
+        } catch (err) {
+            console.error('Error fetching assignees:', err);
+        }
+    };
 
     useEffect(() => {
         if (task) {
@@ -116,7 +144,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 required
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-brand-coral outline-none"
+                                className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
                                 placeholder="Título da tarefa..."
                             />
                         </div>
@@ -132,7 +160,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                     <select
                                         value={formData.priority}
                                         onChange={e => setFormData({ ...formData, priority: e.target.value as any })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 outline-none appearance-none"
+                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none appearance-none"
                                     >
                                         <option value="low">Baixa</option>
                                         <option value="medium">Média</option>
@@ -147,7 +175,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 <select
                                     value={formData.status}
                                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                                    className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 outline-none"
+                                    className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
                                 >
                                     <option value="backlog">Backlog</option>
                                     <option value="in_progress">Em Execução</option>
@@ -157,18 +185,23 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 </select>
                             </div>
 
-                            {/* Assignee */}
+                            {/* Assignee - Modified to Select */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Responsável</label>
                                 <div className="relative">
                                     <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
+                                    <select
                                         value={formData.assignee}
                                         onChange={e => setFormData({ ...formData, assignee: e.target.value })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 outline-none"
-                                        placeholder="Nome..."
-                                    />
+                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none appearance-none"
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {assigneeOptions.map(user => (
+                                            <option key={user.id} value={user.name}>
+                                                {user.name} ({user.role})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -181,7 +214,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                         type="date"
                                         value={formData.due_date}
                                         onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 outline-none"
+                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
                                     />
                                 </div>
                             </div>
@@ -196,7 +229,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 rows={6}
                                 value={formData.description}
                                 onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                className="w-full p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
                                 placeholder="Detalhes da tarefa..."
                             />
                         </div>
@@ -214,7 +247,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors"
+                            className="px-6 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
                         >
                             Cancelar
                         </button>
