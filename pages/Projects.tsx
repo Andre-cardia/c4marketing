@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, KanbanSquare } from 'lucide-react';
+import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 
@@ -292,7 +292,7 @@ const Projects: React.FC = () => {
                                                     onClick={() => setSelectedProjectForKanban(project)}
                                                     className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 hover:bg-brand-coral hover:text-white text-brand-coral rounded-lg transition-all font-bold text-xs"
                                                 >
-                                                    <KanbanSquare size={16} />
+                                                    <LayoutDashboard size={16} />
                                                     <span className="hidden xl:inline">Ver Tarefas</span>
                                                 </button>
                                             </td>
