@@ -16,40 +16,39 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function seedData() {
     console.log('Seeding access_guide_data...');
 
-    // Get the first project
+    // Get ALL projects
     const { data: projects } = await supabase
         .from('landing_page_projects')
-        .select('id')
-        .limit(1);
+        .select('id');
 
     if (!projects || projects.length === 0) {
         console.log('No projects found to seed.');
         return;
     }
 
-    const id = projects[0].id;
-    console.log(`Updating project ${id}...`);
+    console.log(`Found ${projects.length} projects. Updating all...`);
 
     const dummyData = {
-        company_name: 'Teste Empresa',
-        contact_person: 'João',
+        company_name: 'Teste Empresa (Seeded)',
+        contact_person: 'Admin',
         site_url: 'www.teste.com',
         platform: 'WordPress'
     };
 
-    const { error } = await supabase
-        .from('landing_page_projects')
-        .update({
-            access_guide_data: dummyData,
-            account_setup_status: 'pending' // Ensure it's pending so we see "Validar" button
-        })
-        .eq('id', id);
+    for (const project of projects) {
+        const { error } = await supabase
+            .from('landing_page_projects')
+            .update({
+                access_guide_data: dummyData,
+                account_setup_status: 'pending'
+            })
+            .eq('id', project.id);
 
-    if (error) {
-        console.error('Error updating:', error);
-    } else {
-        console.log('Successfully updated access_guide_data. Refresh the page to see the buttons.');
+        if (error) console.error(`Failed to update ${project.id}:`, error);
+        else console.log(`Updated ${project.id}`);
     }
+
+    console.log('Finished updating projects.');
 }
 
 seedData();
