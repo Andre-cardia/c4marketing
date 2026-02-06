@@ -561,6 +561,7 @@ const Dashboard: React.FC = () => {
                         onClose={handleCloseTaskModal}
                         projectId={selectedProjectId}
                         task={selectedTaskForEdit}
+                        projectName={selectedTaskForEdit?.project_name}
                         onSave={handleCloseTaskModal} // Refresh list on save
                     />
                 )}
