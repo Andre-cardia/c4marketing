@@ -40,18 +40,24 @@ const Meetings: React.FC = () => {
             // Ideally, this should be proxied through a backend API route.
             // Using direct fetch for MVP demonstration.
 
-            const response = await fetch(`https://api.cal.com/v2/bookings?apiKey=${API_KEY}&status=upcoming`);
+            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming`, {
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`
+                }
+            });
 
             if (!response.ok) {
                 throw new Error('Falha ao carregar agendamentos do Cal.com');
             }
 
             const data = await response.json();
+            console.log('Cal.com API Response:', data);
 
             // Transform data if necessary, API v2 structure might vary, adapting to common structure
-            if (data.data) {
+            if (data.data && Array.isArray(data.data)) {
                 setBookings(data.data);
             } else {
+                console.warn('Unexpected API format:', data);
                 setBookings([]);
             }
 
@@ -133,7 +139,7 @@ const Meetings: React.FC = () => {
                                     <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{booking.description}</p>
 
                                     <div className="flex flex-wrap gap-4 mt-4">
-                                        {booking.attendees.map((attendee, idx) => (
+                                        {booking.attendees && booking.attendees.map((attendee, idx) => (
                                             <div key={idx} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
                                                 <User size={14} />
                                                 <span className="font-medium">{attendee.name}</span>

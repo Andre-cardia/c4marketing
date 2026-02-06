@@ -69,7 +69,11 @@ const Account: React.FC = () => {
     const fetchMyBookings = async () => {
         setLoadingBookings(true);
         try {
-            const response = await fetch(`https://api.cal.com/v2/bookings?apiKey=${API_KEY}&status=upcoming`);
+            const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming`, {
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 if (data.data) {
