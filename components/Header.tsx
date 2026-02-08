@@ -42,6 +42,17 @@ const Header: React.FC = () => {
             Dashboard
           </button>
 
+          {/* AI Manager - only for admin and gestor */}
+          {!loading && (userRole === 'admin' || userRole === 'gestor') && (
+            <button
+              onClick={() => navigate('/ai-agent')}
+              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              <span className="p-0.5 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[10px] w-4 h-4 flex items-center justify-center font-bold">AI</span>
+              IA Gerente
+            </button>
+          )}
+
           {/* Propostas - only for gestor and comercial */}
           {!loading && (userRole === 'gestor' || userRole === 'comercial') && (
             <button

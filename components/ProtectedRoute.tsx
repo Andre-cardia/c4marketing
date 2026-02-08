@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabase';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
+    allowedRoles?: string[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
@@ -49,7 +50,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
                 alert('Acesso negado. Seu usuário não tem permissão para acessar este sistema.');
                 setSession(null);
             } else {
-                setAuthorized(true);
+                // Check if role is allowed
+                if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRecord.role)) {
+                    console.warn(`Access Denied: Role ${userRecord.role} not in allowed list [${allowedRoles}]`);
+                    setAuthorized(false);
+                    // Optional: redirect to dashboard or show unauthorized message
+                    // For now, we'll just set authorized to false which redirects to /
+                } else {
+                    setAuthorized(true);
+                }
             }
         } catch (err) {
             console.error('Error verifying user:', err);
@@ -68,7 +77,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     }
 
     if (!authorized) {
-        return <Navigate to="/" replace />;
+        return <Navigate to="/dashboard" replace />; // Redirect to Dashboard if logged in but unauthorized for specific page
     }
 
     return <>{children}</>;

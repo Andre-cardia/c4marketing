@@ -23,7 +23,8 @@ import AccessGuideSurvey from './pages/external/AccessGuideSurvey';
 import Account from './pages/Account';
 import Meetings from './pages/Meetings';
 import ProtectedRoute from './components/ProtectedRoute';
-import ProtectionRoute from './components/ProtectedRoute';
+import ProtectionRoute from './components/ProtectedRoute'; // Duplicate import kept for safety
+import AIAgent from './pages/AIAgent';
 import { UserRoleProvider } from './lib/UserRoleContext';
 import { ThemeProvider } from './lib/ThemeContext';
 
@@ -39,6 +40,14 @@ const App: React.FC = () => {
             <Route path="/contracts/:id" element={<ContractView />} />
             <Route path="/projects/:id/consulting" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
             <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
+            <Route
+              path="/ai-agent"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'gestor']}>
+                  <AIAgent />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/account"
               element={
