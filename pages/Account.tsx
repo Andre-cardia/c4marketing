@@ -34,9 +34,10 @@ interface Booking {
 }
 
 const Account: React.FC = () => {
-    const { email, userRole, fullName: contextFullName, avatarUrl: contextAvatarUrl, refreshRole } = useUserRole();
+    const { email, userRole, fullName: contextFullName, avatarUrl: contextAvatarUrl, calComLink: contextCalComLink, refreshRole } = useUserRole();
 
     const [fullName, setFullName] = useState('');
+    const [calComLink, setCalComLink] = useState('');
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -107,7 +108,8 @@ const Account: React.FC = () => {
 
     useEffect(() => {
         if (contextFullName) setFullName(contextFullName);
-    }, [contextFullName]);
+        if (contextCalComLink) setCalComLink(contextCalComLink);
+    }, [contextFullName, contextCalComLink]);
 
     useEffect(() => {
         if (contextFullName) {
@@ -222,7 +224,8 @@ const Account: React.FC = () => {
             const { error } = await supabase
                 .from('app_users')
                 .update({
-                    full_name: fullName
+                    full_name: fullName,
+                    cal_com_link: calComLink
                 })
                 .eq('email', email);
 
@@ -362,6 +365,17 @@ const Account: React.FC = () => {
                                             onChange={(e) => setFullName(e.target.value)}
                                             className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Link do Cal.com / Username</label>
+                                        <input
+                                            type="text"
+                                            value={calComLink}
+                                            onChange={(e) => setCalComLink(e.target.value)}
+                                            placeholder="Ex: andre-cardia/reuniao-da-equipe"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-1">Este link será usado para o botão "Agendar Reunião Interna".</p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail</label>

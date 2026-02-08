@@ -8,6 +8,7 @@ interface UserRoleContextType {
     fullName: string | null;
     avatarUrl: string | null;
     email: string | null;
+    calComLink: string | null;
     loading: boolean;
     refreshRole: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [userRole, setUserRole] = useState<UserRole>(null);
     const [fullName, setFullName] = useState<string | null>(null);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [calComLink, setCalComLink] = useState<string | null>(null);
     const [email, setEmail] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -29,7 +31,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 setEmail(session.user.email);
                 const { data } = await supabase
                     .from('app_users')
-                    .select('role, full_name, avatar_url')
+                    .select('role, full_name, avatar_url, cal_com_link')
                     .eq('email', session.user.email)
                     .single();
 
@@ -37,12 +39,14 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     setUserRole(data.role as UserRole);
                     setFullName(data.full_name);
                     setAvatarUrl(data.avatar_url);
+                    setCalComLink(data.cal_com_link);
                 } else {
                     setUserRole(null);
                 }
             } else {
                 setUserRole(null);
                 setEmail(null);
+                setCalComLink(null);
             }
         } catch (error) {
             console.error('Error fetching user role:', error);
@@ -57,7 +61,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }, []);
 
     return (
-        <UserRoleContext.Provider value={{ userRole, fullName, avatarUrl, email, loading, refreshRole: fetchUserRole }}>
+        <UserRoleContext.Provider value={{ userRole, fullName, avatarUrl, email, calComLink, loading, refreshRole: fetchUserRole }}>
             {children}
         </UserRoleContext.Provider>
     );
