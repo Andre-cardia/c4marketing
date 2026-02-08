@@ -371,7 +371,11 @@ const Account: React.FC = () => {
                                         <input
                                             type="text"
                                             value={calComLink}
-                                            onChange={(e) => setCalComLink(e.target.value)}
+                                            onChange={(e) => {
+                                                // Strips domain if user pastes full URL
+                                                const val = e.target.value.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '');
+                                                setCalComLink(val);
+                                            }}
                                             placeholder="Ex: andre-cardia/reuniao-da-equipe"
                                             className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         />

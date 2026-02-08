@@ -28,6 +28,11 @@ const Meetings: React.FC = () => {
 
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6'; // Hardcoded for MVP as per request context
 
+    // Derive clean link
+    const cleanCalLink = calComLink
+        ? calComLink.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '')
+        : "";
+
     useEffect(() => {
         (async function () {
             const cal = await getCalApi();
@@ -43,18 +48,14 @@ const Meetings: React.FC = () => {
     useEffect(() => {
         fetchBookings();
     }, []);
+    // ... (keep fetchBookings same)
+
+    // ... (keep helper functions same)
 
     const fetchBookings = async () => {
         setLoading(true);
         setError(null);
         try {
-            // Fetch bookings from Cal.com API v2
-            // Note: Since we are running client-side, this exposes the API Key. 
-            // Ideally, this should be proxied through a backend API route.
-            // Using direct fetch for MVP demonstration.
-
-            // Using direct fetch for MVP demonstration.
-
             const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming&limit=100`, {
                 method: 'GET',
                 headers: {
@@ -71,7 +72,6 @@ const Meetings: React.FC = () => {
             const data = await response.json();
             console.log('Cal.com API Response:', data);
 
-            // Transform data if necessary, API v2 structure might vary, adapting to common structure
             let bookingsArray: any[] = [];
             if (data.data && Array.isArray(data.data)) {
                 bookingsArray = data.data;
@@ -86,7 +86,7 @@ const Meetings: React.FC = () => {
                 }));
                 setBookings(mappedBookings);
             } else {
-                console.warn('Unexpected API format:', data);
+                bookingsArray = []; // fallback
                 setBookings([]);
             }
 
@@ -127,18 +127,19 @@ const Meetings: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {!roleLoading && userRole === 'gestor' && (
                             <button
-                                data-cal-link={calComLink || ""} // Use dynamic link or empty if not set
-                                data-cal-namespace=""
+                                data-cal-link={cleanCalLink}
                                 data-cal-config='{"layout":"month_view"}'
-                                disabled={!calComLink}
-                                title={!calComLink ? "Configure o link do Cal.com em Minha Conta" : "Agendar Reunião"}
-                                className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10 ${!calComLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
+                                disabled={!cleanCalLink}
+                                title={!cleanCalLink ? "Configure o link do Cal.com em Minha Conta" : `Agendar Reunião (${cleanCalLink})`}
+                                className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10 ${!cleanCalLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
+                                onClick={() => console.log('Opening Cal.com with link:', cleanCalLink)}
                             >
                                 <Plus size={20} /> Agendar Reunião Interna
                             </button>
                         )}
                         <button
                             onClick={fetchBookings}
+
                             className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors text-slate-500 shadow-sm"
                             title="Atualizar"
                         >
