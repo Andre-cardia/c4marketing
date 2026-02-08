@@ -8,6 +8,7 @@ import BookingModal from '../components/projects/BookingModal';
 
 interface Booking {
     id: number;
+    uid: string; // Required for API v2 cancel endpoint
     title: string;
     description: string;
     startTime: string;
@@ -47,19 +48,25 @@ const Meetings: React.FC = () => {
         setIsSchedulingModalOpen(true);
     };
 
-    const handleCancelBooking = async (bookingId: number) => {
+    const handleCancelBooking = async (bookingUid: string) => {
         if (!confirm('Tem certeza que deseja cancelar esta reunião?')) return;
 
         try {
-            const response = await fetch(`https://api.cal.com/v2/bookings/${bookingId}/cancel`, {
+            const response = await fetch(`https://api.cal.com/v2/bookings/${bookingUid}/cancel`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${API_KEY}`,
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'cal-api-version': '2024-08-13' // Required for API v2
+                },
+                body: JSON.stringify({
+                    cancellationReason: 'Cancelado pelo sistema C4'
+                })
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                console.error('Cancel error response:', errorData);
                 throw new Error('Falha ao cancelar agendamento');
             }
 
