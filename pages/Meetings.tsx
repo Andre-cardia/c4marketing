@@ -21,7 +21,7 @@ interface Booking {
 }
 
 const Meetings: React.FC = () => {
-    const { userRole, loading: roleLoading } = useUserRole();
+    const { userRole, loading: roleLoading, calComLink } = useUserRole();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -127,10 +127,12 @@ const Meetings: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {!roleLoading && userRole === 'gestor' && (
                             <button
-                                data-cal-link="andre-cardia-c4-marketing/reuniao-da-equipe"
+                                data-cal-link={calComLink || ""} // Use dynamic link or empty if not set
                                 data-cal-namespace=""
                                 data-cal-config='{"layout":"month_view"}'
-                                className="flex items-center gap-2 px-6 py-2.5 bg-brand-dark hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10"
+                                disabled={!calComLink}
+                                title={!calComLink ? "Configure o link do Cal.com em Minha Conta" : "Agendar Reunião"}
+                                className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10 ${!calComLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
                             >
                                 <Plus size={20} /> Agendar Reunião Interna
                             </button>
