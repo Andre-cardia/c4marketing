@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw, Plus } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import Cal, { getCalApi } from "@calcom/embed-react";
+import BookingModal from '../components/projects/BookingModal';
 
 interface Booking {
     id: number;
@@ -22,6 +23,7 @@ interface Booking {
 
 const Meetings: React.FC = () => {
     const { userRole, loading: roleLoading, calComLink } = useUserRole();
+    const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -57,16 +59,8 @@ const Meetings: React.FC = () => {
 
     // ... (keep helper functions same)
 
-    const handleScheduleClick = async () => {
-        if (!cleanCalLink) return;
-        const cal = await getCalApi();
-        cal("modal", {
-            calLink: cleanCalLink,
-            config: {
-                layout: "month_view",
-                theme: "dark"
-            }
-        });
+    const handleScheduleClick = () => {
+        setIsSchedulingModalOpen(true);
     };
 
     const fetchBookings = async () => {
@@ -231,6 +225,13 @@ const Meetings: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            <BookingModal
+                isOpen={isSchedulingModalOpen}
+                onClose={() => setIsSchedulingModalOpen(false)}
+                calLink={cleanCalLink}
+                companyName="Reunião Interna"
+            />
         </div>
     );
 };
