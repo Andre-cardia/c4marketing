@@ -163,7 +163,9 @@ const Dashboard: React.FC = () => {
             setTasks(enrichedTasks);
             setCriticalTasks(enrichedTasks.filter((t: Task) => t.priority === 'high' && t.status !== 'done'));
         }
-        const fetchUpcomingBookings = async () => {
+    };
+
+    const fetchUpcomingBookings = async () => {
             try {
                 const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
                 const response = await fetch(`https://api.cal.com/v2/bookings?status=upcoming&limit=100`, {
@@ -676,7 +678,7 @@ const Dashboard: React.FC = () => {
 
                 </main>
             </div>
-        );
-    };
+    );
+};
 
-    export default Dashboard;
+export default Dashboard;

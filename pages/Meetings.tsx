@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
-import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw, Plus } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import Cal, { getCalApi } from "@calcom/embed-react";
 
 interface Booking {
     id: number;
@@ -26,6 +27,18 @@ const Meetings: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6'; // Hardcoded for MVP as per request context
+
+    useEffect(() => {
+        (async function () {
+            const cal = await getCalApi();
+            cal("ui", {
+                theme: "dark",
+                styles: { branding: { brandColor: "#F06C6C" } },
+                hideEventTypeDetails: false,
+                layout: "month_view"
+            });
+        })();
+    }, []);
 
     useEffect(() => {
         fetchBookings();
@@ -111,13 +124,25 @@ const Meetings: React.FC = () => {
                         </h2>
                         <p className="text-slate-500 dark:text-slate-400 text-sm">Próximas reuniões agendadas via Cal.com</p>
                     </div>
-                    <button
-                        onClick={fetchBookings}
-                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500"
-                        title="Atualizar"
-                    >
-                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {!roleLoading && userRole === 'gestor' && (
+                            <button
+                                data-cal-link="andre-cardia-c4-marketing/reuniao-da-equipe"
+                                data-cal-namespace=""
+                                data-cal-config='{"layout":"month_view"}'
+                                className="flex items-center gap-2 px-6 py-2.5 bg-brand-dark hover:bg-slate-800 text-white font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10"
+                            >
+                                <Plus size={20} /> Agendar Reunião Interna
+                            </button>
+                        )}
+                        <button
+                            onClick={fetchBookings}
+                            className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors text-slate-500 shadow-sm"
+                            title="Atualizar"
+                        >
+                            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                        </button>
+                    </div>
                 </div>
 
                 {loading ? (
