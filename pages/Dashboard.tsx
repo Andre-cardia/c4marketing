@@ -482,13 +482,11 @@ const Dashboard: React.FC = () => {
                                             </div>
                                             {booking.meetingUrl && (
                                                 <a
-                                                    href={booking.meetingUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
+                                                    href="/meetings"
                                                     className="p-1.5 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
-                                                    title="Entrar"
+                                                    title="Ver na Agenda"
                                                 >
-                                                    <ExternalLink size={14} />
+                                                    <ArrowRight size={14} />
                                                 </a>
                                             )}
                                         </div>
