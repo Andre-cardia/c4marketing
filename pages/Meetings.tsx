@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
-import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw, Plus, X } from 'lucide-react';
+import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw, Plus, X, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import Cal, { getCalApi } from "@calcom/embed-react";
 import BookingModal from '../components/projects/BookingModal';
@@ -45,6 +45,30 @@ const Meetings: React.FC = () => {
 
     const handleScheduleClick = () => {
         setIsSchedulingModalOpen(true);
+    };
+
+    const handleCancelBooking = async (bookingId: number) => {
+        if (!confirm('Tem certeza que deseja cancelar esta reunião?')) return;
+
+        try {
+            const response = await fetch(`https://api.cal.com/v2/bookings/${bookingId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Falha ao cancelar agendamento');
+            }
+
+            // Refresh the list
+            fetchBookings();
+        } catch (err) {
+            console.error('Error cancelling booking:', err);
+            alert('Erro ao cancelar reunião. Tente novamente.');
+        }
     };
 
     const fetchBookings = async () => {
@@ -191,16 +215,25 @@ const Meetings: React.FC = () => {
                                     {booking.status === 'CANCELLED' ? (
                                         <span className="px-4 py-2 bg-red-100 text-red-600 rounded-xl font-bold text-sm">Cancelado</span>
                                     ) : (
-                                        booking.meetingUrl && (
-                                            <a
-                                                href={booking.meetingUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="px-5 py-2.5 bg-brand-coral hover:bg-red-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-brand-coral/20"
+                                        <>
+                                            {booking.meetingUrl && (
+                                                <a
+                                                    href={booking.meetingUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-5 py-2.5 bg-brand-coral hover:bg-red-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-brand-coral/20"
+                                                >
+                                                    <Video size={18} /> Entrar
+                                                </a>
+                                            )}
+                                            <button
+                                                onClick={() => handleCancelBooking(booking.id)}
+                                                className="px-4 py-2.5 bg-slate-100 hover:bg-red-100 dark:bg-slate-700 dark:hover:bg-red-900/30 text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400 font-bold rounded-xl flex items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600"
+                                                title="Cancelar Reunião"
                                             >
-                                                <Video size={18} /> Entrar
-                                            </a>
-                                        )
+                                                <Trash2 size={18} /> Cancelar
+                                            </button>
+                                        </>
                                     )}
                                 </div>
 
