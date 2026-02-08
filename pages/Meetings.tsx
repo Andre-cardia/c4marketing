@@ -30,7 +30,7 @@ const Meetings: React.FC = () => {
 
     // Derive clean link
     const cleanCalLink = calComLink
-        ? calComLink.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '')
+        ? calComLink.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '').trim()
         : "";
 
     useEffect(() => {
@@ -51,6 +51,18 @@ const Meetings: React.FC = () => {
     // ... (keep fetchBookings same)
 
     // ... (keep helper functions same)
+
+    const handleScheduleClick = async () => {
+        if (!cleanCalLink) return;
+        const cal = await getCalApi();
+        cal("modal", {
+            calLink: cleanCalLink,
+            config: {
+                layout: "month_view",
+                theme: "dark"
+            }
+        });
+    };
 
     const fetchBookings = async () => {
         setLoading(true);
@@ -127,12 +139,10 @@ const Meetings: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {!roleLoading && userRole === 'gestor' && (
                             <button
-                                data-cal-link={cleanCalLink}
-                                data-cal-config='{"layout":"month_view"}'
+                                onClick={handleScheduleClick}
                                 disabled={!cleanCalLink}
                                 title={!cleanCalLink ? "Configure o link do Cal.com em Minha Conta" : `Agendar Reunião (${cleanCalLink})`}
                                 className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10 ${!cleanCalLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
-                                onClick={() => console.log('Opening Cal.com with link:', cleanCalLink)}
                             >
                                 <Plus size={20} /> Agendar Reunião Interna
                             </button>
