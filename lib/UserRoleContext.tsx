@@ -56,8 +56,33 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
     };
 
+    // Clear all user data when signed out
+    const clearUserData = () => {
+        setUserRole(null);
+        setFullName(null);
+        setAvatarUrl(null);
+        setCalComLink(null);
+        setEmail(null);
+    };
+
     useEffect(() => {
         fetchUserRole();
+
+        // CRITICAL: Listen for auth state changes to update user data on login/logout
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log('[UserRoleContext] Auth state changed:', event);
+
+            if (event === 'SIGNED_OUT') {
+                // Immediately clear all user data on logout
+                clearUserData();
+                setLoading(false);
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                // Fetch fresh user data on login or token refresh
+                fetchUserRole();
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     return (
