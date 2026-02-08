@@ -30,15 +30,9 @@ const Meetings: React.FC = () => {
 
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6'; // Hardcoded for MVP as per request context
 
-    // Derive clean link or use default
-    let cleanCalLink = calComLink
-        ? calComLink.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '').trim()
-        : "grupo-c4/reuniao-grupo-c4"; // Default to known working event
-
-    // Handle email input by stripping domain
-    if (cleanCalLink.includes('@')) {
-        cleanCalLink = cleanCalLink.split('@')[0];
-    }
+    // Hardcode the shared team link to match Projects and ensure it works
+    // This bypasses any user configuration issues until the DB is verified
+    const cleanCalLink = "grupo-c4/reuniao-grupo-c4";
 
 
 
