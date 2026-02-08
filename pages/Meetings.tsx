@@ -230,7 +230,7 @@ const Meetings: React.FC = () => {
                                     <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                                         Agendar Reunião
                                     </h2>
-                                    <p className="text-xs text-slate-500">Reunião Interna</p>
+                                    <p className="text-xs text-slate-500">Reunião Interna ({cleanCalLink})</p>
                                 </div>
                             </div>
                             <button
