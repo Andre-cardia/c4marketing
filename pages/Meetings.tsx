@@ -40,17 +40,7 @@ const Meetings: React.FC = () => {
         cleanCalLink = cleanCalLink.split('@')[0];
     }
 
-    useEffect(() => {
-        (async function () {
-            const cal = await getCalApi();
-            cal("ui", {
-                theme: "dark",
-                styles: { branding: { brandColor: "#F06C6C" } },
-                hideEventTypeDetails: false,
-                layout: "month_view"
-            });
-        })();
-    }, []);
+
 
     useEffect(() => {
         fetchBookings();
