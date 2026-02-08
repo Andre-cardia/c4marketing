@@ -59,12 +59,32 @@ const Header: React.FC = () => {
             Projetos
           </button>
 
-          <button
-            onClick={() => navigate('/meetings')}
-            className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/meetings') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-          >
-            Agenda
-          </button>
+          {/* Dropdown Compromissos */}
+          <div className="relative group">
+            <button
+              className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/meetings') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              Compromissos
+            </button>
+            <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg py-1 min-w-[140px]">
+                <button
+                  onClick={() => navigate('/meetings')}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-coral transition-colors"
+                >
+                  Agenda
+                </button>
+                <a
+                  href="https://www.microsoft.com/pt-br/microsoft-365/outlook/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-coral transition-colors"
+                >
+                  Outlook
+                </a>
+              </div>
+            </div>
+          </div>
 
           {/* Usuários - only for gestor */}
           {!loading && userRole === 'gestor' && (
