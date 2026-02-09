@@ -137,14 +137,14 @@ export default function AIAgent() {
 
                         {/* Markdown Content */}
                         <div className="p-8 md:p-12 prose prose-slate dark:prose-invert max-w-none 
-              prose-headings:font-bold prose-headings:text-slate-800 dark:prose-headings:text-white 
-              prose-p:text-slate-600 dark:prose-p:text-slate-100 
-              prose-strong:text-slate-900 dark:prose-strong:text-brand-coral 
-              prose-li:text-slate-600 dark:prose-li:text-slate-100
-              prose-ul:text-slate-600 dark:prose-ul:text-slate-100
-              prose-ol:text-slate-600 dark:prose-ol:text-slate-100
-              [&>*]:dark:text-slate-100
-              prose-a:text-indigo-600 dark:prose-a:text-indigo-400">
+              prose-headings:font-bold 
+              dark:text-slate-100
+              [&_*]:dark:!text-slate-100
+              [&_strong]:dark:!text-brand-coral
+              [&_h1]:dark:!text-white
+              [&_h2]:dark:!text-white
+              [&_h3]:dark:!text-white
+              [&_a]:dark:!text-indigo-400">
                             <ReactMarkdown>{analysis}</ReactMarkdown>
                         </div>
 
