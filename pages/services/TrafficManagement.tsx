@@ -4,6 +4,7 @@ import Header from '../../components/Header';
 import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, TrendingUp, Flag, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './traffic/SurveyAnswersModal';
+import AccessAnswersModal from './traffic/AccessAnswersModal';
 
 interface TrafficProject {
     id: string;
@@ -12,6 +13,7 @@ interface TrafficProject {
     account_setup_status: 'pending' | 'completed';
     strategy_meeting_notes: string | null;
     survey_data?: any;
+    access_data?: any;
 }
 
 interface Campaign {
@@ -19,6 +21,7 @@ interface Campaign {
     name: string;
     platform: 'google_ads' | 'meta_ads' | 'linkedin_ads' | 'tiktok_ads';
     status: 'active' | 'paused' | 'ended';
+    created_at?: string;
 }
 
 const TrafficManagement: React.FC = () => {
@@ -30,9 +33,8 @@ const TrafficManagement: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [showCampaignModal, setShowCampaignModal] = useState(false);
     const [showSurveyModal, setShowSurveyModal] = useState(false);
+    const [showAccessModal, setShowAccessModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
-
-
 
     // Shared Fetch Function
     const loadProjectData = async () => {
@@ -92,6 +94,11 @@ const TrafficManagement: React.FC = () => {
     const handleOpenSurveyModal = async () => {
         await loadProjectData(); // Refresh data first
         setShowSurveyModal(true);
+    };
+
+    const handleOpenAccessModal = async () => {
+        await loadProjectData();
+        setShowAccessModal(true);
     };
 
     // Handlers
@@ -257,7 +264,7 @@ const TrafficManagement: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* 2. Account Setup */}
+                    {/* 2. Account Setup / Access Config */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
@@ -269,18 +276,55 @@ const TrafficManagement: React.FC = () => {
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
                                     <CheckCircle size={14} /> Contas Vinculadas
                                 </span>
+                                <div className="mt-4">
+                                    <button
+                                        onClick={handleOpenAccessModal}
+                                        className="w-full py-2 text-xs font-medium text-purple-600 hover:text-purple-700 underline"
+                                    >
+                                        Ver Credenciais
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <div className="space-y-3 relative z-10">
-                                <button className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors">
-                                    Enviar Guia
-                                </button>
                                 <button
-                                    onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                    className="w-full text-xs text-slate-400 hover:text-slate-600 underline"
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link do formulário copiado!');
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors flex items-center justify-center gap-2"
                                 >
-                                    Marcar como Feito (Dev)
+                                    <Settings size={16} />
+                                    Enviar Formulário
                                 </button>
+
+                                {trafficProject?.access_data && (
+                                    <>
+                                        <button
+                                            onClick={handleOpenAccessModal}
+                                            className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                                        >
+                                            Ver Respostas
+                                        </button>
+
+                                        {trafficProject.account_setup_status !== 'completed' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                                className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <CheckCircle size={16} />
+                                                Validar
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+
+                                {!trafficProject?.access_data && (
+                                    <p className="text-xs text-center text-slate-400">
+                                        Aguardando preenchimento...
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -428,6 +472,7 @@ const TrafficManagement: React.FC = () => {
                     </div>
                 </div>
             )}
+
             {/* Survey Modal */}
             <SurveyAnswersModal
                 isOpen={showSurveyModal}
@@ -436,6 +481,16 @@ const TrafficManagement: React.FC = () => {
                 isCompleted={trafficProject?.survey_status === 'completed'}
                 onValidate={() => handleUpdateStatus('survey_status', 'completed')}
                 onReopen={() => handleUpdateStatus('survey_status', 'pending')}
+            />
+
+            {/* Access Modal */}
+            <AccessAnswersModal
+                isOpen={showAccessModal}
+                onClose={() => setShowAccessModal(false)}
+                accessData={trafficProject?.access_data || {}}
+                isCompleted={trafficProject?.account_setup_status === 'completed'}
+                onValidate={() => handleUpdateStatus('account_setup_status', 'completed')}
+                onReopen={() => handleUpdateStatus('account_setup_status', 'pending')}
             />
         </div>
     );

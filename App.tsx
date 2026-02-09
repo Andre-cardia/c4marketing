@@ -17,6 +17,7 @@ import Consulting from './pages/services/Consulting';
 import StrategyMeeting from './pages/services/traffic/StrategyMeeting';
 import CampaignStage from './pages/services/traffic/CampaignStage';
 import TrafficSurvey from './pages/external/TrafficSurvey';
+import TrafficAccessForm from './pages/external/TrafficAccessForm';
 import LandingPageSurvey from './pages/external/LandingPageSurvey';
 import WebsiteSurvey from './pages/external/WebsiteSurvey';
 import AccessGuideSurvey from './pages/external/AccessGuideSurvey';
@@ -57,6 +58,7 @@ const App: React.FC = () => {
               }
             />
             <Route path="/external/traffic-survey/:id" element={<TrafficSurvey />} />
+            <Route path="/external/traffic-access/:id" element={<TrafficAccessForm />} />
             <Route path="/external/lp-survey/:id" element={<LandingPageSurvey />} />
             <Route path="/external/website-survey/:id" element={<WebsiteSurvey />} />
             <Route path="/external/access-guide/:id" element={<AccessGuideSurvey />} />
