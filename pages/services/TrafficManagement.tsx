@@ -48,6 +48,7 @@ interface AppUser {
     id: string;
     full_name: string | null;
     email?: string;
+    role?: string;
 }
 
 const TrafficManagement: React.FC = () => {
@@ -71,11 +72,15 @@ const TrafficManagement: React.FC = () => {
     const loadProjectData = async () => {
         if (!id) return;
         try {
-            // 0. Get Users
+            // 0. Get Users (Filtered by role: gestor or operacional)
             const { data: userData } = await supabase
                 .from('app_users')
-                .select('id, full_name, email');
-            if (userData) setAppUsers(userData);
+                .select('id, full_name, email, role');
+
+            if (userData) {
+                const filteredUsers = userData.filter(u => u.role === 'gestor' || u.role === 'operacional');
+                setAppUsers(filteredUsers);
+            }
 
             // 1. Get Company Name
             const { data: acceptance } = await supabase
@@ -234,22 +239,63 @@ const TrafficManagement: React.FC = () => {
         }
     };
 
-    const handleCompleteStep = async (stepId: string, campaignId: string, currentOrder: number) => {
+    const handleCompleteStep = async (step: TimelineStep, campaignId: string) => {
         const now = new Date().toISOString();
 
         // 1. Complete current step
-        await handleUpdateTimelineStep(stepId, {
+        await handleUpdateTimelineStep(step.id, {
             status: 'completed',
             end_date: now
         });
 
         // 2. Activate next step
-        const nextStep = timelineSteps[campaignId]?.find(s => s.order_index === currentOrder + 1);
+        const nextStep = timelineSteps[campaignId]?.find(s => s.order_index === step.order_index + 1);
         if (nextStep) {
             await handleUpdateTimelineStep(nextStep.id, {
                 status: 'in_progress',
                 start_date: now
             });
+        }
+
+        // 3. If Finalization, complete campaign
+        if (step.step_key === 'finalization') {
+            const { error } = await supabase
+                .from('traffic_campaigns')
+                .update({ status: 'ended' })
+                .eq('id', campaignId);
+
+            if (!error) {
+                setCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, status: 'ended' } : c));
+            }
+        }
+    };
+
+    const handleUndoStep = async (step: TimelineStep, campaignId: string) => {
+        // 1. Revert current step
+        await handleUpdateTimelineStep(step.id, {
+            status: 'in_progress',
+            end_date: null
+        });
+
+        // 2. Reset next step if it was auto-started (only if in_progress)
+        const nextStep = timelineSteps[campaignId]?.find(s => s.order_index === step.order_index + 1);
+        if (nextStep && nextStep.status === 'in_progress') {
+            await handleUpdateTimelineStep(nextStep.id, {
+                status: 'pending',
+                start_date: null
+            });
+        }
+
+        // 3. If it was finalized, reopen campaign
+        if (step.step_key === 'finalization') {
+            const { error } = await supabase
+                .from('traffic_campaigns')
+                .update({ status: 'active' })
+                .eq('id', campaignId);
+
+            if (!error) {
+                setCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, status: 'active' } : c));
+            }
         }
     };
 
@@ -511,7 +557,14 @@ const TrafficManagement: React.FC = () => {
                                             <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${getPlatformColor(campaign.platform)} bg-white`}>
                                                 {formatPlatform(campaign.platform)}
                                             </span>
-                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">{campaign.name}</h3>
+                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                                {campaign.name}
+                                                {campaign.status === 'ended' && (
+                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full border border-green-200 flex items-center gap-1">
+                                                        <CheckCircle size={10} /> Finalizada
+                                                    </span>
+                                                )}
+                                            </h3>
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <span className="text-xs font-mono text-slate-500">{new Date(campaign.created_at || new Date()).toLocaleDateString()}</span>
@@ -551,9 +604,9 @@ const TrafficManagement: React.FC = () => {
                                                             <div
                                                                 key={step.id}
                                                                 className={`border rounded-xl transition-all duration-300 overflow-hidden
-                                                                ${isActive ? 'border-brand-coral bg-white shadow-md ring-1 ring-brand-coral/20'
-                                                                        : isCompleted ? 'border-green-200 bg-green-50/30'
-                                                                            : 'border-slate-200 bg-slate-50 opacity-70 hover:opacity-100 hover:bg-white'}`}
+                                                                ${isActive ? 'border-brand-coral bg-white dark:bg-slate-800 shadow-md ring-1 ring-brand-coral/20'
+                                                                        : isCompleted ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10 dark:border-green-900/30'
+                                                                            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 opacity-70 hover:opacity-100 hover:bg-white dark:hover:bg-slate-800'}`}
                                                             >
                                                                 {/* Step Header */}
                                                                 <div
@@ -561,22 +614,22 @@ const TrafficManagement: React.FC = () => {
                                                                     className="px-6 py-4 flex items-center justify-between cursor-pointer"
                                                                 >
                                                                     <div className="flex items-center gap-4">
-                                                                        <div className={`p-2 rounded-lg ${isActive || isCompleted ? config.bg.replace('50', '100') : 'bg-slate-100'}`}>
-                                                                            <config.icon className={`w-5 h-5 ${isActive || isCompleted ? config.color : 'text-slate-400'}`} />
+                                                                        <div className={`p-2 rounded-lg ${isActive || isCompleted ? config.bg.replace('50', '100') : 'bg-slate-100 dark:bg-slate-700'}`}>
+                                                                            <config.icon className={`w-5 h-5 ${isActive || isCompleted ? config.color : 'text-slate-400 dark:text-slate-500'}`} />
                                                                         </div>
                                                                         <div>
-                                                                            <h4 className={`font-bold ${isActive ? 'text-slate-900' : isCompleted ? 'text-green-800' : 'text-slate-500'}`}>
+                                                                            <h4 className={`font-bold ${isActive ? 'text-slate-900 dark:text-white' : isCompleted ? 'text-green-800 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
                                                                                 {config.label}
                                                                             </h4>
                                                                             <div className="flex items-center gap-3 text-xs mt-1">
                                                                                 <span className={`font-semibold ${isActive ? 'text-brand-coral' :
-                                                                                        isCompleted ? 'text-green-600' :
-                                                                                            'text-slate-400'
+                                                                                    isCompleted ? 'text-green-600 dark:text-green-400' :
+                                                                                        'text-slate-400'
                                                                                     }`}>
                                                                                     {isActive ? 'Em Andamento' : isCompleted ? 'Concluído' : 'Pendente'}
                                                                                 </span>
                                                                                 {step.start_date && (
-                                                                                    <span className="text-slate-400 flex items-center gap-1">
+                                                                                    <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1">
                                                                                         <Calendar size={12} /> {new Date(step.start_date).toLocaleDateString()}
                                                                                     </span>
                                                                                 )}
@@ -585,37 +638,37 @@ const TrafficManagement: React.FC = () => {
                                                                     </div>
 
                                                                     <div className="flex items-center gap-3">
-                                                                        {isCompleted && <CheckCircle className="text-green-500 w-5 h-5" />}
-                                                                        {isExpanded ? <ChevronUp className="text-slate-400 w-4 h-4" /> : <ChevronDown className="text-slate-400 w-4 h-4" />}
+                                                                        {isCompleted && <CheckCircle className="text-green-500 dark:text-green-400 w-5 h-5" />}
+                                                                        {isExpanded ? <ChevronUp className="text-slate-400 dark:text-slate-500 w-4 h-4" /> : <ChevronDown className="text-slate-400 dark:text-slate-500 w-4 h-4" />}
                                                                     </div>
                                                                 </div>
 
                                                                 {/* Step Body */}
                                                                 {isExpanded && (
-                                                                    <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-white animate-in slide-in-from-top-2">
+                                                                    <div className="px-6 pb-6 pt-2 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 animate-in slide-in-from-top-2">
                                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                                                             {/* Dates */}
                                                                             <div>
-                                                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período</label>
+                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Período</label>
                                                                                 <div className="flex gap-2">
                                                                                     <div className="flex-1">
-                                                                                        <span className="text-xs text-slate-400 block mb-1">Início</span>
+                                                                                        <span className="text-xs text-slate-400 dark:text-slate-500 block mb-1">Início</span>
                                                                                         <input
                                                                                             type="date"
                                                                                             value={step.start_date ? step.start_date.split('T')[0] : ''}
                                                                                             disabled={!isActive}
                                                                                             onChange={(e) => handleUpdateTimelineStep(step.id, { start_date: e.target.value })}
-                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none"
+                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
                                                                                         />
                                                                                     </div>
                                                                                     <div className="flex-1">
-                                                                                        <span className="text-xs text-slate-400 block mb-1">Fim Previsto</span>
+                                                                                        <span className="text-xs text-slate-400 dark:text-slate-500 block mb-1">Fim Previsto</span>
                                                                                         <input
                                                                                             type="date"
                                                                                             value={step.end_date ? step.end_date.split('T')[0] : ''}
                                                                                             disabled={!isActive && !isCompleted}
                                                                                             onChange={(e) => handleUpdateTimelineStep(step.id, { end_date: e.target.value })}
-                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none"
+                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
                                                                                         />
                                                                                     </div>
                                                                                 </div>
@@ -623,52 +676,64 @@ const TrafficManagement: React.FC = () => {
 
                                                                             {/* Responsible */}
                                                                             <div>
-                                                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável</label>
+                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Responsável</label>
                                                                                 <div className="relative">
                                                                                     <select
                                                                                         value={step.responsible_id || ''}
                                                                                         onChange={(e) => handleUpdateTimelineStep(step.id, { responsible_id: e.target.value })}
                                                                                         disabled={!isActive && !isCompleted}
-                                                                                        className="w-full text-sm p-2 pl-9 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none appearance-none bg-white"
+                                                                                        className="w-full text-sm p-2 pl-9 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none appearance-none"
                                                                                     >
                                                                                         <option value="">Selecione...</option>
                                                                                         {appUsers.map(u => (
                                                                                             <option key={u.id} value={u.id}>{u.full_name || u.email || 'Usuário Sem Nome'}</option>
                                                                                         ))}
                                                                                     </select>
-                                                                                    <User className="absolute left-2.5 top-2.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                                                                    <User className="absolute left-2.5 top-2.5 text-slate-400 dark:text-slate-500 w-4 h-4 pointer-events-none" />
                                                                                 </div>
                                                                             </div>
                                                                         </div>
 
                                                                         {/* Observations */}
                                                                         <div className="mb-6">
-                                                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Observações</label>
+                                                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
                                                                             <textarea
                                                                                 rows={3}
                                                                                 value={step.observations || ''}
                                                                                 onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
                                                                                 disabled={!isActive && !isCompleted}
                                                                                 placeholder="Adicione notas sobre esta etapa..."
-                                                                                className="w-full text-sm p-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                                                                className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
                                                                             />
                                                                         </div>
 
-                                                                        {/* Action Button */}
-                                                                        {isActive && (
-                                                                            <div className="flex justify-end">
+                                                                        {/* Action Buttons */}
+                                                                        <div className="flex justify-end gap-3">
+                                                                            {isCompleted && (
                                                                                 <button
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        handleCompleteStep(step.id, campaign.id, step.order_index);
+                                                                                        handleUndoStep(step, campaign.id);
                                                                                     }}
-                                                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200"
+                                                                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                                                >
+                                                                                    Desfazer / Reabrir
+                                                                                </button>
+                                                                            )}
+
+                                                                            {isActive && (
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleCompleteStep(step, campaign.id);
+                                                                                    }}
+                                                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200 dark:shadow-none"
                                                                                 >
                                                                                     <CheckCircle size={16} />
                                                                                     Concluir Etapa
                                                                                 </button>
-                                                                            </div>
-                                                                        )}
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 )}
                                                             </div>
