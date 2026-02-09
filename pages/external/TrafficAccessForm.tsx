@@ -30,9 +30,10 @@ const TrafficAccessForm: React.FC = () => {
                     if (data.access_data) {
                         setAccessData(data.access_data);
                     }
+                    // Only set isLocked if manager has validated
+                    // Don't set completed on load - only after user submits
                     if (data.account_setup_status === 'completed') {
                         setIsLocked(true);
-                        setCompleted(true);
                     }
                 }
             } catch (err) {
@@ -52,6 +53,18 @@ const TrafficAccessForm: React.FC = () => {
     const handleSubmit = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!id) return;
+
+        // Prevent submission if form is locked
+        if (isLocked) {
+            setError('Este formulário já foi validado e não pode ser editado.');
+            return;
+        }
+
+        // Validate required fields
+        if (!accessData.google_ads.trim() || !accessData.meta_ads.trim()) {
+            setError('Por favor, preencha todos os campos obrigatórios.');
+            return;
+        }
 
         setSaving(true);
         setError('');
@@ -130,6 +143,19 @@ const TrafficAccessForm: React.FC = () => {
                     </p>
                 </div>
 
+                {/* Locked Banner */}
+                {isLocked && (
+                    <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
+                        <Lock className="w-5 h-5 text-green-600 flex-shrink-0" />
+                        <div>
+                            <p className="text-green-800 font-semibold">Formulário Validado</p>
+                            <p className="text-green-700 text-sm">
+                                As informações foram validadas pelo gestor e não podem mais ser editadas.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Form Card */}
                 <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
                     <form onSubmit={handleSubmit} className="space-y-8">
@@ -145,7 +171,9 @@ const TrafficAccessForm: React.FC = () => {
                             <textarea
                                 required
                                 rows={10}
-                                className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm"
+                                disabled={isLocked}
+                                className={`w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm ${isLocked ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                                    }`}
                                 value={accessData.google_ads}
                                 onChange={(e) => handleChange('google_ads', e.target.value)}
                                 placeholder="Ex: ID da conta: 123-456-7890..."
@@ -163,7 +191,9 @@ const TrafficAccessForm: React.FC = () => {
                             <textarea
                                 required
                                 rows={10}
-                                className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm"
+                                disabled={isLocked}
+                                className={`w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm ${isLocked ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                                    }`}
                                 value={accessData.meta_ads}
                                 onChange={(e) => handleChange('meta_ads', e.target.value)}
                                 placeholder="Ex: Business ID: 123456789..."
@@ -180,7 +210,9 @@ const TrafficAccessForm: React.FC = () => {
                             </p>
                             <textarea
                                 rows={10}
-                                className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm"
+                                disabled={isLocked}
+                                className={`w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-coral focus:border-transparent outline-none transition-all font-mono text-sm ${isLocked ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                                    }`}
                                 value={accessData.additional_info}
                                 onChange={(e) => handleChange('additional_info', e.target.value)}
                                 placeholder="Observações extras..."
@@ -197,8 +229,8 @@ const TrafficAccessForm: React.FC = () => {
                         <div className="pt-6 border-t border-slate-100 flex justify-end">
                             <button
                                 type="submit"
-                                disabled={saving}
-                                className="flex items-center gap-2 px-8 py-3 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
+                                disabled={saving || isLocked}
+                                className="flex items-center gap-2 px-8 py-3 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {saving ? 'Salvando...' : 'Salvar Informações'}
                                 {!saving && <Save size={20} />}
