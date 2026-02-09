@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, FileText, Lock } from 'lucide-react';
+import { X, CheckCircle, FileText, Lock, Edit3 } from 'lucide-react';
 
 interface AccessAnswersModalProps {
     isOpen: boolean;
@@ -8,9 +8,10 @@ interface AccessAnswersModalProps {
     onValidate?: () => void;
     onReopen?: () => void;
     isCompleted?: boolean;
+    projectId?: string; // Traffic Project ID for edit link
 }
 
-const AccessAnswersModal: React.FC<AccessAnswersModalProps> = ({ isOpen, onClose, accessData, onValidate, onReopen, isCompleted }) => {
+const AccessAnswersModal: React.FC<AccessAnswersModalProps> = ({ isOpen, onClose, accessData, onValidate, onReopen, isCompleted, projectId }) => {
     if (!isOpen) return null;
 
     if (!accessData || Object.keys(accessData).length === 0) {
@@ -87,10 +88,24 @@ const AccessAnswersModal: React.FC<AccessAnswersModalProps> = ({ isOpen, onClose
                 <div className="p-6 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-3xl flex flex-col md:flex-row gap-3 items-center">
                     <button
                         onClick={onClose}
-                        className={`py-3 font-bold rounded-xl transition-all ${onValidate ? 'flex-1 text-slate-500 hover:bg-slate-100' : 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+                        className={`py-3 font-bold rounded-xl transition-all ${onValidate || projectId ? 'flex-1 text-slate-500 hover:bg-slate-100' : 'w-full bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
                     >
                         Fechar
                     </button>
+
+                    {/* Edit Button - Always show for managers */}
+                    {projectId && (
+                        <button
+                            onClick={() => {
+                                const url = `${window.location.origin}/external/traffic-access/${projectId}?manager=true`;
+                                window.open(url, '_blank');
+                            }}
+                            className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Edit3 size={20} />
+                            Editar Formulário
+                        </button>
+                    )}
 
                     {/* Pending State: Show Validate Button */}
                     {onValidate && !isCompleted && (

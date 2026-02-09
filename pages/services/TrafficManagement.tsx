@@ -483,6 +483,7 @@ const TrafficManagement: React.FC = () => {
                 isCompleted={trafficProject?.account_setup_status === 'completed'}
                 onValidate={() => handleUpdateStatus('account_setup_status', 'completed')}
                 onReopen={() => handleUpdateStatus('account_setup_status', 'pending')}
+                projectId={trafficProject?.id}
             />
         </div>
     );
