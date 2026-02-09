@@ -18,20 +18,34 @@ const TrafficAccessForm: React.FC = () => {
     const [completed, setCompleted] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [error, setError] = useState('');
+    const [companyName, setCompanyName] = useState('');
 
     useEffect(() => {
         const loadData = async () => {
             if (!id) return;
             try {
+                // Fetch traffic project with acceptance data
                 const { data, error } = await supabase
                     .from('traffic_projects')
-                    .select('access_data, account_setup_status')
+                    .select(`
+                        access_data, 
+                        account_setup_status,
+                        acceptance_id,
+                        acceptances!inner(company_name)
+                    `)
                     .eq('id', id)
                     .single();
 
                 if (data) {
                     if (data.access_data) {
                         setAccessData(data.access_data);
+                    }
+                    // Set company name from acceptance
+                    if (data.acceptances) {
+                        const acceptance = Array.isArray(data.acceptances) ? data.acceptances[0] : data.acceptances;
+                        if (acceptance?.company_name) {
+                            setCompanyName(acceptance.company_name);
+                        }
                     }
                     // Only set isLocked if manager has validated AND user is not a manager
                     // Don't set completed on load - only after user submits
@@ -141,6 +155,14 @@ const TrafficAccessForm: React.FC = () => {
                 <div className="mb-8 text-center">
                     <img src="/logo.png" alt="Logo" className="h-10 mx-auto mb-6" />
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Configuração de Acessos</h1>
+
+                    {companyName && (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 border border-brand-coral/20 rounded-full mb-3">
+                            <span className="text-sm font-semibold text-slate-600">Cliente:</span>
+                            <span className="text-sm font-bold text-brand-coral">{companyName}</span>
+                        </div>
+                    )}
+
                     <p className="text-slate-500">
                         Forneça os dados de acesso para iniciarmos a gestão das campanhas.
                     </p>

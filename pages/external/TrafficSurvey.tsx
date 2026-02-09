@@ -74,6 +74,7 @@ const TrafficSurvey: React.FC = () => {
     const [completed, setCompleted] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [error, setError] = useState('');
+    const [companyName, setCompanyName] = useState('');
 
     useEffect(() => {
         const loadSurvey = async () => {
@@ -81,13 +82,25 @@ const TrafficSurvey: React.FC = () => {
             try {
                 const { data, error } = await supabase
                     .from('traffic_projects')
-                    .select('survey_data, survey_status')
+                    .select(`
+                        survey_data, 
+                        survey_status,
+                        acceptance_id,
+                        acceptances!inner(company_name)
+                    `)
                     .eq('id', id)
                     .single();
 
                 if (data) {
                     if (data.survey_data) {
                         setAnswers(data.survey_data);
+                    }
+                    // Set company name from acceptance
+                    if (data.acceptances) {
+                        const acceptance = Array.isArray(data.acceptances) ? data.acceptances[0] : data.acceptances;
+                        if (acceptance?.company_name) {
+                            setCompanyName(acceptance.company_name);
+                        }
                     }
                     if (data.survey_status === 'completed') {
                         setIsLocked(true);
@@ -206,6 +219,14 @@ const TrafficSurvey: React.FC = () => {
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <img src="/logo.png" alt="Logo" className="h-10 mx-auto mb-6" /> {/* Placeholder Logo */}
+
+                    {companyName && (
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 border border-brand-coral/20 rounded-full mb-4">
+                            <span className="text-sm font-semibold text-slate-600">Cliente:</span>
+                            <span className="text-sm font-bold text-brand-coral">{companyName}</span>
+                        </div>
+                    )}
+
                     <div className="w-full bg-slate-200 rounded-full h-2 mb-4">
                         <div className="bg-brand-coral h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
                     </div>
