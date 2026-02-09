@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { CheckCircle, AlertCircle, ArrowLeft, Lock, Save } from 'lucide-react';
+import { CheckCircle, AlertCircle, ArrowLeft, Lock, Save, Edit3 } from 'lucide-react';
 
 const TrafficAccessForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
+    const isManagerMode = searchParams.get('manager') === 'true';
+
     const [accessData, setAccessData] = useState({
         google_ads: '',
         meta_ads: '',
@@ -30,9 +33,9 @@ const TrafficAccessForm: React.FC = () => {
                     if (data.access_data) {
                         setAccessData(data.access_data);
                     }
-                    // Only set isLocked if manager has validated
+                    // Only set isLocked if manager has validated AND user is not a manager
                     // Don't set completed on load - only after user submits
-                    if (data.account_setup_status === 'completed') {
+                    if (data.account_setup_status === 'completed' && !isManagerMode) {
                         setIsLocked(true);
                     }
                 }
@@ -43,7 +46,7 @@ const TrafficAccessForm: React.FC = () => {
             }
         };
         loadData();
-    }, [id]);
+    }, [id, isManagerMode]);
 
     const handleChange = (field: string, value: string) => {
         if (isLocked) return;
@@ -144,13 +147,26 @@ const TrafficAccessForm: React.FC = () => {
                 </div>
 
                 {/* Locked Banner */}
-                {isLocked && (
+                {isLocked && !isManagerMode && (
                     <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">
                         <Lock className="w-5 h-5 text-green-600 flex-shrink-0" />
                         <div>
                             <p className="text-green-800 font-semibold">Formulário Validado</p>
                             <p className="text-green-700 text-sm">
                                 As informações foram validadas pelo gestor e não podem mais ser editadas.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Manager Mode Banner */}
+                {isManagerMode && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
+                        <Edit3 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                        <div>
+                            <p className="text-blue-800 font-semibold">Modo Gestor Ativo</p>
+                            <p className="text-blue-700 text-sm">
+                                Você pode editar este formulário mesmo estando validado. As alterações serão salvas no banco de dados.
                             </p>
                         </div>
                     </div>
