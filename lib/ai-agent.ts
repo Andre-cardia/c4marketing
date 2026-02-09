@@ -2,8 +2,24 @@ import { supabase } from './supabase';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
-interface AIAnalysisResult {
-    analysis: string;
+export interface AgentReport {
+    executiveSummary: string;
+    tasks: {
+        inProgress: Array<{ name: string; assignee: string; priority: string; daysActive: number }>;
+        backlog: Array<{ name: string; assignee: string; deadline: string; priority: string }>;
+        analysis: string;
+    };
+    proposals: {
+        recentWon: Array<{ client: string; service: string; value: string }>;
+        totalValue: string;
+        celebrationMessage: string;
+    };
+    users: {
+        newUsers: Array<{ name: string; role: string }>;
+        totalActive: number;
+        analysis: string;
+    };
+    recommendations: string[];
     timestamp: string;
 }
 
@@ -50,9 +66,9 @@ async function fetchSystemContext() {
 }
 
 /**
- * Analyzes the system context using OpenAI GPT-4o-mini.
+ * Analyzes the system context using OpenAI GPT-4o and returns a structured JSON report.
  */
-export async function analyzeSystem(): Promise<AIAnalysisResult> {
+export async function analyzeSystem(): Promise<AgentReport> {
     if (!OPENAI_API_KEY) {
         throw new Error('OpenAI API Key is missing. Please check your .env file.');
     }
@@ -60,68 +76,47 @@ export async function analyzeSystem(): Promise<AIAnalysisResult> {
     const context = await fetchSystemContext();
 
     const systemPrompt = `
-Você é o Gerente Geral de IA da C4 Marketing. 
-Analise os dados do sistema e gere um relatório executivo BEM FORMATADO.
+    Você é o Gerente Geral de IA da C4 Marketing. 
+    Analise os dados do sistema e gere um relatório executivo ESTRUTURADO em JSON.
+    
+    Seu objetivo é alimentar um dashboard visual, então seja preciso nos dados.
 
-ESTRUTURA OBRIGATÓRIA (siga EXATAMENTE este formato):
+    Retorne APENAS um objeto JSON com a seguinte estrutura (sem markdown, sem \`\`\`json):
+    {
+        "executiveSummary": "Texto corrido de 2-3 frases resumindo o estado geral da empresa.",
+        "tasks": {
+            "inProgress": [
+                { "name": "Nome da tarefa", "assignee": "Responsável", "priority": "Alta/Média/Baixa", "daysActive": 3 }
+            ],
+            "backlog": [
+                { "name": "Nome da tarefa", "assignee": "Responsável", "deadline": "DD/MM/AAAA", "priority": "Alta/Média/Baixa" }
+            ],
+            "analysis": "Uma frase analisando gargalos ou fluxo de trabalho."
+        },
+        "proposals": {
+            "recentWon": [
+                { "client": "Nome Cliente", "service": "Descrição curta", "value": "R$ 0.000,00" }
+            ],
+            "totalValue": "Soma total estimada das recentes",
+            "celebrationMessage": "Uma frase curta celebrando as conquistas."
+        },
+        "users": {
+            "newUsers": [
+                { "name": "Nome", "role": "Cargo" }
+            ],
+            "totalActive": 5,
+            "analysis": "Breve comentário sobre o time."
+        },
+        "recommendations": [
+            "Ação prática 1",
+            "Ação prática 2",
+            "Ação prática 3"
+        ]
+    }
 
-# Relatório de Status do Sistema
-
-## Resumo Executivo
-
-[Parágrafo de 2-3 linhas descrevendo a situação geral]
-
-## Tarefas
-
-### Tarefas em Andamento
-
-- **[Nome da Tarefa]** - Responsável: [Nome] | Status: [Status] | Prioridade: [Prioridade]
-- **[Nome da Tarefa]** - Responsável: [Nome] | Status: [Status] | Prioridade: [Prioridade]
-
-### Tarefas em Backlog
-
-- **[Nome da Tarefa]** - Responsável: [Nome] | Prazo: [Data]
-- **[Nome da Tarefa]** - Responsável: [Nome] | Prazo: [Data]
-
-**Observação:** [Análise crítica sobre as tarefas]
-
-## Propostas
-
-### Propostas Aceitas
-
-- **[Cliente]**: [Descrição do serviço] - Valor: R$ [valor]
-- **[Cliente]**: [Descrição do serviço] - Valor: R$ [valor]
-
-**Celebração:** [Comentário positivo sobre as vendas]
-
-## Usuários
-
-**Total de Usuários Ativos:** [número]
-
-Novos usuários recentes:
-- **[Nome]** - Perfil: [perfil]
-- **[Nome]** - Perfil: [perfil]
-
-**Observação:** [Análise sobre o crescimento da equipe]
-
-## Recomendações
-
-1. [Recomendação específica]
-2. [Recomendação específica]
-
----
-
-REGRAS CRÍTICAS:
-- Use # apenas UMA VEZ para o título principal
-- Use ## para TODAS as seções principais
-- Use ### apenas para subsSeções
-- Deixe SEMPRE uma linha em branco antes e depois de títulos
-- Use **negrito** para nomes, valores e dados importantes
-- Seja conciso mas informativo
-
-Dados do sistema:
-${JSON.stringify(context, null, 2)}
-`;
+    Dados do sistema:
+    ${JSON.stringify(context, null, 2)}
+  `;
 
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -134,9 +129,10 @@ ${JSON.stringify(context, null, 2)}
                 model: 'gpt-4o',
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: 'Gere o relatório de status atual do sistema seguindo EXATAMENTE a estrutura fornecida.' }
+                    { role: 'user', content: 'Gere o JSON do relatório.' }
                 ],
-                temperature: 0.3,
+                temperature: 0.2,
+                response_format: { type: "json_object" }
             }),
         });
 
@@ -146,9 +142,11 @@ ${JSON.stringify(context, null, 2)}
             throw new Error(data.error?.message || 'Failed to fetch analysis from OpenAI');
         }
 
+        const reportData = JSON.parse(data.choices[0].message.content);
+
         return {
-            analysis: data.choices[0].message.content,
-            timestamp: new Date().toISOString(),
+            ...reportData,
+            timestamp: new Date().toISOString()
         };
     } catch (error) {
         console.error('Error calling OpenAI:', error);
