@@ -253,6 +253,16 @@ const TrafficManagement: React.FC = () => {
                                             Validar & Concluir
                                         </button>
                                     )}
+
+                                    {trafficProject.survey_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('survey_status', 'pending')}
+                                            className="w-full py-2 text-sm font-bold text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <ArrowLeft size={16} />
+                                            Desvalidar Formulário
+                                        </button>
+                                    )}
                                 </div>
                             )}
 
@@ -315,6 +325,16 @@ const TrafficManagement: React.FC = () => {
                                     >
                                         <CheckCircle size={16} />
                                         Validar & Concluir
+                                    </button>
+                                )}
+
+                                {trafficProject?.account_setup_status === 'completed' && (
+                                    <button
+                                        onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                        className="w-full py-2 text-sm font-bold text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <ArrowLeft size={16} />
+                                        Desvalidar Formulário
                                     </button>
                                 )}
                             </div>
