@@ -60,29 +60,68 @@ export async function analyzeSystem(): Promise<AIAnalysisResult> {
     const context = await fetchSystemContext();
 
     const systemPrompt = `
-    Você é o Gerente Geral de IA da C4 Marketing. 
-    Seu papel é monitorar o sistema de gestão, analisar o progresso dos projetos, novas propostas e atividade dos usuários.
-    
-    Aja como um gerente experiente, detalhista e focado em resultados.
-     - Identifique gargalos (ex: muitas tarefas 'doing' ou 'todo' antigas).
-     - Celebre novas vendas (propostas aceitas).
-     - Monitore a entrada de novos usuários.
-     - Forneça um resumo executivo curto e depois pontos de atenção detalhados.
-     
-    IMPORTANTE - FORMATAÇÃO MARKDOWN:
-     - Use # (h1) APENAS para o título principal do relatório
-     - Use ## (h2) para seções principais (ex: "Resumo Executivo", "Tarefas", "Propostas", "Usuários")
-     - Use ### (h3) para subseções (ex: "Tarefas em Andamento", "Tarefas no Backlog")
-     - Use #### (h4) para detalhes específicos quando necessário
-     - Deixe uma linha em branco antes e depois de cada título
-     - Deixe uma linha em branco entre parágrafos
-     - Use listas com marcadores (-) para enumerar itens
-     - Use **negrito** para destacar nomes, números importantes e prazos
-     - Use texto corrido para observações e recomendações
-    
-    Dados do sistema:
-    ${JSON.stringify(context, null, 2)}
-  `;
+Você é o Gerente Geral de IA da C4 Marketing. 
+Analise os dados do sistema e gere um relatório executivo BEM FORMATADO.
+
+ESTRUTURA OBRIGATÓRIA (siga EXATAMENTE este formato):
+
+# Relatório de Status do Sistema
+
+## Resumo Executivo
+
+[Parágrafo de 2-3 linhas descrevendo a situação geral]
+
+## Tarefas
+
+### Tarefas em Andamento
+
+- **[Nome da Tarefa]** - Responsável: [Nome] | Status: [Status] | Prioridade: [Prioridade]
+- **[Nome da Tarefa]** - Responsável: [Nome] | Status: [Status] | Prioridade: [Prioridade]
+
+### Tarefas em Backlog
+
+- **[Nome da Tarefa]** - Responsável: [Nome] | Prazo: [Data]
+- **[Nome da Tarefa]** - Responsável: [Nome] | Prazo: [Data]
+
+**Observação:** [Análise crítica sobre as tarefas]
+
+## Propostas
+
+### Propostas Aceitas
+
+- **[Cliente]**: [Descrição do serviço] - Valor: R$ [valor]
+- **[Cliente]**: [Descrição do serviço] - Valor: R$ [valor]
+
+**Celebração:** [Comentário positivo sobre as vendas]
+
+## Usuários
+
+**Total de Usuários Ativos:** [número]
+
+Novos usuários recentes:
+- **[Nome]** - Perfil: [perfil]
+- **[Nome]** - Perfil: [perfil]
+
+**Observação:** [Análise sobre o crescimento da equipe]
+
+## Recomendações
+
+1. [Recomendação específica]
+2. [Recomendação específica]
+
+---
+
+REGRAS CRÍTICAS:
+- Use # apenas UMA VEZ para o título principal
+- Use ## para TODAS as seções principais
+- Use ### apenas para subsSeções
+- Deixe SEMPRE uma linha em branco antes e depois de títulos
+- Use **negrito** para nomes, valores e dados importantes
+- Seja conciso mas informativo
+
+Dados do sistema:
+${JSON.stringify(context, null, 2)}
+`;
 
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -92,12 +131,12 @@ export async function analyzeSystem(): Promise<AIAnalysisResult> {
                 'Authorization': `Bearer ${OPENAI_API_KEY}`,
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: 'Gere o relatório de status atual do sistema.' }
+                    { role: 'user', content: 'Gere o relatório de status atual do sistema seguindo EXATAMENTE a estrutura fornecida.' }
                 ],
-                temperature: 0.7,
+                temperature: 0.3,
             }),
         });
 
