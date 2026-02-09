@@ -26,9 +26,6 @@ export interface AgentReport {
 /**
  * Fetches relevant system context for the AI agent.
  */
-/**
- * Fetches relevant system context for the AI agent.
- */
 async function fetchSystemContext() {
     const now = new Date();
     // Use start of the current month to align with "this month" user expectation
@@ -67,13 +64,22 @@ async function fetchSystemContext() {
 
     // Calculate Financials correctly in code
     const wonProposals = acceptances?.map((acc: any) => {
-        const monthly = acc.proposal?.monthly_fee || 0;
-        const setup = acc.proposal?.setup_fee || 0;
+        let monthly = acc.proposal?.monthly_fee || 0;
+        let setup = acc.proposal?.setup_fee || 0;
+        let services = acc.proposal?.services;
+
+        // Fallback to snapshot if proposal is missing (Legacy or Broken Link)
+        if (!acc.proposal && acc.contract_snapshot && acc.contract_snapshot.proposal) {
+            monthly = acc.contract_snapshot.proposal.monthly_fee || 0;
+            setup = acc.contract_snapshot.proposal.setup_fee || 0;
+            services = acc.contract_snapshot.proposal.services;
+        }
+
         const totalValue = monthly + setup;
 
         return {
             client: acc.company_name,
-            service: acc.proposal?.services ? 'Serviços de Marketing' : 'Contrato', // Simplify or parse services
+            service: services ? 'Serviços de Marketing' : 'Contrato', // Simplify or parse services
             value: totalValue,
             formattedValue: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)
         };
