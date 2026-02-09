@@ -102,7 +102,7 @@ const TrafficManagement: React.FC = () => {
     };
 
     // Handlers
-    const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status', value: 'completed') => {
+    const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status', value: 'completed' | 'pending') => {
         if (!trafficProject) return;
 
         const { error } = await supabase
@@ -276,12 +276,23 @@ const TrafficManagement: React.FC = () => {
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
                                     <CheckCircle size={14} /> Contas Vinculadas
                                 </span>
-                                <div className="mt-4">
+                                <div className="mt-4 space-y-2">
                                     <button
                                         onClick={handleOpenAccessModal}
                                         className="w-full py-2 text-xs font-medium text-purple-600 hover:text-purple-700 underline"
                                     >
                                         Ver Credenciais
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
+                                            navigator.clipboard.writeText(url);
+                                            alert('Link do formulário copiado!');
+                                        }}
+                                        className="w-full py-2 text-xs font-medium text-slate-400 hover:text-purple-600 flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        <Send size={12} />
+                                        Reenviar Formulário
                                     </button>
                                 </div>
                             </div>
