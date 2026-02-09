@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
 import Header from '../components/Header';
-import { analyzeSystem } from '../lib/ai-agent';
-import { Bot, Loader2, Play, RefreshCw, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { analyzeSystem, AgentReport } from '../lib/ai-agent';
+import { Bot, Loader2, RefreshCw, AlertTriangle, Sparkles, CheckCircle2, TrendingUp, Users, Calendar, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 
 export default function AIAgent() {
-    const [analysis, setAnalysis] = useState<string | null>(null);
+    const [report, setReport] = useState<AgentReport | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [lastRun, setLastRun] = useState<string | null>(null);
 
     const runAnalysis = async () => {
         setLoading(true);
         setError(null);
         try {
             const result = await analyzeSystem();
-            setAnalysis(result.analysis);
-            setLastRun(new Date(result.timestamp).toLocaleString());
+            console.log('analysis result:', result);
+            setReport(result);
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'Falha ao executar a análise da IA.');
@@ -65,7 +63,7 @@ export default function AIAgent() {
 
                 {/* Error State */}
                 {error && (
-                    <div className="mb-8 p-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-3xl flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="mb-8 p-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-3xl flex items-start gap-4">
                         <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full shrink-0">
                             <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
                         </div>
@@ -77,7 +75,7 @@ export default function AIAgent() {
                 )}
 
                 {/* Empty State */}
-                {!analysis && !loading && !error && (
+                {!report && !loading && !error && (
                     <div className="flex flex-col items-center justify-center py-24 bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-sm border border-slate-200 dark:border-slate-700 text-center px-4">
                         <div className="w-24 h-24 bg-slate-50 dark:bg-slate-700/50 rounded-full flex items-center justify-center mb-6">
                             <Bot className="w-12 h-12 text-slate-300 dark:text-slate-500" />
@@ -90,80 +88,189 @@ export default function AIAgent() {
                 )}
 
                 {/* Loading Skeleton */}
-                {loading && !analysis && (
+                {loading && !report && (
                     <div className="space-y-6 animate-pulse">
-                        <div className="h-40 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8 space-y-4">
-                            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg w-1/3"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-2/3"></div>
+                        <div className="h-40 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8"></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="h-32 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700"></div>
+                            <div className="h-32 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700"></div>
+                            <div className="h-32 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700"></div>
                         </div>
-                        <div className="h-96 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-8">
-                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-lg w-1/4 mb-8"></div>
-                            <div className="space-y-4">
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-full"></div>
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-3/4"></div>
-                            </div>
-                        </div>
+                        <div className="h-96 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700"></div>
                     </div>
                 )}
 
-                {/* Analysis Result */}
-                {analysis && (
-                    <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-black/20 border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* Report Header */}
-                        <div className="bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg">
-                                    <CheckCircle2 className="w-5 h-5" />
+                {/* Analysis Report UI */}
+                {report && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                        {/* Executive Summary Card */}
+                        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-8 border border-slate-200 dark:border-slate-700 shadow-xl shadow-slate-200/50 dark:shadow-black/20 position-relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-brand-coral"></div>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-3">
+                                <Sparkles className="w-6 h-6 text-brand-coral" />
+                                Resumo Executivo
+                            </h2>
+                            <p className="text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
+                                {report.executiveSummary}
+                            </p>
+                            <div className="mt-4 flex items-center gap-2 text-sm text-slate-400 dark:text-slate-500">
+                                <Clock className="w-4 h-4" />
+                                Atualizado em: {new Date(report.timestamp).toLocaleString()}
+                            </div>
+                        </div>
+
+                        {/* KPI Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Proposals KPI */}
+                            <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl text-green-600 dark:text-green-400">
+                                        <TrendingUp className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-xs font-bold px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-full">Vendas</span>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-slate-800 dark:text-white">Relatório Gerado com Sucesso</h3>
-                                    <span className="text-sm font-medium text-slate-500 dark:text-slate-400 block">
-                                        Atualizado em: {lastRun}
-                                    </span>
+                                <div className="mt-4">
+                                    <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{report.proposals.totalValue}</h3>
+                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Valor Estimado Recente</p>
+                                </div>
+                                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl">
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 italic">"{report.proposals.celebrationMessage}"</p>
                                 </div>
                             </div>
-                            <button
-                                onClick={runAnalysis}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-brand-coral dark:hover:border-brand-coral text-slate-600 dark:text-slate-300 rounded-lg font-medium transition-all text-sm group"
-                                title="Atualizar"
-                            >
-                                <RefreshCw className={`w-4 h-4 text-slate-400 group-hover:text-brand-coral transition-colors ${loading ? 'animate-spin' : ''}`} />
-                                Recalcular
-                            </button>
+
+                            {/* Tasks KPI */}
+                            <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400">
+                                        <Calendar className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-xs font-bold px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">Operacional</span>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="flex items-baseline gap-2">
+                                        <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{report.tasks.inProgress.length}</h3>
+                                        <span className="text-sm text-slate-500">Em andamento</span>
+                                    </div>
+                                    <div className="flex items-baseline gap-2">
+                                        <h3 className="text-xl font-bold text-slate-400 dark:text-slate-500">{report.tasks.backlog.length}</h3>
+                                        <span className="text-sm text-slate-500">No backlog</span>
+                                    </div>
+                                </div>
+                                <p className="mt-4 text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700 pt-3">
+                                    {report.tasks.analysis}
+                                </p>
+                            </div>
+
+                            {/* Users KPI */}
+                            <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-xl text-purple-600 dark:text-purple-400">
+                                        <Users className="w-6 h-6" />
+                                    </div>
+                                    <span className="text-xs font-bold px-2 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-full">Equipe</span>
+                                </div>
+                                <div className="mt-4">
+                                    <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{report.users.totalActive}</h3>
+                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Usuários Ativos</p>
+                                </div>
+                                <div className="mt-4 flex -space-x-2 overflow-hidden">
+                                    {report.users.newUsers.slice(0, 4).map((u, i) => (
+                                        <div key={i} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300" title={u.name}>
+                                            {u.name.substring(0, 1)}
+                                        </div>
+                                    ))}
+                                    {report.users.newUsers.length > 4 && (
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-800 flex items-center justify-center text-xs font-bold text-slate-500">
+                                            +{report.users.newUsers.length - 4}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Markdown Content */}
-                        <div className="p-8 md:p-12 prose prose-slate max-w-none 
-              prose-headings:font-bold prose-headings:text-slate-800 dark:prose-headings:text-white
-              prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
-              prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-8
-              prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-6
-              prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-4
-              prose-p:text-slate-700 prose-p:mb-4 prose-p:leading-relaxed
-              prose-strong:text-slate-900 prose-strong:font-semibold
-              prose-li:text-slate-700 prose-li:mb-2
-              prose-ul:mb-4 prose-ul:mt-2
-              prose-ol:mb-4 prose-ol:mt-2
-              prose-a:text-indigo-600 prose-a:underline
-              dark:[&]:text-slate-100
-              dark:[&_p]:!text-slate-100
-              dark:[&_li]:!text-slate-100
-              dark:[&_ul]:!text-slate-100
-              dark:[&_ol]:!text-slate-100
-              dark:[&_strong]:!text-amber-400
-              dark:[&_h1]:!text-white
-              dark:[&_h2]:!text-white
-              dark:[&_h3]:!text-white
-              dark:[&_h4]:!text-white
-              dark:[&_a]:!text-indigo-300">
-                            <ReactMarkdown>{analysis}</ReactMarkdown>
-                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                        {/* Footer decoration */}
-                        <div className="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-brand-coral"></div>
+                            {/* Tasks Column */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5 text-indigo-500" />
+                                    Tarefas e Prioridades
+                                </h3>
+
+                                <div className="space-y-4">
+                                    {report.tasks.inProgress.map((task, i) => (
+                                        <div key={i} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                    <h4 className="font-bold text-slate-800 dark:text-white text-sm">{task.name}</h4>
+                                                </div>
+                                                <p className="text-xs text-slate-500 ml-4">Responsável: {task.assignee}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 rounded-lg text-xs font-bold ${task.priority.toLowerCase().includes('alta') || task.priority.toLowerCase().includes('high')
+                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                                }`}>
+                                                {task.priority || 'Normal'}
+                                            </span>
+                                        </div>
+                                    ))}
+
+                                    {report.tasks.backlog.slice(0, 3).map((task, i) => (
+                                        <div key={i} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/50 flex items-start justify-between opacity-80">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                                                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 text-sm">{task.name}</h4>
+                                                </div>
+                                                <p className="text-xs text-slate-500 ml-4">Prazo: {task.deadline || 'N/A'}</p>
+                                            </div>
+                                            <span className="text-xs text-slate-400 font-medium">Backlog</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Recommendations Column */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Bot className="w-5 h-5 text-brand-coral" />
+                                    Recomendações Estratégicas
+                                </h3>
+
+                                <div className="bg-indigo-50 dark:bg-indigo-900/10 rounded-3xl p-6 border border-indigo-100 dark:border-indigo-800/30 space-y-4">
+                                    {report.recommendations.map((rec, i) => (
+                                        <div key={i} className="flex gap-4">
+                                            <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                                                {i + 1}
+                                            </div>
+                                            <p className="text-indigo-900 dark:text-indigo-200 text-sm leading-relaxed font-medium">
+                                                {rec}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700">
+                                    <h4 className="font-bold text-slate-800 dark:text-white mb-4 text-sm uppercase tracking-wider">Últimas Vendas</h4>
+                                    <div className="space-y-3">
+                                        {report.proposals.recentWon.length > 0 ? report.proposals.recentWon.map((prop, i) => (
+                                            <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                                                <div>
+                                                    <p className="font-bold text-slate-700 dark:text-slate-200 text-sm">{prop.client}</p>
+                                                    <p className="text-xs text-slate-500">{prop.service}</p>
+                                                </div>
+                                                <span className="font-mono font-bold text-green-600 dark:text-green-400 text-sm">{prop.value}</span>
+                                            </div>
+                                        )) : (
+                                            <p className="text-sm text-slate-500 italic">Nenhuma venda recente encontrada.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
                 )}
             </main>
