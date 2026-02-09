@@ -53,6 +53,7 @@ async function fetchSystemContext() {
         .from('acceptances')
         .select(`
             *,
+            contract_snapshot,
             proposal:proposals (
                 monthly_fee,
                 setup_fee,
