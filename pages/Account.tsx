@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video, Bot, Sparkles, MessageSquare } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
@@ -9,12 +9,12 @@ import { getLatestFeedback, markFeedbackRead, generateUserFeedback, AiFeedback }
 interface Task {
     id: string;
     title: string;
-    status: string;
-    priority: string;
+    status: 'backlog' | 'in_progress' | 'approval' | 'done' | 'paused';
+    priority: 'low' | 'medium' | 'high';
     due_date: string;
     project_id: number;
-    description?: string;
-    assignee?: string;
+    description: string;
+    assignee: string;
     attachment_url?: string;
     project_name?: string;
 }
@@ -122,35 +122,42 @@ const Account: React.FC = () => {
         }
     }, [contextFullName]);
 
-    useEffect(() => {
-        const initAiFeedback = async () => {
-            if (!email || !contextFullName) return;
+    const initAiFeedback = useCallback(async (shouldForceNew = false) => {
+        if (!email || !contextFullName) return;
 
-            setLoadingAiMessage(true);
-            try {
-                // 1. Try to get existing unread feedback
-                const existing = await getLatestFeedback(email);
+        setLoadingAiMessage(true);
+        try {
+            // 1. Try to get existing unread feedback
+            // If forcing new (e.g. task completed), skip fetching existing unless we want to mark it read first separately.
+            // But here logic is: get existing. If none, generate.
 
-                if (existing) {
-                    setAiMessage(existing);
-                } else {
-                    // 2. If none, generate new one (Automatic Monitoring)
-                    // We only generate if there are NO unread messages to avoid spamming
-                    // Ideally we should check if we already generated one today, but for now this works.
-                    const newFeedback = await generateUserFeedback(email, contextFullName);
-                    setAiMessage(newFeedback);
-                }
-            } catch (error) {
-                console.error('Error with AI Agent:', error);
-            } finally {
-                setLoadingAiMessage(false);
+            let existing = await getLatestFeedback(email);
+
+            if (existing && shouldForceNew) {
+                // Mark existing read so we generate a new one
+                await markFeedbackRead(existing.id);
+                existing = null;
             }
-        };
 
+            if (existing) {
+                setAiMessage(existing);
+            } else {
+                // 2. If none (or forced refresh cleared it), generate new one
+                const newFeedback = await generateUserFeedback(email, contextFullName);
+                setAiMessage(newFeedback);
+            }
+        } catch (error) {
+            console.error('Error with AI Agent:', error);
+        } finally {
+            setLoadingAiMessage(false);
+        }
+    }, [email, contextFullName]);
+
+    useEffect(() => {
         if (email && contextFullName) {
             initAiFeedback();
         }
-    }, [email, contextFullName]);
+    }, [initAiFeedback, email, contextFullName]);
 
     const handleMarkRead = async () => {
         if (!aiMessage) return;
@@ -200,6 +207,10 @@ const Account: React.FC = () => {
 
                 const enrichedTasks = userTasks.map((t: any) => ({
                     ...t,
+                    description: t.description || '',
+                    assignee: t.assignee || '',
+                    status: t.status as any,
+                    priority: t.priority as any,
                     project_name: projectsMap.get(t.project_id) || 'Projeto Desconhecido'
                 }));
 
@@ -337,7 +348,14 @@ const Account: React.FC = () => {
         setShowTaskModal(false);
         setSelectedTask(undefined);
         setSelectedProjectId(null);
-        if (fullName) fetchMyTasks(fullName); // Refresh list
+    };
+
+    const handleTaskSaved = () => {
+        if (fullName) {
+            fetchMyTasks(fullName); // Refresh list
+            // Refresh AI feedback forcing a new generation because context changed
+            initAiFeedback(true);
+        }
     };
 
     const getRoleLabel = (role: string | null) => {
@@ -709,7 +727,7 @@ const Account: React.FC = () => {
                         projectId={selectedProjectId}
                         task={selectedTask}
                         projectName={selectedTask?.project_name}
-                        onSave={handleCloseTaskModal}
+                        onSave={handleTaskSaved}
                     />
                 )}
             </main>

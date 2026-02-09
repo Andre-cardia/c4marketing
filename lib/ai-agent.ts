@@ -284,22 +284,26 @@ export async function generateUserFeedback(userEmail: string, userName: string):
         }
 
         // 2. Analyzes Context
-        const overdueTasks = userTasks.filter(t => new Date(t.due_date) < new Date());
-        const highPriority = userTasks.filter(t => t.priority === 'high');
+        const activeTasks = userTasks.filter(t => ['backlog', 'in_progress'].includes(t.status));
+        const approvalTasks = userTasks.filter(t => t.status === 'approval');
+
+        const overdueTasks = activeTasks.filter(t => new Date(t.due_date) < new Date());
+        const highPriority = activeTasks.filter(t => t.priority === 'high');
 
         const systemPrompt = `
         Você é um Gerente de Projetos de IA experiente e mentor.
         Seu objetivo é enviar uma mensagem CURTA e DIRETA (máximo 2 frases) para o usuário "${userName}" sobre o desempenho dele.
         
         Contexto do Usuário:
-        - Total de tarefas pendentes: ${userTasks.length}
-        - Tarefas atrasadas: ${overdueTasks.length}
-        - Tarefas de alta prioridade: ${highPriority.length}
+        - Tarefas em andamento/backlog: ${activeTasks.length}
+        - Tarefas aguardando aprovação: ${approvalTasks.length}
+        - ENTRE AS TAREFAS EM ANDAMENTO, atrasadas: ${overdueTasks.length}
+        - Alta prioridade (Ativas): ${highPriority.length}
         
         Diretrizes:
-        - Se houver tarefas atrasadas, cobre de forma firme mas profissional.
-        - Se houver muitas tarefas, sugira foco.
-        - Se estiver tudo em dia, parabenize e motive.
+        - Se houver tarefas atrasadas (active + overdue), cobre de forma firme mas profissional.
+        - Se houver tarefas em aprovação, mencione que estão sendo revisadas (positivo).
+        - Se não houver tarefas atrasadas e o backlog estiver limpo, parabenize e motive.
         - Use emojis profissionais.
         - Não use markdown, apenas texto puro.
         `;
