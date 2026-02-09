@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase credentials missing. Storing acceptances will fail.');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// Use placeholders to prevent crash if env vars are missing
+const url = supabaseUrl || 'https://placeholder.supabase.co';
+const key = supabaseAnonKey || 'placeholder';
+
+export const supabase = createClient(url, key);
