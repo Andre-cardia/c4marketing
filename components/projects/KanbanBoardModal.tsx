@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Plus, Calendar, MoreHorizontal, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useUserRole } from '../../lib/UserRoleContext';
 import TaskModal from './TaskModal';
 import BookingModal from './BookingModal';
 
@@ -35,6 +36,7 @@ const COLUMNS = [
 ];
 
 const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, project }) => {
+    const { fullName } = useUserRole();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showTaskModal, setShowTaskModal] = useState(false);
@@ -115,6 +117,17 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
             console.error('Error moving task:', error);
             alert('Erro ao mover tarefa.');
             fetchTasks(); // Revert on error
+        } else {
+            // Log History
+            await supabase.from('task_history').insert({
+                task_id: draggedTaskId,
+                project_id: project.id,
+                action: 'status_change',
+                old_status: taskToMove.status,
+                new_status: targetStatus,
+                changed_by: fullName || 'Sistema',
+                details: { title: taskToMove.title }
+            });
         }
     };
 

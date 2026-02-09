@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useUserRole } from '../../lib/UserRoleContext';
 
 interface Task {
     id?: string;
@@ -30,6 +31,7 @@ interface TaskModalProps {
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId, projectName, onSave }) => {
+    const { fullName } = useUserRole();
     const [formData, setFormData] = useState<Task>({
         project_id: projectId,
         title: '',
@@ -150,6 +152,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
         setLoading(true);
         try {
+            await supabase.from('task_history').insert({
+                task_id: task.id,
+                project_id: projectId,
+                action: 'deleted',
+                old_status: task.status,
+                changed_by: fullName || 'Sistema',
+                details: { title: task.title, deleted_id: task.id }
+            });
+
             const { error } = await supabase
                 .from('project_tasks')
                 .delete()
@@ -185,12 +196,36 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     .update(dataToSave)
                     .eq('id', task.id);
                 if (error) throw error;
+
+                await supabase.from('task_history').insert({
+                    task_id: task.id,
+                    project_id: projectId,
+                    action: task.status !== dataToSave.status ? 'status_change' : 'updated',
+                    old_status: task.status,
+                    new_status: dataToSave.status,
+                    changed_by: fullName || 'Sistema',
+                    details: { title: task.title }
+                });
+
             } else {
                 // Insert
-                const { error } = await supabase
+                const { data: newTask, error } = await supabase
                     .from('project_tasks')
-                    .insert([dataToSave]);
+                    .insert([dataToSave])
+                    .select()
+                    .single();
                 if (error) throw error;
+
+                if (newTask) {
+                    await supabase.from('task_history').insert({
+                        task_id: newTask.id,
+                        project_id: projectId,
+                        action: 'created',
+                        new_status: newTask.status,
+                        changed_by: fullName || 'Sistema',
+                        details: { title: newTask.title }
+                    });
+                }
             }
 
             onSave();
