@@ -62,6 +62,7 @@ const TrafficManagement: React.FC = () => {
     const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [showAccessModal, setShowAccessModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
+    const [newCampaignName, setNewCampaignName] = useState('');
 
     // Timeline State
     const [timelineSteps, setTimelineSteps] = useState<Record<string, TimelineStep[]>>({});
@@ -173,16 +174,18 @@ const TrafficManagement: React.FC = () => {
     };
 
     // Handlers
-    const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status', value: 'completed' | 'pending') => {
+    const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status', status: 'pending' | 'completed') => {
         if (!trafficProject) return;
 
         const { error } = await supabase
             .from('traffic_projects')
-            .update({ [field]: value })
+            .update({ [field]: status })
             .eq('id', trafficProject.id);
 
         if (!error) {
-            setTrafficProject({ ...trafficProject, [field]: value });
+            setTrafficProject(prev => prev ? { ...prev, [field]: status } : null);
+            if (field === 'survey_status') setShowSurveyModal(false);
+            if (field === 'account_setup_status') setShowAccessModal(false);
         }
     };
 
@@ -195,19 +198,26 @@ const TrafficManagement: React.FC = () => {
             .eq('id', campaignId);
 
         if (!error) {
-            setCampaigns(campaigns.filter(c => c.id !== campaignId));
+            setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+            const newSteps = { ...timelineSteps };
+            delete newSteps[campaignId];
+            setTimelineSteps(newSteps);
         }
     };
 
     const handleCreateCampaign = async () => {
         if (!trafficProject) return;
+        if (!newCampaignName.trim()) {
+            alert('Por favor, informe o nome da campanha.');
+            return;
+        }
 
         const { data, error } = await supabase
             .from('traffic_campaigns')
             .insert([{
                 traffic_project_id: trafficProject.id,
                 platform: newCampaignPlatform,
-                name: `Campanha 0${campaigns.length + 1} - ${formatPlatform(newCampaignPlatform)}`
+                name: newCampaignName // Use user provided name
             }])
             .select()
             .single();
@@ -215,6 +225,7 @@ const TrafficManagement: React.FC = () => {
         if (data) {
             setCampaigns([data, ...campaigns]);
             setShowCampaignModal(false);
+            setNewCampaignName('');
         }
     };
 
@@ -772,10 +783,25 @@ const TrafficManagement: React.FC = () => {
             {showCampaignModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in duration-300">
-                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Selecione a Plataforma</h3>
-                        <p className="text-slate-500 mb-6">Qual será o canal principal desta campanha?</p>
+                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Nova Campanha</h3>
 
-                        <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                                Nome da Campanha <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={newCampaignName}
+                                onChange={(e) => setNewCampaignName(e.target.value)}
+                                placeholder="Ex: Black Friday 2026 - Captação"
+                                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none transition-all"
+                                autoFocus
+                            />
+                        </div>
+
+                        <p className="text-slate-500 mb-4 font-medium">Selecione a Plataforma</p>
+
+                        <div className="grid grid-cols-2 gap-4 mb-8">
                             {[
                                 { id: 'google_ads', label: 'Google Ads', color: 'bg-blue-50 hover:border-blue-500 text-blue-700' },
                                 { id: 'meta_ads', label: 'Meta Ads', color: 'bg-indigo-50 hover:border-indigo-500 text-indigo-700' },
@@ -797,14 +823,21 @@ const TrafficManagement: React.FC = () => {
 
                         <div className="flex gap-3">
                             <button
-                                onClick={() => setShowCampaignModal(false)}
-                                className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl"
+                                onClick={() => {
+                                    setShowCampaignModal(false);
+                                    setNewCampaignName('');
+                                }}
+                                className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleCreateCampaign}
-                                className="flex-1 py-3 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20"
+                                disabled={!newCampaignName.trim()}
+                                className={`flex-1 py-3 font-bold rounded-xl shadow-lg transition-all
+                                    ${!newCampaignName.trim()
+                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                        : 'bg-brand-coral text-white hover:bg-red-500 shadow-brand-coral/20'}`}
                             >
                                 Criar Campanha
                             </button>
