@@ -271,73 +271,54 @@ const TrafficManagement: React.FC = () => {
                             <Settings className="w-5 h-5 text-purple-500" />
                             Configuração
                         </h3>
-                        {trafficProject?.account_setup_status === 'completed' ? (
-                            <div className="relative z-10">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
-                                    <CheckCircle size={14} /> Contas Vinculadas
-                                </span>
-                                <div className="mt-4 space-y-2">
-                                    <button
-                                        onClick={handleOpenAccessModal}
-                                        className="w-full py-2 text-xs font-medium text-purple-600 hover:text-purple-700 underline"
-                                    >
-                                        Ver Credenciais
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
-                                            navigator.clipboard.writeText(url);
-                                            alert('Link do formulário copiado!');
-                                        }}
-                                        className="w-full py-2 text-xs font-medium text-slate-400 hover:text-purple-600 flex items-center justify-center gap-1 transition-colors"
-                                    >
-                                        <Send size={12} />
-                                        Reenviar Formulário
-                                    </button>
+
+                        <div className="space-y-4 relative z-10">
+                            {/* always visible: Send Link (Red button style like Pesquisa Inicial) */}
+                            <button
+                                onClick={() => {
+                                    const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
+                                    navigator.clipboard.writeText(url);
+                                    alert('Link copiado para a área de transferência!');
+                                }}
+                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Settings size={16} />
+                                Enviar Formulário
+                            </button>
+
+                            {/* Visibility Logic for Responses & Validation - Always visible as requested */}
+                            <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
+                                    {trafficProject?.account_setup_status === 'completed' ? (
+                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                            <CheckCircle size={12} /> Contas Vinculadas
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                            Pendente
+                                        </span>
+                                    )}
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 relative z-10">
+
                                 <button
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
-                                        navigator.clipboard.writeText(url);
-                                        alert('Link do formulário copiado!');
-                                    }}
-                                    className="w-full py-2.5 px-4 bg-white border-2 border-purple-500 text-purple-600 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors flex items-center justify-center gap-2"
+                                    onClick={handleOpenAccessModal}
+                                    className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                                 >
-                                    <Settings size={16} />
-                                    Enviar Formulário
+                                    Ver Respostas Recebidas
                                 </button>
 
-                                {trafficProject?.access_data && (
-                                    <>
-                                        <button
-                                            onClick={handleOpenAccessModal}
-                                            className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-                                        >
-                                            Ver Respostas
-                                        </button>
-
-                                        {trafficProject.account_setup_status !== 'completed' && (
-                                            <button
-                                                onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                                className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <CheckCircle size={16} />
-                                                Validar
-                                            </button>
-                                        )}
-                                    </>
-                                )}
-
-                                {!trafficProject?.access_data && (
-                                    <p className="text-xs text-center text-slate-400">
-                                        Aguardando preenchimento...
-                                    </p>
+                                {trafficProject?.account_setup_status !== 'completed' && (
+                                    <button
+                                        onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                        className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle size={16} />
+                                        Validar & Concluir
+                                    </button>
                                 )}
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* 3. Strategy Meeting */}
