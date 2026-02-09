@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video } from 'lucide-react';
+import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video, Bot, Sparkles, MessageSquare } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import TaskModal from '../components/projects/TaskModal';
+import { getLatestFeedback, markFeedbackRead, generateUserFeedback, AiFeedback } from '../lib/ai-agent';
 
 interface Task {
     id: string;
@@ -61,6 +62,10 @@ const Account: React.FC = () => {
     const [loadingBookings, setLoadingBookings] = useState(false);
     const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
 
+    // AI Agent State
+    const [aiMessage, setAiMessage] = useState<AiFeedback | null>(null);
+    const [loadingAiMessage, setLoadingAiMessage] = useState(false);
+
     useEffect(() => {
         fetchMyBookings();
     }, []);
@@ -116,6 +121,46 @@ const Account: React.FC = () => {
             fetchMyTasks(contextFullName);
         }
     }, [contextFullName]);
+
+    useEffect(() => {
+        const initAiFeedback = async () => {
+            if (!email || !contextFullName) return;
+
+            setLoadingAiMessage(true);
+            try {
+                // 1. Try to get existing unread feedback
+                const existing = await getLatestFeedback(email);
+
+                if (existing) {
+                    setAiMessage(existing);
+                } else {
+                    // 2. If none, generate new one (Automatic Monitoring)
+                    // We only generate if there are NO unread messages to avoid spamming
+                    // Ideally we should check if we already generated one today, but for now this works.
+                    const newFeedback = await generateUserFeedback(email, contextFullName);
+                    setAiMessage(newFeedback);
+                }
+            } catch (error) {
+                console.error('Error with AI Agent:', error);
+            } finally {
+                setLoadingAiMessage(false);
+            }
+        };
+
+        if (email && contextFullName) {
+            initAiFeedback();
+        }
+    }, [email, contextFullName]);
+
+    const handleMarkRead = async () => {
+        if (!aiMessage) return;
+        try {
+            setAiMessage(null); // Optimistic update
+            await markFeedbackRead(aiMessage.id);
+        } catch (error) {
+            console.error('Error marking read:', error);
+        }
+    }
 
     const normalizeString = (str: string | undefined | null) => {
         if (!str) return '';
@@ -523,6 +568,55 @@ const Account: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* AI Manager Section */}
+                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <Bot size={120} className="text-white" />
+                            </div>
+
+                            <div className="p-6 relative z-10">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-brand-coral/20 rounded-xl text-brand-coral shadow-inner">
+                                        <Sparkles size={24} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                                            Gestor de Projetos IA
+                                            {loadingAiMessage && <Loader2 size={16} className="animate-spin text-slate-400" />}
+                                        </h2>
+
+                                        {loadingAiMessage ? (
+                                            <div className="animate-pulse flex space-x-4 mt-2">
+                                                <div className="flex-1 space-y-2 py-1">
+                                                    <div className="h-2 bg-slate-600 rounded"></div>
+                                                    <div className="h-2 bg-slate-600 rounded w-3/4"></div>
+                                                </div>
+                                            </div>
+                                        ) : aiMessage ? (
+                                            <div className="mt-2">
+                                                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-slate-200 leading-relaxed font-medium shadow-sm">
+                                                    "{aiMessage.message}"
+                                                </div>
+                                                <div className="mt-3 flex justify-end">
+                                                    <button
+                                                        onClick={handleMarkRead}
+                                                        className="flex items-center gap-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral px-3 py-1.5 rounded-lg border border-brand-coral/20"
+                                                    >
+                                                        <CheckCircle size={14} />
+                                                        Confirmar Leitura
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-slate-400 text-sm mt-1">
+                                                Tudo certo por aqui! Nenhuma mensagem nova do seu gestor.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

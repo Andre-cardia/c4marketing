@@ -153,3 +153,149 @@ export async function analyzeSystem(): Promise<AgentReport> {
         throw error;
     }
 }
+
+export interface AiFeedback {
+    id: number;
+    user_email: string;
+    message: string;
+    is_read: boolean;
+    created_at: string;
+    read_at: string | null;
+}
+
+/**
+ * Fetches the latest unread feedback for a user.
+ */
+export async function getLatestFeedback(userEmail: string): Promise<AiFeedback | null> {
+    const { data, error } = await supabase
+        .from('ai_feedback')
+        .select('*')
+        .eq('user_email', userEmail)
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error) {
+        console.error('Error fetching feedback:', error);
+        return null;
+    }
+
+    return data && data.length > 0 ? data[0] : null;
+}
+
+/**
+ * Marks a feedback message as read.
+ */
+export async function markFeedbackRead(id: number): Promise<void> {
+    const { error } = await supabase
+        .from('ai_feedback')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error marking feedback as read:', error);
+        throw error;
+    }
+}
+
+/**
+ * Generates new feedback for a user based on their tasks and performance.
+ */
+export async function generateUserFeedback(userEmail: string, userName: string): Promise<AiFeedback> {
+    if (!OPENAI_API_KEY) {
+        throw new Error('OpenAI API Key is missing.');
+    }
+
+    try {
+        // 1. Fetch User Tasks (Replicating logic from Account.tsx)
+        const normalizeString = (str: string | undefined | null) => {
+            if (!str) return '';
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        };
+
+        const { data: tasksData } = await supabase
+            .from('project_tasks')
+            .select('*')
+            .neq('status', 'done')
+            .order('due_date', { ascending: true });
+
+        let userTasks: any[] = [];
+
+        if (tasksData) {
+            const targetName = normalizeString(userName);
+            userTasks = tasksData.filter((t: any) => {
+                const assigneeName = normalizeString(t.assignee);
+                if (!assigneeName || !targetName) return false;
+                return assigneeName === targetName ||
+                    assigneeName.includes(targetName) ||
+                    targetName.includes(assigneeName);
+            });
+        }
+
+        // 2. Analyzes Context
+        const overdueTasks = userTasks.filter(t => new Date(t.due_date) < new Date());
+        const highPriority = userTasks.filter(t => t.priority === 'high');
+
+        const systemPrompt = `
+        Você é um Gerente de Projetos de IA experiente e mentor.
+        Seu objetivo é enviar uma mensagem CURTA e DIRETA (máximo 2 frases) para o usuário "${userName}" sobre o desempenho dele.
+        
+        Contexto do Usuário:
+        - Total de tarefas pendentes: ${userTasks.length}
+        - Tarefas atrasadas: ${overdueTasks.length}
+        - Tarefas de alta prioridade: ${highPriority.length}
+        
+        Diretrizes:
+        - Se houver tarefas atrasadas, cobre de forma firme mas profissional.
+        - Se houver muitas tarefas, sugira foco.
+        - Se estiver tudo em dia, parabenize e motive.
+        - Use emojis profissionais.
+        - Não use markdown, apenas texto puro.
+        `;
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: 'Gere a mensagem para o usuário.' }
+                ],
+                temperature: 0.7,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to generate feedback');
+        }
+
+        const messageContent = data.choices[0].message.content.trim();
+
+        // 3. Save to Database
+        const { data: insertData, error: insertError } = await supabase
+            .from('ai_feedback')
+            .insert({
+                user_email: userEmail,
+                message: messageContent,
+                is_read: false
+            })
+            .select()
+            .single();
+
+        if (insertError) {
+            throw insertError;
+        }
+
+        return insertData;
+
+    } catch (error) {
+        console.error('Error generating user feedback:', error);
+        throw error;
+    }
+}
