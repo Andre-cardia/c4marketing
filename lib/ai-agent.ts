@@ -26,11 +26,19 @@ export interface AgentReport {
 /**
  * Fetches relevant system context for the AI agent.
  */
+/**
+ * Fetches relevant system context for the AI agent.
+ */
 async function fetchSystemContext() {
     const now = new Date();
+    // Use start of the current month to align with "this month" user expectation
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Fetch recent tasks (keep as is, but maybe filter by updated_at or created_at)
+    // We'll keep the 7 days window for tasks as "recent activity", or align to month?
+    // Let's keep tasks as "active context" (last 7 days is good for checking immediate backlog)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Fetch recent tasks
     const { data: tasks, error: taskError } = await supabase
         .from('project_tasks')
         .select('*')
@@ -39,14 +47,39 @@ async function fetchSystemContext() {
 
     if (taskError) console.error('Error fetching tasks:', taskError);
 
-    // Fetch recent proposals
-    const { data: proposals, error: proposalError } = await supabase
-        .from('proposals')
-        .select('*')
-        .gte('created_at', sevenDaysAgo)
-        .limit(10);
+    // Fetch WON proposals (Acceptances) from the start of the month
+    // We need to join with proposals to get the financial value
+    const { data: acceptances, error: acceptanceError } = await supabase
+        .from('acceptances')
+        .select(`
+            *,
+            proposal:proposals (
+                monthly_fee,
+                setup_fee,
+                services
+            )
+        `)
+        .gte('timestamp', startOfMonth)
+        .order('timestamp', { ascending: false });
 
-    if (proposalError) console.error('Error fetching proposals:', proposalError);
+    if (acceptanceError) console.error('Error fetching acceptances:', acceptanceError);
+
+    // Calculate Financials correctly in code
+    const wonProposals = acceptances?.map((acc: any) => {
+        const monthly = acc.proposal?.monthly_fee || 0;
+        const setup = acc.proposal?.setup_fee || 0;
+        const totalValue = monthly + setup;
+
+        return {
+            client: acc.company_name,
+            service: acc.proposal?.services ? 'Serviços de Marketing' : 'Contrato', // Simplify or parse services
+            value: totalValue,
+            formattedValue: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)
+        };
+    }) || [];
+
+    const totalSalesValue = wonProposals.reduce((sum, item) => sum + item.value, 0);
+    const formattedTotal = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalSalesValue);
 
     // Fetch recent user activity (users created recently)
     const { data: users, error: userError } = await supabase
@@ -59,7 +92,11 @@ async function fetchSystemContext() {
 
     return {
         tasks: tasks || [],
-        proposals: proposals || [],
+        sales: {
+            won: wonProposals,
+            totalFormatted: formattedTotal,
+            totalNumeric: totalSalesValue
+        },
         users: users || [],
         timestamp: now.toISOString(),
     };
@@ -79,7 +116,10 @@ export async function analyzeSystem(): Promise<AgentReport> {
     Você é o Gerente Geral de IA da C4 Marketing. 
     Analise os dados do sistema e gere um relatório executivo ESTRUTURADO em JSON.
     
-    Seu objetivo é alimentar um dashboard visual, então seja preciso nos dados.
+    DADOS DE VENDAS (CRÍTICO):
+    - O valor TOTAL de vendas deste mês é EXATAMENTE: ${context.sales.totalFormatted}.
+    - NÃO altere e NÃO recalcule esse valor. Use exatemente string fornecida.
+    - Liste exatamente as ${context.sales.won.length} vendas fornecidas no contexto.
 
     Retorne APENAS um objeto JSON com a seguinte estrutura (sem markdown, sem \`\`\`json):
     {
@@ -97,7 +137,7 @@ export async function analyzeSystem(): Promise<AgentReport> {
             "recentWon": [
                 { "client": "Nome Cliente", "service": "Descrição curta", "value": "R$ 0.000,00" }
             ],
-            "totalValue": "Soma total estimada das recentes",
+            "totalValue": "${context.sales.totalFormatted}",
             "celebrationMessage": "Uma frase curta celebrando as conquistas."
         },
         "users": {
@@ -115,7 +155,11 @@ export async function analyzeSystem(): Promise<AgentReport> {
     }
 
     Dados do sistema:
-    ${JSON.stringify(context, null, 2)}
+    ${JSON.stringify({
+        tasks: context.tasks,
+        sales: context.sales,
+        users: context.users
+    }, null, 2)}
   `;
 
     try {
