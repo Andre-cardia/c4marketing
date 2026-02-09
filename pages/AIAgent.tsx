@@ -138,10 +138,16 @@ export default function AIAgent() {
                         {/* Markdown Content */}
                         <div className="p-8 md:p-12 prose prose-slate max-w-none 
               prose-headings:font-bold prose-headings:text-slate-800 dark:prose-headings:text-white
-              prose-p:text-slate-700 
-              prose-strong:text-slate-900 
-              prose-li:text-slate-700
-              prose-a:text-indigo-600 
+              prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
+              prose-h2:text-2xl prose-h2:mb-4 prose-h2:mt-8
+              prose-h3:text-xl prose-h3:mb-3 prose-h3:mt-6
+              prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-4
+              prose-p:text-slate-700 prose-p:mb-4 prose-p:leading-relaxed
+              prose-strong:text-slate-900 prose-strong:font-semibold
+              prose-li:text-slate-700 prose-li:mb-2
+              prose-ul:mb-4 prose-ul:mt-2
+              prose-ol:mb-4 prose-ol:mt-2
+              prose-a:text-indigo-600 prose-a:underline
               dark:[&]:text-slate-100
               dark:[&_p]:!text-slate-100
               dark:[&_li]:!text-slate-100

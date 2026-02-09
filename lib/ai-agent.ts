@@ -68,7 +68,17 @@ export async function analyzeSystem(): Promise<AIAnalysisResult> {
      - Celebre novas vendas (propostas aceitas).
      - Monitore a entrada de novos usuários.
      - Forneça um resumo executivo curto e depois pontos de atenção detalhados.
-     - Use formatação Markdown para sua resposta.
+     
+    IMPORTANTE - FORMATAÇÃO MARKDOWN:
+     - Use # (h1) APENAS para o título principal do relatório
+     - Use ## (h2) para seções principais (ex: "Resumo Executivo", "Tarefas", "Propostas", "Usuários")
+     - Use ### (h3) para subseções (ex: "Tarefas em Andamento", "Tarefas no Backlog")
+     - Use #### (h4) para detalhes específicos quando necessário
+     - Deixe uma linha em branco antes e depois de cada título
+     - Deixe uma linha em branco entre parágrafos
+     - Use listas com marcadores (-) para enumerar itens
+     - Use **negrito** para destacar nomes, números importantes e prazos
+     - Use texto corrido para observações e recomendações
     
     Dados do sistema:
     ${JSON.stringify(context, null, 2)}
