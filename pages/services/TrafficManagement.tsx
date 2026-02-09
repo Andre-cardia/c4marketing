@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
-import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, TrendingUp, Flag, Trash2 } from 'lucide-react';
+import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, FileText, Layers, TrendingUp, Flag, Trash2, Calendar, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './traffic/SurveyAnswersModal';
 import AccessAnswersModal from './traffic/AccessAnswersModal';
+
+const STEP_CONFIG = {
+    planning: { label: 'Planejamento', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
+    creatives: { label: 'Criativos', icon: Layers, color: 'text-purple-500', bg: 'bg-purple-50' },
+    execution: { label: 'Execução', icon: Play, color: 'text-green-500', bg: 'bg-green-50' },
+    optimization: { label: 'Análise e Otimização', icon: TrendingUp, color: 'text-amber-500', bg: 'bg-amber-50' },
+    finalization: { label: 'Finalização', icon: Flag, color: 'text-red-500', bg: 'bg-red-50' }
+};
 
 interface TrafficProject {
     id: string;
@@ -24,6 +32,24 @@ interface Campaign {
     created_at?: string;
 }
 
+interface TimelineStep {
+    id: string;
+    campaign_id: string;
+    step_key: 'planning' | 'creatives' | 'execution' | 'optimization' | 'finalization';
+    status: 'pending' | 'in_progress' | 'completed';
+    start_date: string | null;
+    end_date: string | null;
+    responsible_id: string | null;
+    observations: string | null;
+    order_index: number;
+}
+
+interface AppUser {
+    id: string;
+    full_name: string | null;
+    email?: string;
+}
+
 const TrafficManagement: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -36,10 +62,21 @@ const TrafficManagement: React.FC = () => {
     const [showAccessModal, setShowAccessModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
 
+    // Timeline State
+    const [timelineSteps, setTimelineSteps] = useState<Record<string, TimelineStep[]>>({});
+    const [expandedStep, setExpandedStep] = useState<string | null>(null); // Format: "campaignId-stepKey"
+    const [appUsers, setAppUsers] = useState<AppUser[]>([]);
+
     // Shared Fetch Function
     const loadProjectData = async () => {
         if (!id) return;
         try {
+            // 0. Get Users
+            const { data: userData } = await supabase
+                .from('app_users')
+                .select('id, full_name, email');
+            if (userData) setAppUsers(userData);
+
             // 1. Get Company Name
             const { data: acceptance } = await supabase
                 .from('acceptances')
@@ -65,7 +102,28 @@ const TrafficManagement: React.FC = () => {
                     .eq('traffic_project_id', tpData.id)
                     .order('created_at', { ascending: false });
 
-                if (campData) setCampaigns(campData);
+                if (campData) {
+                    setCampaigns(campData);
+
+                    // 4. Fetch Timeline Steps
+                    const campaignIds = campData.map(c => c.id);
+                    if (campaignIds.length > 0) {
+                        const { data: steps } = await supabase
+                            .from('traffic_campaign_timeline')
+                            .select('*')
+                            .in('campaign_id', campaignIds)
+                            .order('order_index', { ascending: true });
+
+                        if (steps) {
+                            const stepsMap: Record<string, TimelineStep[]> = {};
+                            steps.forEach(step => {
+                                if (!stepsMap[step.campaign_id]) stepsMap[step.campaign_id] = [];
+                                stepsMap[step.campaign_id].push(step as any);
+                            });
+                            setTimelineSteps(stepsMap);
+                        }
+                    }
+                }
 
             } else {
                 // Create default project if not exists
@@ -154,6 +212,63 @@ const TrafficManagement: React.FC = () => {
             case 'linkedin_ads': return 'LinkedIn Ads';
             case 'tiktok_ads': return 'TikTok Ads';
             default: return p;
+        }
+    };
+
+    const handleUpdateTimelineStep = async (stepId: string, updates: Partial<TimelineStep>) => {
+        const { error } = await supabase
+            .from('traffic_campaign_timeline')
+            .update(updates)
+            .eq('id', stepId);
+
+        if (!error) {
+            setTimelineSteps(prev => {
+                const newSteps = { ...prev };
+                for (const campaignId in newSteps) {
+                    newSteps[campaignId] = newSteps[campaignId].map(step =>
+                        step.id === stepId ? { ...step, ...updates } : step
+                    );
+                }
+                return newSteps;
+            });
+        }
+    };
+
+    const handleCompleteStep = async (stepId: string, campaignId: string, currentOrder: number) => {
+        const now = new Date().toISOString();
+
+        // 1. Complete current step
+        await handleUpdateTimelineStep(stepId, {
+            status: 'completed',
+            end_date: now
+        });
+
+        // 2. Activate next step
+        const nextStep = timelineSteps[campaignId]?.find(s => s.order_index === currentOrder + 1);
+        if (nextStep) {
+            await handleUpdateTimelineStep(nextStep.id, {
+                status: 'in_progress',
+                start_date: now
+            });
+        }
+    };
+
+    const handleInitializeTimeline = async (campaignId: string) => {
+        const steps = [
+            { campaign_id: campaignId, step_key: 'planning', order_index: 0, status: 'in_progress', start_date: new Date().toISOString() },
+            { campaign_id: campaignId, step_key: 'creatives', order_index: 1, status: 'pending' },
+            { campaign_id: campaignId, step_key: 'execution', order_index: 2, status: 'pending' },
+            { campaign_id: campaignId, step_key: 'optimization', order_index: 3, status: 'pending' },
+            { campaign_id: campaignId, step_key: 'finalization', order_index: 4, status: 'pending' },
+        ];
+
+        const { data, error } = await supabase.from('traffic_campaign_timeline').insert(steps).select();
+
+        if (data) {
+            setTimelineSteps(prev => ({
+                ...prev,
+                [campaignId]: data as any
+            }));
         }
     };
 
@@ -410,28 +525,157 @@ const TrafficManagement: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Campaign Track */}
+                                    {/* Timeline */}
                                     <div className="p-6">
-                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                            {[
-                                                { label: 'Planejamento', icon: FileText, color: 'text-blue-500', id: 'planning' },
-                                                { label: 'Criativos', icon: Layers, color: 'text-purple-500', id: 'creatives' },
-                                                { label: 'Execução', icon: Play, color: 'text-green-500', id: 'execution' },
-                                                { label: 'Análise e Otimização', icon: TrendingUp, color: 'text-amber-500', id: 'optimization' },
-                                                { label: 'Finalização', icon: Flag, color: 'text-red-500', id: 'finalization' },
-                                            ].map((stage, idx) => (
+                                        {!timelineSteps[campaign.id] || timelineSteps[campaign.id].length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                                                <p className="text-slate-500 mb-4 text-center text-sm">Esta campanha não possui timeline ativa.</p>
                                                 <button
-                                                    key={idx}
-                                                    onClick={() => navigate(`/projects/${id}/traffic/campaign/${campaign.id}/${stage.id}`)}
-                                                    className="flex flex-col items-center justify-center p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-white hover:shadow-md hover:border-brand-coral/30 transition-all group"
+                                                    onClick={() => handleInitializeTimeline(campaign.id)}
+                                                    className="px-4 py-2 bg-brand-coral text-white rounded-lg font-bold text-sm hover:bg-red-600 transition-colors"
                                                 >
-                                                    <stage.icon className={`w-8 h-8 mb-3 ${stage.color} opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all`} />
-                                                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white text-center">
-                                                        {stage.label}
-                                                    </span>
+                                                    Ativar Timeline da Campanha
                                                 </button>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col gap-3">
+                                                {timelineSteps[campaign.id]
+                                                    .sort((a, b) => a.order_index - b.order_index)
+                                                    .map((step) => {
+                                                        const config = STEP_CONFIG[step.step_key] || { label: step.step_key, icon: FileText, color: 'text-slate-500', bg: 'bg-slate-50' };
+                                                        const isExpanded = expandedStep === `${campaign.id}-${step.step_key}`;
+                                                        const isActive = step.status === 'in_progress';
+                                                        const isCompleted = step.status === 'completed';
+
+                                                        return (
+                                                            <div
+                                                                key={step.id}
+                                                                className={`border rounded-xl transition-all duration-300 overflow-hidden
+                                                                ${isActive ? 'border-brand-coral bg-white shadow-md ring-1 ring-brand-coral/20'
+                                                                        : isCompleted ? 'border-green-200 bg-green-50/30'
+                                                                            : 'border-slate-200 bg-slate-50 opacity-70 hover:opacity-100 hover:bg-white'}`}
+                                                            >
+                                                                {/* Step Header */}
+                                                                <div
+                                                                    onClick={() => setExpandedStep(isExpanded ? null : `${campaign.id}-${step.step_key}`)}
+                                                                    className="px-6 py-4 flex items-center justify-between cursor-pointer"
+                                                                >
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className={`p-2 rounded-lg ${isActive || isCompleted ? config.bg.replace('50', '100') : 'bg-slate-100'}`}>
+                                                                            <config.icon className={`w-5 h-5 ${isActive || isCompleted ? config.color : 'text-slate-400'}`} />
+                                                                        </div>
+                                                                        <div>
+                                                                            <h4 className={`font-bold ${isActive ? 'text-slate-900' : isCompleted ? 'text-green-800' : 'text-slate-500'}`}>
+                                                                                {config.label}
+                                                                            </h4>
+                                                                            <div className="flex items-center gap-3 text-xs mt-1">
+                                                                                <span className={`font-semibold ${isActive ? 'text-brand-coral' :
+                                                                                        isCompleted ? 'text-green-600' :
+                                                                                            'text-slate-400'
+                                                                                    }`}>
+                                                                                    {isActive ? 'Em Andamento' : isCompleted ? 'Concluído' : 'Pendente'}
+                                                                                </span>
+                                                                                {step.start_date && (
+                                                                                    <span className="text-slate-400 flex items-center gap-1">
+                                                                                        <Calendar size={12} /> {new Date(step.start_date).toLocaleDateString()}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-3">
+                                                                        {isCompleted && <CheckCircle className="text-green-500 w-5 h-5" />}
+                                                                        {isExpanded ? <ChevronUp className="text-slate-400 w-4 h-4" /> : <ChevronDown className="text-slate-400 w-4 h-4" />}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Step Body */}
+                                                                {isExpanded && (
+                                                                    <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-white animate-in slide-in-from-top-2">
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                                                            {/* Dates */}
+                                                                            <div>
+                                                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Período</label>
+                                                                                <div className="flex gap-2">
+                                                                                    <div className="flex-1">
+                                                                                        <span className="text-xs text-slate-400 block mb-1">Início</span>
+                                                                                        <input
+                                                                                            type="date"
+                                                                                            value={step.start_date ? step.start_date.split('T')[0] : ''}
+                                                                                            disabled={!isActive}
+                                                                                            onChange={(e) => handleUpdateTimelineStep(step.id, { start_date: e.target.value })}
+                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none"
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="flex-1">
+                                                                                        <span className="text-xs text-slate-400 block mb-1">Fim Previsto</span>
+                                                                                        <input
+                                                                                            type="date"
+                                                                                            value={step.end_date ? step.end_date.split('T')[0] : ''}
+                                                                                            disabled={!isActive && !isCompleted}
+                                                                                            onChange={(e) => handleUpdateTimelineStep(step.id, { end_date: e.target.value })}
+                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none"
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Responsible */}
+                                                                            <div>
+                                                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Responsável</label>
+                                                                                <div className="relative">
+                                                                                    <select
+                                                                                        value={step.responsible_id || ''}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { responsible_id: e.target.value })}
+                                                                                        disabled={!isActive && !isCompleted}
+                                                                                        className="w-full text-sm p-2 pl-9 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none appearance-none bg-white"
+                                                                                    >
+                                                                                        <option value="">Selecione...</option>
+                                                                                        {appUsers.map(u => (
+                                                                                            <option key={u.id} value={u.id}>{u.full_name || u.email || 'Usuário Sem Nome'}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                    <User className="absolute left-2.5 top-2.5 text-slate-400 w-4 h-4 pointer-events-none" />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Observations */}
+                                                                        <div className="mb-6">
+                                                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Observações</label>
+                                                                            <textarea
+                                                                                rows={3}
+                                                                                value={step.observations || ''}
+                                                                                onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
+                                                                                disabled={!isActive && !isCompleted}
+                                                                                placeholder="Adicione notas sobre esta etapa..."
+                                                                                className="w-full text-sm p-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                                                            />
+                                                                        </div>
+
+                                                                        {/* Action Button */}
+                                                                        {isActive && (
+                                                                            <div className="flex justify-end">
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleCompleteStep(step.id, campaign.id, step.order_index);
+                                                                                    }}
+                                                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200"
+                                                                                >
+                                                                                    <CheckCircle size={16} />
+                                                                                    Concluir Etapa
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
