@@ -77,9 +77,17 @@ const TrafficManagement: React.FC = () => {
                 .from('app_users')
                 .select('id, full_name, email, role');
 
+            console.log('User Data Raw:', userData); // Debug
+
             if (userData) {
                 const filteredUsers = userData.filter(u => u.role === 'gestor' || u.role === 'operacional');
+                console.log('Filtered Users:', filteredUsers); // Debug
                 setAppUsers(filteredUsers);
+
+                if (filteredUsers.length === 0 && userData.length > 0) {
+                    console.warn('No users matching role filter! Showing all for fallback.');
+                    // Optional: setAppUsers(userData); // Uncomment if we want to fallback
+                }
             }
 
             // 1. Get Company Name
@@ -221,10 +229,21 @@ const TrafficManagement: React.FC = () => {
     };
 
     const handleUpdateTimelineStep = async (stepId: string, updates: Partial<TimelineStep>) => {
+        // Fix: Convert empty string to null for UUID fields
+        if ('responsible_id' in updates && updates.responsible_id === '') {
+            updates.responsible_id = null;
+        }
+
         const { error } = await supabase
             .from('traffic_campaign_timeline')
             .update(updates)
             .eq('id', stepId);
+
+        if (error) {
+            console.error('Error updating timeline step:', error);
+            alert(`Erro ao atualizar: ${error.message}`);
+            return;
+        }
 
         if (!error) {
             setTimelineSteps(prev => {
