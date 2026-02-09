@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
-import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video, Bot, Sparkles, MessageSquare } from 'lucide-react';
+import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video, Bot, Sparkles, MessageSquare, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import TaskModal from '../components/projects/TaskModal';
@@ -21,6 +21,7 @@ interface Task {
 
 interface Booking {
     id: number;
+    uid: string;
     title: string;
     description: string;
     startTime: string;
@@ -99,7 +100,9 @@ const Account: React.FC = () => {
                 if (bookingsArray.length > 0) {
                     const mappedBookings = bookingsArray.map((b: any) => ({
                         ...b,
-                        meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location
+                        ...b,
+                        meetingUrl: b.metadata?.videoCallUrl || b.references?.find((r: any) => r.meetingUrl)?.meetingUrl || b.location,
+                        uid: b.uid
                     }));
                     setMyBookings(mappedBookings);
                 }
@@ -168,6 +171,34 @@ const Account: React.FC = () => {
             console.error('Error marking read:', error);
         }
     }
+
+    const handleCancelBooking = async (bookingUid: string) => {
+        if (!confirm('Tem certeza que deseja excluir este agendamento? Ao fazer isso, você negará automaticamente a participação.')) return;
+
+        try {
+            const response = await fetch(`https://api.cal.com/v2/bookings/${bookingUid}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json',
+                    'cal-api-version': '2024-08-13'
+                },
+                body: JSON.stringify({
+                    cancellationReason: 'Cancelado pelo usuário via Painel Admin'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Falha ao cancelar agendamento');
+            }
+
+            fetchMyBookings();
+            setMessage({ type: 'success', text: 'Agendamento excluído com sucesso!' });
+        } catch (error: any) {
+            console.error('Error cancelling booking:', error);
+            setMessage({ type: 'error', text: 'Erro ao excluir agendamento.' });
+        }
+    };
 
     const normalizeString = (str: string | undefined | null) => {
         if (!str) return '';
@@ -571,17 +602,27 @@ const Account: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                {booking.meetingUrl && (
-                                                    <a
-                                                        href={booking.meetingUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
-                                                        title="Entrar na Reunião"
+                                                <div className="flex items-center gap-2">
+                                                    {booking.meetingUrl && (
+                                                        <a
+                                                            href={booking.meetingUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-2 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
+                                                            title="Entrar na Reunião"
+                                                        >
+                                                            <Video size={18} />
+                                                        </a>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => handleCancelBooking(booking.uid)}
+                                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors border border-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-900/30"
+                                                        title="Excluir Agendamento"
                                                     >
-                                                        <Video size={18} />
-                                                    </a>
-                                                )}
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
