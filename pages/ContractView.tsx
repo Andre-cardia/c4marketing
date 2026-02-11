@@ -317,9 +317,14 @@ const ContractView: React.FC = () => {
                                 )}
 
                                 {proposal.setup_fee > 0 && (
-                                    <p className="mb-0 text-sm">
-                                        <strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.
-                                    </p>
+                                    <div className="mb-0 text-sm">
+                                        <p><strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.</p>
+                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'website') && (
+                                            <p className="mt-1 text-xs text-slate-500 italic">
+                                                * Para o serviço de Web Site Institucional, o pagamento será realizado em duas parcelas: 50% no ato do aceite e os 50% restantes na entrega do projeto.
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                             </>
                         )}
