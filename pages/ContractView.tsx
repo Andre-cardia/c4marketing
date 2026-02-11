@@ -17,7 +17,7 @@ interface Proposal {
     setup_fee: number;
     contract_duration: number;
     created_at: string;
-    services?: { id: string; price: number }[] | string[];
+    services?: { id: string; price: number; details?: string }[] | string[];
     accepted_at?: string;
     is_legacy?: boolean;
 }
@@ -252,14 +252,25 @@ const ContractView: React.FC = () => {
                         </div>
                     ) : templates.length > 0 ? (
                         <div className="space-y-6">
-                            {templates.map((template, index) => (
-                                <div key={template.id} className="pl-4 border-l-2 border-slate-200">
-                                    <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
-                                    <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
-                                        {template.content.replace(/^### .*$/gm, '').trim()} {/* Remove markdown headers from DB content if present to keep styling consistent */}
+                            {templates.map((template, index) => {
+                                const serviceDetail = Array.isArray(proposal.services)
+                                    ? (proposal.services as any[]).find(s => s.id === template.service_id)?.details
+                                    : null;
+
+                                return (
+                                    <div key={template.id} className="pl-4 border-l-2 border-slate-200">
+                                        <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
+                                        <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
+                                            {template.content.replace(/^### .*$/gm, '').trim()}
+                                        </div>
+                                        {serviceDetail && (
+                                            <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm italic text-slate-600">
+                                                <strong>Detalhamento Adicional:</strong> {serviceDetail}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <p className="text-red-500 italic text-sm">Serviços descritos conforme anexo técnico da proposta.</p>
@@ -327,9 +338,11 @@ const ContractView: React.FC = () => {
                     <p className="mb-2 text-sm">
                         5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
                     </p>
-                    <p className="mb-2 text-sm">
-                        5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes.
-                    </p>
+                    {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'traffic_management') && (
+                        <p className="mb-2 text-sm">
+                            5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência para o serviço de Gestão de Tráfego, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes deste serviço.
+                        </p>
+                    )}
                     <p className="mb-2 text-sm">
                         5.4. Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
                     </p>
