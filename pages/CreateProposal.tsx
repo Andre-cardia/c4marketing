@@ -63,7 +63,7 @@ const CreateProposal: React.FC = () => {
             if (error) throw error;
 
             alert('Proposta criada com sucesso!');
-            navigate('/dashboard');
+            navigate('/proposals');
         } catch (error: any) {
             console.error('Error creating proposal:', error);
             alert('Erro ao criar proposta: ' + error.message);
@@ -78,7 +78,7 @@ const CreateProposal: React.FC = () => {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="mb-8 flex items-center gap-4">
-                    <button onClick={() => navigate('/dashboard')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <button onClick={() => navigate('/proposals')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                         <ArrowLeft className="w-6 h-6 text-slate-600" />
                     </button>
                     <h1 className="text-3xl font-bold text-slate-900">Nova Proposta</h1>
