@@ -187,7 +187,7 @@ const LandingPageManagement: React.FC = () => {
                         </h1>
                         <p className="text-xl text-slate-600 dark:text-slate-400 mt-2 font-medium">
                             {companyName}
-
+                            <span className="ml-4 text-xs font-mono text-slate-400">CNPJ: (Carregado do contrato)</span>
                         </p>
                     </div>
                 </div>
