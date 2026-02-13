@@ -234,7 +234,7 @@ const LandingPageManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenSurveyModal}
-                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
                                         Ver Respostas Recebidas
                                     </button>
@@ -266,10 +266,10 @@ const LandingPageManagement: React.FC = () => {
                     </div>
 
                     {/* 2. Account Setup (Access Guide) */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-purple-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-purple-500" />
+                            <Settings className="w-5 h-5 text-blue-500" />
                             Configuração
                         </h3>
 
@@ -304,7 +304,7 @@ const LandingPageManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
-                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
                                         Ver Respostas Recebidas
                                     </button>
