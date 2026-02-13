@@ -14,6 +14,16 @@ const STEP_CONFIG = {
     finalization: { label: 'Finalização', icon: Flag, color: 'text-red-500', bg: 'bg-red-50' }
 };
 
+const PLANNING_CHECKLIST_ITEMS = [
+    "Seleção de Palavras Chaves",
+    "Definição de Títulos",
+    "Definição de Descrições",
+    "Ajuste de Logos e Imagens",
+    "Criação de Site Links",
+    "Extensões de Anúncio",
+    "Orçamento"
+];
+
 interface TrafficProject {
     id: string;
     acceptance_id: string;
@@ -41,6 +51,7 @@ interface TimelineStep {
     end_date: string | null;
     responsible_id: string | null;
     observations: string | null;
+    checklist_data?: Record<string, boolean>;
     order_index: number;
 }
 
@@ -267,6 +278,11 @@ const TrafficManagement: React.FC = () => {
                 return newSteps;
             });
         }
+    };
+
+    const handleToggleChecklist = async (stepId: string, item: string, currentData: Record<string, boolean> = {}) => {
+        const newData = { ...currentData, [item]: !currentData[item] };
+        await handleUpdateTimelineStep(stepId, { checklist_data: newData });
     };
 
     const handleCompleteStep = async (step: TimelineStep, campaignId: string) => {
@@ -725,17 +741,62 @@ const TrafficManagement: React.FC = () => {
                                                                         </div>
 
                                                                         {/* Observations */}
-                                                                        <div className="mb-6">
-                                                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
-                                                                            <textarea
-                                                                                rows={3}
-                                                                                value={step.observations || ''}
-                                                                                onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
-                                                                                disabled={!isActive && !isCompleted}
-                                                                                placeholder="Adicione notas sobre esta etapa..."
-                                                                                className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
-                                                                            />
-                                                                        </div>
+                                                                        {/* Checklist & Observations Split for Planning */}
+                                                                        {step.step_key === 'planning' ? (
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                                                                {/* Column 1: Checklist */}
+                                                                                <div>
+                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">Checklist</label>
+                                                                                    <div className="space-y-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                                                        {PLANNING_CHECKLIST_ITEMS.map((item) => {
+                                                                                            const isChecked = step.checklist_data?.[item] || false;
+                                                                                            return (
+                                                                                                <label key={item} className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-green-50 dark:bg-green-900/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                                                                                                    <div className="relative flex items-center mt-0.5">
+                                                                                                        <input
+                                                                                                            type="checkbox"
+                                                                                                            checked={isChecked}
+                                                                                                            disabled={!isActive}
+                                                                                                            onChange={() => handleToggleChecklist(step.id, item, step.checklist_data)}
+                                                                                                            className="peer h-4 w-4 rounded border-slate-300 text-brand-coral focus:ring-brand-coral"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                    <span className={`text-sm ${isChecked ? 'text-slate-700 dark:text-slate-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                                                        {item}
+                                                                                                    </span>
+                                                                                                </label>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Column 2: Observations */}
+                                                                                <div>
+                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
+                                                                                    <textarea
+                                                                                        rows={12}
+                                                                                        value={step.observations || ''}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
+                                                                                        disabled={!isActive && !isCompleted}
+                                                                                        placeholder="Adicione notas sobre esta etapa..."
+                                                                                        className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none h-full"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            /* Standard Observations for other steps */
+                                                                            <div className="mb-6">
+                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
+                                                                                <textarea
+                                                                                    rows={3}
+                                                                                    value={step.observations || ''}
+                                                                                    onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
+                                                                                    disabled={!isActive && !isCompleted}
+                                                                                    placeholder="Adicione notas sobre esta etapa..."
+                                                                                    className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                                                                />
+                                                                            </div>
+                                                                        )}
 
                                                                         {/* Action Buttons */}
                                                                         <div className="flex justify-end gap-3">
