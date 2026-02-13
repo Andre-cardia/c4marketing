@@ -63,6 +63,7 @@ const TrafficManagement: React.FC = () => {
     const [showAccessModal, setShowAccessModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
     const [newCampaignName, setNewCampaignName] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     // Timeline State
     const [timelineSteps, setTimelineSteps] = useState<Record<string, TimelineStep[]>>({});
@@ -206,28 +207,35 @@ const TrafficManagement: React.FC = () => {
     };
 
     const handleCreateCampaign = async () => {
-        if (!trafficProject) return;
+        if (!trafficProject || isCreating) return;
         if (!newCampaignName.trim()) {
             alert('Por favor, informe o nome da campanha.');
             return;
         }
 
-        const { data, error } = await supabase
+        setIsCreating(true);
+        const { data: campaignData, error: campaignError } = await supabase
             .from('traffic_campaigns')
             .insert([{
                 traffic_project_id: trafficProject.id,
                 platform: newCampaignPlatform,
-                name: newCampaignName // Use user provided name
+                name: newCampaignName
             }])
             .select()
             .single();
 
-        if (data) {
-            setCampaigns([data, ...campaigns]);
+        if (campaignData) {
+            setCampaigns([campaignData, ...campaigns]);
             setShowCampaignModal(false);
             setNewCampaignName('');
-            // Refresh project data to load automatically created timeline steps from DB trigger
-            setTimeout(() => loadProjectData(), 500);
+            // Wait for DB trigger to finish and refresh state
+            setTimeout(() => {
+                loadProjectData();
+                setIsCreating(false);
+            }, 1000);
+        } else {
+            setIsCreating(false);
+            if (campaignError) alert(`Erro ao criar campanha: ${campaignError.message}`);
         }
     };
 
@@ -840,13 +848,20 @@ const TrafficManagement: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleCreateCampaign}
-                                disabled={!newCampaignName.trim()}
-                                className={`flex-1 py-3 font-bold rounded-xl shadow-lg transition-all
-                                    ${!newCampaignName.trim()
-                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                        : 'bg-brand-coral text-white hover:bg-red-500 shadow-brand-coral/20'}`}
+                                disabled={isCreating || !newCampaignName.trim()}
+                                className="w-full py-3 bg-brand-coral text-white rounded-xl font-bold hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Criar Campanha
+                                {isCreating ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Criando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus size={20} />
+                                        Criar Campanha
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
