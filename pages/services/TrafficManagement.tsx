@@ -761,11 +761,11 @@ const TrafficManagement: React.FC = () => {
                                                                         {/* Observations */}
                                                                         {/* Checklist & Observations Split for Planning */}
                                                                         {step.step_key === 'planning' ? (
-                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                                                                 {/* Column 1: Checklist */}
-                                                                                <div>
+                                                                                <div className="flex flex-col h-full">
                                                                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">Checklist</label>
-                                                                                    <div className="space-y-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                                                    <div className="flex-1 space-y-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                                                                         {PLANNING_CHECKLIST_ITEMS.map((item) => {
                                                                                             const isChecked = step.checklist_data?.[item] || false;
                                                                                             return (
@@ -789,15 +789,15 @@ const TrafficManagement: React.FC = () => {
                                                                                 </div>
 
                                                                                 {/* Column 2: Observations */}
-                                                                                <div>
-                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
+                                                                                <div className="flex flex-col h-full">
+                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">Observações</label>
                                                                                     <textarea
                                                                                         rows={12}
                                                                                         value={step.observations || ''}
                                                                                         onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
                                                                                         disabled={!isActive && !isCompleted}
                                                                                         placeholder="Adicione notas sobre esta etapa..."
-                                                                                        className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none h-full"
+                                                                                        className="flex-1 w-full text-sm p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
                                                                                     />
                                                                                 </div>
                                                                             </div>
@@ -817,14 +817,14 @@ const TrafficManagement: React.FC = () => {
                                                                         )}
 
                                                                         {/* Action Buttons */}
-                                                                        <div className="flex justify-end gap-3">
+                                                                        <div className="flex justify-end gap-4 mt-4">
                                                                             {isCompleted && (
                                                                                 <button
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
                                                                                         handleUndoStep(step, campaign.id);
                                                                                     }}
-                                                                                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                                                    className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                                                                                 >
                                                                                     Desfazer / Reabrir
                                                                                 </button>
@@ -836,9 +836,9 @@ const TrafficManagement: React.FC = () => {
                                                                                         e.stopPropagation();
                                                                                         handleCompleteStep(step, campaign.id);
                                                                                     }}
-                                                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200 dark:shadow-none"
+                                                                                    className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200 dark:shadow-none"
                                                                                 >
-                                                                                    <CheckCircle size={16} />
+                                                                                    <CheckCircle size={18} />
                                                                                     Concluir Etapa
                                                                                 </button>
                                                                             )}
@@ -849,9 +849,9 @@ const TrafficManagement: React.FC = () => {
                                                                                     setTaskContext({ campaignName: campaign.name || '', stepLabel: config.label });
                                                                                     setShowTaskModal(true);
                                                                                 }}
-                                                                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                                                                className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                                                             >
-                                                                                <Plus size={16} />
+                                                                                <Plus size={18} />
                                                                                 Nova Tarefa
                                                                             </button>
                                                                         </div>
