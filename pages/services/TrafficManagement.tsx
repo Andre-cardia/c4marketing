@@ -5,6 +5,7 @@ import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, Fi
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './traffic/SurveyAnswersModal';
 import AccessAnswersModal from './traffic/AccessAnswersModal';
+import TaskModal from '../../components/projects/TaskModal';
 
 const STEP_CONFIG = {
     planning: { label: 'Planejamento', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -74,11 +75,14 @@ const TrafficManagement: React.FC = () => {
     const [showAccessModal, setShowAccessModal] = useState(false);
     const [newCampaignPlatform, setNewCampaignPlatform] = useState<Campaign['platform']>('google_ads');
     const [newCampaignName, setNewCampaignName] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     // Timeline State
     const [timelineSteps, setTimelineSteps] = useState<Record<string, TimelineStep[]>>({});
     const [expandedStep, setExpandedStep] = useState<string | null>(null); // Format: "campaignId-stepKey"
     const [appUsers, setAppUsers] = useState<AppUser[]>([]);
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [taskContext, setTaskContext] = useState<{ campaignName: string, stepLabel: string } | null>(null);
 
     // Shared Fetch Function
     const loadProjectData = async () => {
@@ -217,26 +221,35 @@ const TrafficManagement: React.FC = () => {
     };
 
     const handleCreateCampaign = async () => {
-        if (!trafficProject) return;
+        if (!trafficProject || isCreating) return;
         if (!newCampaignName.trim()) {
             alert('Por favor, informe o nome da campanha.');
             return;
         }
 
-        const { data, error } = await supabase
+        setIsCreating(true);
+        const { data: campaignData, error: campaignError } = await supabase
             .from('traffic_campaigns')
             .insert([{
                 traffic_project_id: trafficProject.id,
                 platform: newCampaignPlatform,
-                name: newCampaignName // Use user provided name
+                name: newCampaignName
             }])
             .select()
             .single();
 
-        if (data) {
-            setCampaigns([data, ...campaigns]);
+        if (campaignData) {
+            setCampaigns([campaignData, ...campaigns]);
             setShowCampaignModal(false);
             setNewCampaignName('');
+            // Wait for DB trigger to finish and refresh state
+            setTimeout(() => {
+                loadProjectData();
+                setIsCreating(false);
+            }, 1000);
+        } else {
+            setIsCreating(false);
+            if (campaignError) alert(`Erro ao criar campanha: ${campaignError.message}`);
         }
     };
 
@@ -346,6 +359,11 @@ const TrafficManagement: React.FC = () => {
     };
 
     const handleInitializeTimeline = async (campaignId: string) => {
+        // Prevent manual initialization if stages already exist for this campaign
+        if (timelineSteps[campaignId] && timelineSteps[campaignId].length > 0) {
+            return;
+        }
+
         const steps = [
             { campaign_id: campaignId, step_key: 'planning', order_index: 0, status: 'in_progress', start_date: new Date().toISOString() },
             { campaign_id: campaignId, step_key: 'creatives', order_index: 1, status: 'pending' },
@@ -446,7 +464,7 @@ const TrafficManagement: React.FC = () => {
 
                                     <button
                                         onClick={handleOpenSurveyModal}
-                                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
                                         Ver Respostas Recebidas
                                     </button>
@@ -454,7 +472,7 @@ const TrafficManagement: React.FC = () => {
                                     {trafficProject.survey_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('survey_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
                                             <CheckCircle size={16} />
                                             Validar & Concluir
@@ -464,9 +482,9 @@ const TrafficManagement: React.FC = () => {
                                     {trafficProject.survey_status === 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('survey_status', 'pending')}
-                                            className="w-full py-2 text-sm font-bold text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
                                         >
-                                            <ArrowLeft size={16} />
+                                            <ArrowLeft size={12} />
                                             Desvalidar Formulário
                                         </button>
                                     )}
@@ -520,7 +538,7 @@ const TrafficManagement: React.FC = () => {
 
                                 <button
                                     onClick={handleOpenAccessModal}
-                                    className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                    className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                 >
                                     Ver Respostas Recebidas
                                 </button>
@@ -528,7 +546,7 @@ const TrafficManagement: React.FC = () => {
                                 {trafficProject?.account_setup_status !== 'completed' && (
                                     <button
                                         onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                        className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                     >
                                         <CheckCircle size={16} />
                                         Validar & Concluir
@@ -538,9 +556,9 @@ const TrafficManagement: React.FC = () => {
                                 {trafficProject?.account_setup_status === 'completed' && (
                                     <button
                                         onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
-                                        className="w-full py-2 text-sm font-bold text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
                                     >
-                                        <ArrowLeft size={16} />
+                                        <ArrowLeft size={12} />
                                         Desvalidar Formulário
                                     </button>
                                 )}
@@ -824,6 +842,18 @@ const TrafficManagement: React.FC = () => {
                                                                                     Concluir Etapa
                                                                                 </button>
                                                                             )}
+
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setTaskContext({ campaignName: campaign.name || '', stepLabel: config.label });
+                                                                                    setShowTaskModal(true);
+                                                                                }}
+                                                                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                                                            >
+                                                                                <Plus size={16} />
+                                                                                Nova Tarefa
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -894,13 +924,20 @@ const TrafficManagement: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleCreateCampaign}
-                                disabled={!newCampaignName.trim()}
-                                className={`flex-1 py-3 font-bold rounded-xl shadow-lg transition-all
-                                    ${!newCampaignName.trim()
-                                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                        : 'bg-brand-coral text-white hover:bg-red-500 shadow-brand-coral/20'}`}
+                                disabled={isCreating || !newCampaignName.trim()}
+                                className="w-full py-3 bg-brand-coral text-white rounded-xl font-bold hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Criar Campanha
+                                {isCreating ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Criando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus size={20} />
+                                        Criar Campanha
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -926,6 +963,19 @@ const TrafficManagement: React.FC = () => {
                 onValidate={() => handleUpdateStatus('account_setup_status', 'completed')}
                 onReopen={() => handleUpdateStatus('account_setup_status', 'pending')}
                 projectId={trafficProject?.id}
+            />
+            {/* Task Modal */}
+            <TaskModal
+                isOpen={showTaskModal}
+                onClose={() => {
+                    setShowTaskModal(false);
+                    setTaskContext(null);
+                }}
+                projectId={Number(id)}
+                projectName={taskContext ? `[Tráfego] ${taskContext.campaignName} - ${taskContext.stepLabel}` : companyName}
+                onSave={() => {
+                    alert('Tarefa criada com sucesso! Ela já está disponível no Kanban do projeto.');
+                }}
             />
         </div>
     );

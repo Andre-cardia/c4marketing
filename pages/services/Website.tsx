@@ -204,16 +204,17 @@ const WebsiteManagement: React.FC = () => {
                         </h3>
 
                         <div className="space-y-4 relative z-10">
-                            {/* Send Button */}
+                            {/* always visible: Send Link */}
                             <button
                                 onClick={() => {
                                     const url = `${window.location.origin}/external/website-survey/${webProject?.id}`;
                                     navigator.clipboard.writeText(url);
-                                    alert('Link copiado!');
+                                    alert('Link copiado para a área de transferência!');
                                 }}
                                 className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Send size={16} /> Enviar Pesquisa
+                                <Send size={16} />
+                                Enviar Pesquisa
                             </button>
 
                             {/* Validation Logic */}
@@ -233,16 +234,25 @@ const WebsiteManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenSurveyModal}
-                                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
-                                        Ver Respostas
+                                        Ver Respostas Recebidas
                                     </button>
                                     {webProject.survey_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('survey_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
-                                            <CheckCircle size={16} /> Validar
+                                            <CheckCircle size={16} /> Validar & Concluir
+                                        </button>
+                                    )}
+                                    {webProject.survey_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('survey_status', 'pending')}
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
+                                        >
+                                            <ArrowLeft size={12} />
+                                            Desvalidar Formulário
                                         </button>
                                     )}
                                 </div>
@@ -256,23 +266,24 @@ const WebsiteManagement: React.FC = () => {
                     </div>
 
                     {/* 2. Account Setup */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-purple-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-purple-500" />
+                            <Settings className="w-5 h-5 text-blue-500" />
                             Configuração
                         </h3>
-                        <div className="space-y-3 relative z-10">
+                        <div className="space-y-4 relative z-10">
+                            {/* always visible: Send Link */}
                             <button
                                 onClick={() => {
-                                    // Modified: Link to AccessGuideSurvey with type=website
                                     const url = `${window.location.origin}/external/access-guide/${webProject?.id}?type=website`;
                                     navigator.clipboard.writeText(url);
-                                    alert('Link do Guia de Acesso copiado!');
+                                    alert('Link copiado para a área de transferência!');
                                 }}
-                                className="w-full py-2.5 px-4 bg-purple-500 text-white rounded-xl font-bold text-sm hover:bg-purple-600 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Send size={16} /> Enviar Guia de Acesso
+                                <Send size={16} />
+                                Enviar Guia de Acesso
                             </button>
 
                             {webProject?.access_guide_data ? (
@@ -291,16 +302,25 @@ const WebsiteManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
-                                        className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
-                                        Ver Respostas
+                                        Ver Respostas Recebidas
                                     </button>
                                     {webProject.account_setup_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
-                                            <CheckCircle size={16} /> Validar
+                                            <CheckCircle size={16} /> Validar & Concluir
+                                        </button>
+                                    )}
+                                    {webProject.account_setup_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
+                                        >
+                                            <ArrowLeft size={12} />
+                                            Desvalidar Formulário
                                         </button>
                                     )}
                                 </div>

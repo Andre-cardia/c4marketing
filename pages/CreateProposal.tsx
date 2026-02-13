@@ -12,7 +12,7 @@ const CreateProposal: React.FC = () => {
         responsibleName: '',
         mediaLimit: 5000,
         contractDuration: 6,
-        services: [] as { id: string; price: number }[]
+        services: [] as { id: string; price: number; details?: string }[]
     });
 
     const servicesList = [
@@ -63,7 +63,7 @@ const CreateProposal: React.FC = () => {
             if (error) throw error;
 
             alert('Proposta criada com sucesso!');
-            navigate('/dashboard');
+            navigate('/proposals');
         } catch (error: any) {
             console.error('Error creating proposal:', error);
             alert('Erro ao criar proposta: ' + error.message);
@@ -78,7 +78,7 @@ const CreateProposal: React.FC = () => {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="mb-8 flex items-center gap-4">
-                    <button onClick={() => navigate('/dashboard')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <button onClick={() => navigate('/proposals')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                         <ArrowLeft className="w-6 h-6 text-slate-600" />
                     </button>
                     <h1 className="text-3xl font-bold text-slate-900">Nova Proposta</h1>
@@ -142,7 +142,7 @@ const CreateProposal: React.FC = () => {
                                                         onChange={e => {
                                                             const currentServices = newProposal.services;
                                                             if (e.target.checked) {
-                                                                setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0 }] });
+                                                                setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0, details: '' }] });
                                                             } else {
                                                                 setNewProposal({ ...newProposal, services: currentServices.filter(s => s.id !== service.id) });
                                                             }
@@ -152,7 +152,7 @@ const CreateProposal: React.FC = () => {
                                                     <div className="flex-1 cursor-pointer" onClick={() => {
                                                         const currentServices = newProposal.services;
                                                         if (!isSelected) {
-                                                            setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0 }] });
+                                                            setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0, details: '' }] });
                                                         }
                                                     }}>
                                                         <span className="font-bold text-slate-900 block">{service.label}</span>
@@ -178,6 +178,27 @@ const CreateProposal: React.FC = () => {
                                                         </div>
                                                     )}
                                                 </div>
+
+                                                {isSelected && (
+                                                    <div className="mt-4 pl-10 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Detalhamento do Serviço (Opcional)</label>
+                                                            <textarea
+                                                                placeholder="Descreva aqui os detalhes específicos deste serviço para o contrato..."
+                                                                value={serviceData?.details || ''}
+                                                                onChange={e => {
+                                                                    const details = e.target.value;
+                                                                    setNewProposal(prev => ({
+                                                                        ...prev,
+                                                                        services: prev.services.map(s => s.id === service.id ? { ...s, details } : s)
+                                                                    }));
+                                                                }}
+                                                                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none"
+                                                                rows={2}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}

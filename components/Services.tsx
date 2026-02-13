@@ -3,7 +3,7 @@ import React from 'react';
 import { Layout, LineChart, ShoppingCart, Users, Globe } from 'lucide-react';
 
 interface ServicesProps {
-  services?: { id: string; price: number }[] | string[];
+  services?: { id: string; price: number; details?: string }[] | string[];
 }
 
 const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }) => {
@@ -87,7 +87,7 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
 
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
               <h4 className="text-xl font-bold mb-6">O que está incluído na gestão:</h4>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4 mb-8">
                 {coreWork.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 text-slate-700">
                     <svg className="w-5 h-5 text-green-500 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -97,6 +97,16 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
                   </div>
                 ))}
               </div>
+
+              {(() => {
+                const s = Array.isArray(services) ? services.find((i: any) => (typeof i === 'string' ? i === 'traffic_management' : i.id === 'traffic_management')) : null;
+                const details = (s && typeof s !== 'string') ? (s as any).details : null;
+                return details ? (
+                  <div className="mt-6 p-5 bg-blue-50/50 rounded-2xl border border-blue-100/50 text-sm text-blue-900 italic">
+                    <strong className="text-blue-600 block mb-1">Detalhamento Adicional da Gestão:</strong> {details}
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
         )}
@@ -115,6 +125,15 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
               <p className="text-slate-300 mb-6 leading-relaxed">
                 Desenvolvemos 1 página de alta conversão focada no produto ou serviço principal, otimizada para dispositivos móveis e com copy persuasivo.
               </p>
+              {(() => {
+                const s = Array.isArray(services) ? services.find((i: any) => (typeof i === 'string' ? i === 'landing_page' : i.id === 'landing_page')) : null;
+                const details = (s && typeof s !== 'string') ? (s as any).details : null;
+                return details ? (
+                  <div className="mb-6 p-4 bg-white/10 rounded-2xl border border-white/10 text-sm text-slate-200 italic">
+                    <strong>Detalhamento:</strong> {details}
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-auto pt-4 border-t border-white/10">
                 <span className="text-xs text-slate-400 block mb-1">Item Adicional</span>
                 <div className="flex items-baseline gap-2">
@@ -142,6 +161,15 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
               <p className="text-slate-600 mb-6 leading-relaxed">
                 Site completo com múltiplas páginas (Home, Sobre, Serviços, Contato), blog integrado e painel administrativo. Design exclusivo e otimizado para SEO.
               </p>
+              {(() => {
+                const s = Array.isArray(services) ? services.find((i: any) => (typeof i === 'string' ? i === 'website' : i.id === 'website')) : null;
+                const details = (s && typeof s !== 'string') ? (s as any).details : null;
+                return details ? (
+                  <div className="mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 text-sm text-blue-800 italic">
+                    <strong>Detalhamento:</strong> {details}
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-auto pt-4 border-t border-slate-100">
                 <span className="text-xs text-slate-400 block mb-1">Status</span>
                 <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">Selecionado</span>
@@ -161,6 +189,15 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
               <p className="text-slate-600 mb-6 leading-relaxed">
                 Loja virtual integrada com meios de pagamento e logística. Cadastro de produtos ilimitado, gestão de estoque e área do cliente.
               </p>
+              {(() => {
+                const s = Array.isArray(services) ? services.find((i: any) => (typeof i === 'string' ? i === 'ecommerce' : i.id === 'ecommerce')) : null;
+                const details = (s && typeof s !== 'string') ? (s as any).details : null;
+                return details ? (
+                  <div className="mb-6 p-4 bg-purple-50/50 rounded-2xl border border-purple-100/50 text-sm text-purple-800 italic">
+                    <strong>Detalhamento:</strong> {details}
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-auto pt-4 border-t border-slate-100">
                 <span className="text-xs text-slate-400 block mb-1">Status</span>
                 <span className="text-sm font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full">Selecionado</span>
@@ -180,6 +217,15 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
               <p className="text-slate-600 mb-6 leading-relaxed">
                 Acompanhamento estratégico, definição de processos comerciais, treinamento de equipe e análise profunda de métricas de crescimento.
               </p>
+              {(() => {
+                const s = Array.isArray(services) ? services.find((i: any) => (typeof i === 'string' ? i === 'consulting' : i.id === 'consulting')) : null;
+                const details = (s && typeof s !== 'string') ? (s as any).details : null;
+                return details ? (
+                  <div className="mb-6 p-4 bg-amber-50/50 rounded-2xl border border-amber-100/50 text-sm text-amber-800 italic">
+                    <strong>Detalhamento:</strong> {details}
+                  </div>
+                ) : null;
+              })()}
               <div className="mt-auto pt-4 border-t border-slate-100">
                 <span className="text-xs text-slate-400 block mb-1">Status</span>
                 <span className="text-sm font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Selecionado</span>

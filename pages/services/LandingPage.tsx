@@ -187,7 +187,7 @@ const LandingPageManagement: React.FC = () => {
                         </h1>
                         <p className="text-xl text-slate-600 dark:text-slate-400 mt-2 font-medium">
                             {companyName}
-
+                            <span className="ml-4 text-xs font-mono text-slate-400">CNPJ: (Carregado do contrato)</span>
                         </p>
                     </div>
                 </div>
@@ -204,16 +204,17 @@ const LandingPageManagement: React.FC = () => {
                         </h3>
 
                         <div className="space-y-4 relative z-10">
-                            {/* Send Button */}
+                            {/* always visible: Send Link */}
                             <button
                                 onClick={() => {
                                     const url = `${window.location.origin}/external/lp-survey/${lpProject?.id}`;
                                     navigator.clipboard.writeText(url);
-                                    alert('Link copiado!');
+                                    alert('Link copiado para a área de transferência!');
                                 }}
                                 className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Send size={16} /> Enviar Pesquisa
+                                <Send size={16} />
+                                Enviar Pesquisa
                             </button>
 
                             {/* Validation Logic */}
@@ -233,16 +234,25 @@ const LandingPageManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenSurveyModal}
-                                        className="w-full py-2 text-sm font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
-                                        Ver Respostas
+                                        Ver Respostas Recebidas
                                     </button>
                                     {lpProject.survey_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('survey_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
-                                            <CheckCircle size={16} /> Validar
+                                            <CheckCircle size={16} /> Validar & Concluir
+                                        </button>
+                                    )}
+                                    {lpProject.survey_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('survey_status', 'pending')}
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
+                                        >
+                                            <ArrowLeft size={12} />
+                                            Desvalidar Formulário
                                         </button>
                                     )}
                                 </div>
@@ -256,27 +266,29 @@ const LandingPageManagement: React.FC = () => {
                     </div>
 
                     {/* 2. Account Setup (Access Guide) */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-purple-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-purple-500" />
+                            <Settings className="w-5 h-5 text-blue-500" />
                             Configuração
                         </h3>
 
-                        <div className="space-y-3 relative z-10">
+                        <div className="space-y-4 relative z-10">
+                            {/* always visible: Send Link (Standardized Coral) */}
                             <button
                                 onClick={() => {
-                                    // Modified: Link to AccessGuideSurvey
-                                    const url = `${window.location.origin}/external/access-guide/${lpProject?.id}?type=lp`;
+                                    const url = `${window.location.origin}/external/lp-access/${lpProject?.id}`;
                                     navigator.clipboard.writeText(url);
-                                    alert('Link do Guia de Acesso copiado!');
+                                    alert('Link copiado para a área de transferência!');
                                 }}
-                                className="w-full py-2.5 px-4 bg-purple-500 text-white rounded-xl font-bold text-sm hover:bg-purple-600 shadow-md shadow-purple-500/20 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Send size={16} /> Enviar Guia de Acesso
+                                <Send size={16} />
+                                Enviar Guia de Acesso
                             </button>
 
-                            {lpProject?.access_guide_data ? (
+                            {/* Visibility Logic for Responses & Validation */}
+                            {lpProject?.access_guide_data && (
                                 <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
@@ -292,20 +304,30 @@ const LandingPageManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
-                                        className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
-                                        Ver Respostas
+                                        Ver Respostas Recebidas
                                     </button>
                                     {lpProject.account_setup_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
-                                            <CheckCircle size={16} /> Validar
+                                            <CheckCircle size={16} /> Validar & Concluir
+                                        </button>
+                                    )}
+                                    {lpProject.account_setup_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
+                                        >
+                                            <ArrowLeft size={12} />
+                                            Desvalidar Formulário
                                         </button>
                                     )}
                                 </div>
-                            ) : (
+                            )}
+                            {!lpProject?.access_guide_data && (
                                 <p className="text-xs text-center text-slate-400 italic">
                                     Aguardando dados de acesso...
                                 </p>
@@ -340,7 +362,7 @@ const LandingPageManagement: React.FC = () => {
                     </div>
 
                     {/* 4. Action: New LP Button */}
-                    <div className="flex items-center justify-center">
+                    < div className="flex items-center justify-center" >
                         <button
                             onClick={handleCreateLandingPage}
                             className="w-full h-full min-h-[160px] rounded-2xl border-2 border-dashed border-slate-300 hover:border-brand-coral bg-slate-50 dark:bg-slate-800/50 hover:bg-brand-coral/5 transition-all flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-brand-coral group cursor-pointer"
@@ -350,95 +372,99 @@ const LandingPageManagement: React.FC = () => {
                             </div>
                             <span className="font-bold text-lg">Nova Landing Page</span>
                         </button>
-                    </div>
-                </div>
+                    </div >
+                </div >
 
                 {/* Landing Pages List */}
-                <div className="space-y-8">
+                < div className="space-y-8" >
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white border-l-4 border-green-500 pl-4">Páginas em Produção</h2>
 
-                    {landingPages.map(page => (
-                        <div key={page.id} className="bg-white dark:bg-slate-800 p-0 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
-                            {/* Page Header */}
-                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
-                                <div className="flex items-center gap-3">
-                                    <span className="p-2 bg-green-100 text-green-600 rounded-lg">
-                                        <Layout size={20} />
-                                    </span>
-                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{page.name}</h3>
+                    {
+                        landingPages.map(page => (
+                            <div key={page.id} className="bg-white dark:bg-slate-800 p-0 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+                                {/* Page Header */}
+                                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                                    <div className="flex items-center gap-3">
+                                        <span className="p-2 bg-green-100 text-green-600 rounded-lg">
+                                            <Layout size={20} />
+                                        </span>
+                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">{page.name}</h3>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-mono text-slate-400">{new Date(page.created_at).toLocaleDateString()}</span>
+                                        <button
+                                            onClick={() => handleDeletePage(page.id)}
+                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Apagar Landing Page"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs font-mono text-slate-400">{new Date(page.created_at).toLocaleDateString()}</span>
-                                    <button
-                                        onClick={() => handleDeletePage(page.id)}
-                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Apagar Landing Page"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                </div>
-                            </div>
 
-                            {/* Status Flow */}
-                            <div className="p-6">
-                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                                    {STATUS_FLOW.map((step, idx) => {
-                                        const currentIndex = getStatusIndex(page.status);
-                                        const isCompleted = idx <= currentIndex;
-                                        const isCurrent = idx === currentIndex;
-                                        const isNext = idx === currentIndex + 1;
+                                {/* Status Flow */}
+                                <div className="p-6">
+                                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                                        {STATUS_FLOW.map((step, idx) => {
+                                            const currentIndex = getStatusIndex(page.status);
+                                            const isCompleted = idx <= currentIndex;
+                                            const isCurrent = idx === currentIndex;
+                                            const isNext = idx === currentIndex + 1;
 
-                                        return (
-                                            <button
-                                                key={step.id}
-                                                disabled={!isNext && !isCompleted}
-                                                onClick={() => {
-                                                    if (isNext || (isCompleted && idx !== currentIndex)) { // Allow rollback or advance
-                                                        handleUpdatePageStatus(page.id, step.id as any);
-                                                    }
-                                                }}
-                                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all group relative overflow-hidden
+                                            return (
+                                                <button
+                                                    key={step.id}
+                                                    disabled={!isNext && !isCompleted}
+                                                    onClick={() => {
+                                                        if (isNext || (isCompleted && idx !== currentIndex)) { // Allow rollback or advance
+                                                            handleUpdatePageStatus(page.id, step.id as any);
+                                                        }
+                                                    }}
+                                                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all group relative overflow-hidden
                                                     ${isCurrent
-                                                        ? 'border-brand-coral/50 bg-gradient-to-br from-brand-coral/10 to-brand-coral/5'
-                                                        : isCompleted
-                                                            ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900/30'
-                                                            : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 opacity-60 cursor-default'
-                                                    }
+                                                            ? 'border-brand-coral/50 bg-gradient-to-br from-brand-coral/10 to-brand-coral/5'
+                                                            : isCompleted
+                                                                ? 'border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900/30'
+                                                                : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 opacity-60 cursor-default'
+                                                        }
                                                     ${isNext ? 'hover:border-brand-coral hover:bg-white dark:hover:bg-slate-800 hover:text-brand-coral cursor-pointer border-dashed hover:shadow-md' : ''}
                                                 `}
-                                            >
-                                                <div className={`mb-3 transition-transform group-hover:scale-110 
+                                                >
+                                                    <div className={`mb-3 transition-transform group-hover:scale-110 
                                                     ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-green-500' : 'text-slate-400'}
                                                 `}>
-                                                    <step.icon size={28} />
-                                                </div>
-                                                <span className={`text-sm font-bold text-center
+                                                        <step.icon size={28} />
+                                                    </div>
+                                                    <span className={`text-sm font-bold text-center
                                                     ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-green-700 dark:text-green-400' : 'text-slate-400'}
                                                 `}>
-                                                    {step.label}
-                                                </span>
+                                                        {step.label}
+                                                    </span>
 
-                                                {isCurrent && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-coral"></div>}
-                                            </button>
-                                        );
-                                    })}
+                                                    {isCurrent && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-coral"></div>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    }
 
-                    {landingPages.length === 0 && (
-                        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                            <p className="text-slate-400 font-medium mb-2">Nenhuma Landing Page criada.</p>
-                            <p className="text-slate-500 text-sm">Clique em "Nova Landing Page" acima para começar.</p>
-                        </div>
-                    )}
-                </div>
+                    {
+                        landingPages.length === 0 && (
+                            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                                <p className="text-slate-400 font-medium mb-2">Nenhuma Landing Page criada.</p>
+                                <p className="text-slate-500 text-sm">Clique em "Nova Landing Page" acima para começar.</p>
+                            </div>
+                        )
+                    }
+                </div >
 
-            </main>
+            </main >
 
             {/* Survey Modal */}
-            <SurveyAnswersModal
+            < SurveyAnswersModal
                 isOpen={showSurveyModal}
                 onClose={() => setShowSurveyModal(false)}
                 surveyData={lpProject?.survey_data || {}}
@@ -453,7 +479,7 @@ const LandingPageManagement: React.FC = () => {
                 onClose={() => setShowAccessGuideModal(false)}
                 data={lpProject?.access_guide_data || {}}
             />
-        </div>
+        </div >
     );
 };
 
