@@ -292,16 +292,26 @@ const LandingPageManagement: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleOpenAccessGuideModal}
-                                        className="w-full py-2 text-sm font-medium text-purple-600 hover:text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-100"
+                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
                                     >
-                                        Ver Respostas
+                                        Ver Respostas Recebidas
                                     </button>
                                     {lpProject.account_setup_status !== 'completed' && (
                                         <button
                                             onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                            className="w-full py-2 text-sm font-bold text-green-700 hover:text-green-800 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
                                         >
-                                            <CheckCircle size={16} /> Validar
+                                            <CheckCircle size={16} /> Validar & Concluir
+                                        </button>
+                                    )}
+
+                                    {lpProject.account_setup_status === 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
+                                        >
+                                            <ArrowLeft size={12} />
+                                            Desvalidar Formulário
                                         </button>
                                     )}
                                 </div>
