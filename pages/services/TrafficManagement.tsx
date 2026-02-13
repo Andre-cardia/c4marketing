@@ -226,6 +226,8 @@ const TrafficManagement: React.FC = () => {
             setCampaigns([data, ...campaigns]);
             setShowCampaignModal(false);
             setNewCampaignName('');
+            // Refresh project data to load automatically created timeline steps from DB trigger
+            setTimeout(() => loadProjectData(), 500);
         }
     };
 
@@ -330,6 +332,11 @@ const TrafficManagement: React.FC = () => {
     };
 
     const handleInitializeTimeline = async (campaignId: string) => {
+        // Prevent manual initialization if stages already exist for this campaign
+        if (timelineSteps[campaignId] && timelineSteps[campaignId].length > 0) {
+            return;
+        }
+
         const steps = [
             { campaign_id: campaignId, step_key: 'planning', order_index: 0, status: 'in_progress', start_date: new Date().toISOString() },
             { campaign_id: campaignId, step_key: 'creatives', order_index: 1, status: 'pending' },
