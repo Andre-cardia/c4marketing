@@ -5,6 +5,7 @@ import { ArrowLeft, BarChart, Send, CheckCircle, Settings, Users, Plus, Play, Fi
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './traffic/SurveyAnswersModal';
 import AccessAnswersModal from './traffic/AccessAnswersModal';
+import TaskModal from '../../components/projects/TaskModal';
 
 const STEP_CONFIG = {
     planning: { label: 'Planejamento', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -69,6 +70,8 @@ const TrafficManagement: React.FC = () => {
     const [timelineSteps, setTimelineSteps] = useState<Record<string, TimelineStep[]>>({});
     const [expandedStep, setExpandedStep] = useState<string | null>(null); // Format: "campaignId-stepKey"
     const [appUsers, setAppUsers] = useState<AppUser[]>([]);
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [taskContext, setTaskContext] = useState<{ campaignName: string, stepLabel: string } | null>(null);
 
     // Shared Fetch Function
     const loadProjectData = async () => {
@@ -778,6 +781,18 @@ const TrafficManagement: React.FC = () => {
                                                                                     Concluir Etapa
                                                                                 </button>
                                                                             )}
+
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setTaskContext({ campaignName: campaign.name || '', stepLabel: config.label });
+                                                                                    setShowTaskModal(true);
+                                                                                }}
+                                                                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                                                            >
+                                                                                <Plus size={16} />
+                                                                                Nova Tarefa
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -887,6 +902,19 @@ const TrafficManagement: React.FC = () => {
                 onValidate={() => handleUpdateStatus('account_setup_status', 'completed')}
                 onReopen={() => handleUpdateStatus('account_setup_status', 'pending')}
                 projectId={trafficProject?.id}
+            />
+            {/* Task Modal */}
+            <TaskModal
+                isOpen={showTaskModal}
+                onClose={() => {
+                    setShowTaskModal(false);
+                    setTaskContext(null);
+                }}
+                projectId={Number(id)}
+                projectName={taskContext ? `[Tráfego] ${taskContext.campaignName} - ${taskContext.stepLabel}` : companyName}
+                onSave={() => {
+                    alert('Tarefa criada com sucesso! Ela já está disponível no Kanban do projeto.');
+                }}
             />
         </div>
     );
