@@ -40,8 +40,17 @@ O projeto utiliza Supabase como BaaS, o que torna a configuração de **Row Leve
 - **Risco**: Sobrescrita de fotos de outros usuários e consumo excessivo de armazenamento por ataques de negação de serviço (DoS).
 - **Recomendação**: Restringir `INSERT` e `UPDATE` para que o caminho do arquivo no bucket coincida com o `auth.uid()` do usuário logado.
 
+### 5. RLS Desativado em Tabelas Públicas (`acceptances`, `contract_templates`)
+
+**Relatório de Erros Supabase:** `policy_exists_rls_disabled`, `rls_disabled_in_public`
+
+- **Problema**: As tabelas `acceptances` e `contract_templates` existem no esquema `public`, mas o RLS não estava habilitado na tabela, embora existissem políticas (no caso de `acceptances`).
+- **Risco**: As políticas de segurança são ignoradas se o RLS não estiver habilitado na tabela, permitindo acesso irrestrito.
+- **Recomendação**: Executar `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` para ambas as tabelas.
+
 ## Próximos Passos de Remediação
 
-1. **Corrigir RLS de Projetos**: Criar uma nova migration que revogue as políticas atuais e implemente verificações baseadas em ID.
-2. **Privacidade de Propostas**: Ajustar a política de leitura para que não seja possível listar (listar todas requer autorização de admin).
-3. **Segurança de Storage**: Implementar validação de proprietário nos caminhos dos arquivos.
+1. **Corrigir RLS de Projetos**: Criar uma nova migration que revogue as políticas atuais e implemente verificações baseadas em ID. (Concluído em `20260214_security_hardening.sql`)
+2. **Privacidade de Propostas**: Ajustar a política de leitura para que não seja possível listar (listar todas requer autorização de admin). (Concluído em `20260214_security_hardening.sql`)
+3. **Segurança de Storage**: Implementar validação de proprietário nos caminhos dos arquivos. (Concluído em `20260214_security_hardening.sql`)
+4. **Habilitar RLS em Tabelas Críticas**: Executar migration para ativar RLS em `acceptances` e `contract_templates`. (Concluído em `20260214_enable_rls_critical.sql`)
