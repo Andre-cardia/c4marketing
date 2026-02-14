@@ -28,9 +28,11 @@ const ProposalView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
+
     // Form State
     const [isAccepted, setIsAccepted] = useState(false);
     const [showForm, setShowForm] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -88,13 +90,16 @@ const ProposalView: React.FC = () => {
         );
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!isFormValid()) {
             alert('Por favor, verifique os dados informados.');
             return;
         }
+        setIsConfirming(true);
+    };
 
+    const handleFinalConfirm = async () => {
         setIsSubmitting(true);
         try {
 
@@ -137,6 +142,7 @@ const ProposalView: React.FC = () => {
             setTimestamp(new Date().toLocaleString('pt-BR'));
             setIsAccepted(true);
             setShowForm(false);
+            setIsConfirming(false);
         } catch (err: any) {
             console.error('Error saving acceptance:', err);
             alert('Ocorreu um erro ao salvar. Tente novamente.');
@@ -224,8 +230,8 @@ const ProposalView: React.FC = () => {
 
             <Footer isAccepted={isAccepted} />
 
-            {/* Acceptance Form Modal (Reused) */}
-            {showForm && (
+            {/* Acceptance Form Modal (Original) */}
+            {showForm && !isConfirming && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 no-print animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in slide-in-from-bottom-8 duration-500 relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-coral via-red-400 to-brand-coral opacity-80"></div>
@@ -240,7 +246,7 @@ const ProposalView: React.FC = () => {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <form onSubmit={handleInitialSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="md:col-span-2">
                                 <label htmlFor="name" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">Nome Completo</label>
                                 <input type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-brand-coral focus:bg-white bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300" placeholder="Seu nome completo" required />
@@ -267,11 +273,76 @@ const ProposalView: React.FC = () => {
                             </div>
 
                             <div className="md:col-span-2 pt-4">
-                                <button type="submit" disabled={isSubmitting || !isFormValid()} className={`w-full py-5 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-2 ${isFormValid() ? 'bg-brand-coral text-white hover:bg-red-500 hover:shadow-brand-coral/30 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-200 cursor-not-allowed shadow-none'}`}>
-                                    {isSubmitting ? 'Confirmando...' : 'Confirmar Aceite'}
+                                <button type="submit" disabled={!isFormValid()} className={`w-full py-5 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-2 ${isFormValid() ? 'bg-brand-coral text-white hover:bg-red-500 hover:shadow-brand-coral/30 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-200 cursor-not-allowed shadow-none'}`}>
+                                    Revisar Dados
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Modal */}
+            {isConfirming && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[110] p-4 no-print animate-in zoom-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-2 bg-brand-dark"></div>
+
+                        <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Conferência de Dados
+                        </h2>
+
+                        <div className="space-y-4 mb-8">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Nome</p>
+                                <p className="font-semibold text-slate-800 text-lg">{formData.name}</p>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Email</p>
+                                <p className="font-semibold text-slate-800 text-lg">{formData.email}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">CPF</p>
+                                    <p className="font-semibold text-slate-800">{formData.cpf}</p>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">CNPJ</p>
+                                    <p className="font-semibold text-slate-800">{formData.cnpj}</p>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Razão Social</p>
+                                <p className="font-semibold text-slate-800">{formData.companyName}</p>
+                            </div>
+
+                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 text-amber-800 text-sm flex gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                <span>Por favor, verifique se todos os dados estão corretos. Eles serão usados para a geração automática do contrato.</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={handleFinalConfirm}
+                                disabled={isSubmitting}
+                                className="w-full bg-brand-coral text-white py-4 rounded-xl font-bold text-lg hover:bg-red-500 transition-colors shadow-lg flex justify-center items-center gap-2"
+                            >
+                                {isSubmitting ? 'Finalizando...' : 'Confirmar e Aceitar'}
+                            </button>
+                            <button
+                                onClick={() => setIsConfirming(false)}
+                                disabled={isSubmitting}
+                                className="w-full bg-white text-slate-500 py-4 rounded-xl font-bold hover:bg-slate-50 transition-colors border border-slate-200"
+                            >
+                                Voltar e Corrigir
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
