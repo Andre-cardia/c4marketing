@@ -488,7 +488,7 @@ const TrafficManagement: React.FC = () => {
                                             )}
                                         </div>
                                     ) : (
-                                         <p className="text-xs text-center text-slate-600 py-2">
+                                        <p className="text-xs text-center text-slate-600 py-2">
                                             Aguardando envio...
                                         </p>
                                     )}
@@ -578,9 +578,9 @@ const TrafficManagement: React.FC = () => {
                                 Registre os objetivos, KPIs e público-alvo para as campanhas. Defina a rota estratégica.
                             </p>
                         </div>
-                        
+
                         <div>
-                             <button
+                            <button
                                 onClick={() => navigate(`/projects/${id}/traffic/strategy`)}
                                 className="text-sm font-bold text-brand-coral hover:text-brand-coral/80 flex items-center gap-2 transition-colors"
                             >
@@ -591,7 +591,7 @@ const TrafficManagement: React.FC = () => {
 
                     {/* 4. New Campaign - Dashed Outline Style */}
                     <div className="flex items-center justify-center h-full">
-                         <button
+                        <button
                             onClick={() => setShowCampaignModal(true)}
                             disabled={!isOnboardingComplete}
                             className={`w-full h-full min-h-[280px] rounded-2xl border border-dashed flex flex-col items-center justify-center gap-4 transition-all group
@@ -611,36 +611,48 @@ const TrafficManagement: React.FC = () => {
 
                 {/* Campaigns List */}
                 <div className="space-y-8">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white border-l-4 border-brand-coral pl-4">Campanhas Ativas</h2>
+                    <div className="flex items-center gap-3 mb-6 border-l-4 border-brand-coral pl-4">
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Campanhas Ativas</h2>
+                    </div>
 
                     {campaigns.length === 0 ? (
-                        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
-                            <p className="text-slate-500">Nenhuma campanha criada ainda.</p>
+                        <div className="text-center py-16 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
+                            <p className="text-slate-500 mb-4">Nenhuma campanha criada ainda.</p>
+                            <button
+                                onClick={() => setShowCampaignModal(true)}
+                                className="text-brand-coral font-bold hover:underline"
+                            >
+                                Criar primeira campanha
+                            </button>
                         </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-8">
                             {campaigns.map(campaign => (
-                                <div key={campaign.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                                    {/* Campaign Header */}
-                                    <div className={`px-6 py-4 border-b flex items-center justify-between ${getPlatformColor(campaign.platform)} bg-opacity-10`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${getPlatformColor(campaign.platform)} bg-white`}>
+                                <div key={campaign.id} className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+                                    {/* Campaign Header - Dark & Clean */}
+                                    <div className="px-8 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                                        <div className="flex items-center gap-4">
+                                            <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest border bg-transparent ${campaign.platform === 'google_ads' ? 'border-blue-500/30 text-blue-400' :
+                                                    campaign.platform === 'meta_ads' ? 'border-indigo-500/30 text-indigo-400' :
+                                                        campaign.platform === 'linkedin_ads' ? 'border-sky-500/30 text-sky-400' :
+                                                            'border-pink-500/30 text-pink-400'
+                                                }`}>
                                                 {formatPlatform(campaign.platform)}
                                             </span>
-                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-3">
                                                 {campaign.name}
                                                 {campaign.status === 'ended' && (
-                                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full border border-green-200 flex items-center gap-1">
+                                                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] rounded border border-emerald-500/20 flex items-center gap-1 uppercase tracking-wider">
                                                         <CheckCircle size={10} /> Finalizada
                                                     </span>
                                                 )}
                                             </h3>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs font-mono text-slate-500">{new Date(campaign.created_at || new Date()).toLocaleDateString()}</span>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-xs font-mono text-slate-500">CRIADO EM: {new Date(campaign.created_at || new Date()).toLocaleDateString()}</span>
                                             <button
                                                 onClick={() => handleDeleteCampaign(campaign.id)}
-                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                                 title="Excluir Campanha"
                                             >
                                                 <Trash2 size={16} />
@@ -649,19 +661,19 @@ const TrafficManagement: React.FC = () => {
                                     </div>
 
                                     {/* Timeline */}
-                                    <div className="p-6">
+                                    <div className="p-8 bg-slate-900">
                                         {!timelineSteps[campaign.id] || timelineSteps[campaign.id].length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
-                                                <p className="text-slate-500 mb-4 text-center text-sm">Esta campanha não possui timeline ativa.</p>
+                                            <div className="flex flex-col items-center justify-center p-12 bg-slate-800/30 border border-dashed border-slate-700 rounded-xl">
+                                                <p className="text-slate-400 mb-6 text-center text-sm">Esta campanha não possui etapas definidas.</p>
                                                 <button
                                                     onClick={() => handleInitializeTimeline(campaign.id)}
-                                                    className="px-4 py-2 bg-brand-coral text-white rounded-lg font-bold text-sm hover:bg-red-600 transition-colors"
+                                                    className="px-6 py-3 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-brand-coral/90 shadow-lg shadow-brand-coral/20 transition-all transform hover:-translate-y-0.5"
                                                 >
-                                                    Ativar Timeline da Campanha
+                                                    Iniciar Timeline
                                                 </button>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col gap-3">
+                                            <div className="flex flex-col gap-4">
                                                 {timelineSteps[campaign.id]
                                                     .sort((a, b) => a.order_index - b.order_index)
                                                     .map((step) => {
@@ -670,122 +682,171 @@ const TrafficManagement: React.FC = () => {
                                                         const isActive = step.status === 'in_progress';
                                                         const isCompleted = step.status === 'completed';
 
+                                                        // Progress Bar Calculation for Planning
+                                                        const completedCount = PLANNING_CHECKLIST_ITEMS.filter(i => step.checklist_data?.[i]).length;
+                                                        const totalCount = PLANNING_CHECKLIST_ITEMS.length;
+                                                        const progress = Math.round((completedCount / totalCount) * 100);
+
                                                         return (
                                                             <div
                                                                 key={step.id}
-                                                                className={`border rounded-xl transition-all duration-300 overflow-hidden
-                                                                ${isActive ? 'border-brand-coral bg-white dark:bg-slate-800 shadow-md ring-1 ring-brand-coral/20'
-                                                                        : isCompleted ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10 dark:border-green-900/30'
-                                                                            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 opacity-70 hover:opacity-100 hover:bg-white dark:hover:bg-slate-800'}`}
+                                                                className={`rounded-xl transition-all duration-300 overflow-hidden border
+                                                                ${isActive
+                                                                        ? 'border-brand-coral/30 bg-slate-800/80 shadow-lg shadow-black/20'
+                                                                        : isCompleted
+                                                                            ? 'border-emerald-500/20 bg-emerald-500/5'
+                                                                            : 'border-slate-800 bg-slate-900/50 opacity-60 hover:opacity-100 hover:bg-slate-800/50'}`}
                                                             >
                                                                 {/* Step Header */}
                                                                 <div
                                                                     onClick={() => setExpandedStep(isExpanded ? null : `${campaign.id}-${step.step_key}`)}
-                                                                    className="px-6 py-4 flex items-center justify-between cursor-pointer"
+                                                                    className="px-6 py-5 flex items-center justify-between cursor-pointer select-none group"
                                                                 >
-                                                                    <div className="flex items-center gap-4">
-                                                                        <div className={`p-2 rounded-lg ${isActive || isCompleted ? config.bg.replace('50', '100') : 'bg-slate-100 dark:bg-slate-700'}`}>
-                                                                            <config.icon className={`w-5 h-5 ${isActive || isCompleted ? config.color : 'text-slate-400 dark:text-slate-500'}`} />
+                                                                    <div className="flex items-center gap-5">
+                                                                        {/* Icon Box */}
+                                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors
+                                                                            ${isActive ? 'bg-brand-coral text-white shadow-lg shadow-brand-coral/30' :
+                                                                                isCompleted ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                                    'bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300'}`}>
+                                                                            {isCompleted ? <CheckCircle size={20} /> : <config.icon size={20} />}
                                                                         </div>
+
                                                                         <div>
-                                                                            <h4 className={`font-bold ${isActive ? 'text-slate-900 dark:text-white' : isCompleted ? 'text-green-800 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                            <h4 className={`text-sm font-bold uppercase tracking-wider ${isActive ? 'text-white' : isCompleted ? 'text-emerald-400' : 'text-slate-400'}`}>
                                                                                 {config.label}
                                                                             </h4>
-                                                                            <div className="flex items-center gap-3 text-xs mt-1">
-                                                                                <span className={`font-semibold ${isActive ? 'text-brand-coral' :
-                                                                                    isCompleted ? 'text-green-600 dark:text-green-400' :
-                                                                                        'text-slate-400'
-                                                                                    }`}>
-                                                                                    {isActive ? 'Em Andamento' : isCompleted ? 'Concluído' : 'Pendente'}
-                                                                                </span>
-                                                                                {step.start_date && (
-                                                                                    <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                                                                                        <Calendar size={12} /> {new Date(step.start_date).toLocaleDateString()}
+
+                                                                            <div className="flex items-center gap-3 mt-1.5">
+                                                                                {isActive && (
+                                                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-brand-coral/10 text-brand-coral border border-brand-coral/20">
+                                                                                        Em Andamento
+                                                                                    </span>
+                                                                                )}
+                                                                                {isCompleted && (
+                                                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                                                        Concluído
+                                                                                    </span>
+                                                                                )}
+                                                                                {!isActive && !isCompleted && (
+                                                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                                                                        Pendente
+                                                                                    </span>
+                                                                                )}
+
+                                                                                {step.end_date && (isActive || isCompleted) && (
+                                                                                    <span className="text-[10px] font-medium text-slate-500">
+                                                                                        PREVISÃO: {new Date(step.end_date).toLocaleDateString()}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
 
-                                                                    <div className="flex items-center gap-3">
-                                                                        {isCompleted && <CheckCircle className="text-green-500 dark:text-green-400 w-5 h-5" />}
-                                                                        {isExpanded ? <ChevronUp className="text-slate-400 dark:text-slate-500 w-4 h-4" /> : <ChevronDown className="text-slate-400 dark:text-slate-500 w-4 h-4" />}
+                                                                    <div className="flex items-center gap-4">
+                                                                        {/* Mini Progress Bar in Header (optional, only if expanded is false maybe?) */}
+                                                                        {step.step_key === 'planning' && (isActive || isCompleted) && !isExpanded && (
+                                                                            <div className="flex flex-col items-end gap-1 mr-4">
+                                                                                <span className="text-[10px] font-bold text-slate-400">{progress}%</span>
+                                                                                <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                                                    <div
+                                                                                        className="h-full bg-brand-coral transition-all duration-500"
+                                                                                        style={{ width: `${progress}%` }}
+                                                                                    ></div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                                            <ChevronDown className="text-slate-500 w-5 h-5" />
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 
                                                                 {/* Step Body */}
                                                                 {isExpanded && (
-                                                                    <div className="px-6 pb-6 pt-2 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 animate-in slide-in-from-top-2">
-                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                                                            {/* Dates */}
-                                                                            <div>
-                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Período</label>
-                                                                                <div className="flex gap-2">
-                                                                                    <div className="flex-1">
-                                                                                        <span className="text-xs text-slate-400 dark:text-slate-500 block mb-1">Início</span>
-                                                                                        <input
-                                                                                            type="date"
-                                                                                            value={step.start_date ? step.start_date.split('T')[0] : ''}
-                                                                                            disabled={!isActive}
-                                                                                            onChange={(e) => handleUpdateTimelineStep(step.id, { start_date: e.target.value })}
-                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div className="flex-1">
-                                                                                        <span className="text-xs text-slate-400 dark:text-slate-500 block mb-1">Fim Previsto</span>
-                                                                                        <input
-                                                                                            type="date"
-                                                                                            value={step.end_date ? step.end_date.split('T')[0] : ''}
-                                                                                            disabled={!isActive && !isCompleted}
-                                                                                            onChange={(e) => handleUpdateTimelineStep(step.id, { end_date: e.target.value })}
-                                                                                            className="w-full text-sm p-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
-                                                                                        />
-                                                                                    </div>
+                                                                    <div className="px-6 pb-8 pt-2 border-t border-slate-800/50 bg-slate-900/50 animate-in slide-in-from-top-2 p-6">
+                                                                        {/* Top Row: Dates & Responsible */}
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                <div>
+                                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wider">Início</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        value={step.start_date ? step.start_date.split('T')[0] : ''}
+                                                                                        disabled={!isActive}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { start_date: e.target.value })}
+                                                                                        className="w-full text-sm py-2.5 px-3 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral focus:border-brand-coral outline-none transition-colors"
+                                                                                    />
+                                                                                </div>
+                                                                                {/* Removed End Date Input from prominent view as per 'Previsão' concept, but keeping it in state */}
+                                                                                <div>
+                                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wider">Fim Previsto</label>
+                                                                                    <input
+                                                                                        type="date"
+                                                                                        value={step.end_date ? step.end_date.split('T')[0] : ''}
+                                                                                        disabled={!isActive}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { end_date: e.target.value })}
+                                                                                        className="w-full text-sm py-2.5 px-3 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral focus:border-brand-coral outline-none transition-colors"
+                                                                                    />
                                                                                 </div>
                                                                             </div>
 
-                                                                            {/* Responsible */}
                                                                             <div>
-                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Responsável</label>
+                                                                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wider">Responsável</label>
                                                                                 <div className="relative">
                                                                                     <select
                                                                                         value={step.responsible_id || ''}
                                                                                         onChange={(e) => handleUpdateTimelineStep(step.id, { responsible_id: e.target.value })}
                                                                                         disabled={!isActive && !isCompleted}
-                                                                                        className="w-full text-sm p-2 pl-9 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none appearance-none"
+                                                                                        className="w-full text-sm py-2.5 pl-10 pr-4 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral focus:border-brand-coral outline-none appearance-none transition-colors cursor-pointer"
                                                                                     >
                                                                                         <option value="">Selecione...</option>
                                                                                         {appUsers.map(u => (
                                                                                             <option key={u.id} value={u.id}>{u.full_name || u.email || 'Usuário Sem Nome'}</option>
                                                                                         ))}
                                                                                     </select>
-                                                                                    <User className="absolute left-2.5 top-2.5 text-slate-400 dark:text-slate-500 w-4 h-4 pointer-events-none" />
+                                                                                    <User className="absolute left-3 top-3 text-slate-500 w-4 h-4 pointer-events-none" />
                                                                                 </div>
                                                                             </div>
                                                                         </div>
 
-                                                                        {/* Observations */}
-                                                                        {/* Checklist & Observations Split for Planning */}
+                                                                        {/* Planning Specific Layout */}
                                                                         {step.step_key === 'planning' ? (
-                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                                                                {/* Column 1: Checklist */}
+                                                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                                                {/* Left Column: Checklist */}
                                                                                 <div className="flex flex-col h-full">
-                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">Checklist</label>
-                                                                                    <div className="flex-1 space-y-2 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                                                    <div className="flex items-center justify-between mb-4">
+                                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Checklist de Atividades</label>
+                                                                                        <span className="text-[10px] font-bold text-brand-coral">{progress}% Concluído</span>
+                                                                                    </div>
+
+                                                                                    {/* Progress Bar */}
+                                                                                    <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
+                                                                                        <div
+                                                                                            className="h-full bg-gradient-to-r from-brand-coral to-red-500 shadow-[0_0_10px_rgba(255,107,107,0.5)] transition-all duration-500 ease-out"
+                                                                                            style={{ width: `${progress}%` }}
+                                                                                        ></div>
+                                                                                    </div>
+
+                                                                                    <div className="grid grid-cols-1 gap-3">
                                                                                         {PLANNING_CHECKLIST_ITEMS.map((item) => {
                                                                                             const isChecked = step.checklist_data?.[item] || false;
                                                                                             return (
-                                                                                                <label key={item} className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-green-50 dark:bg-green-900/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                                                                                                    <div className="relative flex items-center mt-0.5">
+                                                                                                <label key={item} className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all border
+                                                                                                    ${isChecked
+                                                                                                        ? 'bg-brand-coral/10 border-brand-coral/30'
+                                                                                                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'}`}>
+                                                                                                    <div className="relative flex items-center justify-center">
                                                                                                         <input
                                                                                                             type="checkbox"
                                                                                                             checked={isChecked}
                                                                                                             disabled={!isActive}
                                                                                                             onChange={() => handleToggleChecklist(step.id, item, step.checklist_data)}
-                                                                                                            className="peer h-4 w-4 rounded border-slate-300 text-brand-coral focus:ring-brand-coral"
+                                                                                                            className="appearance-none w-5 h-5 rounded border-2 border-slate-500 checked:bg-brand-coral checked:border-brand-coral transition-all cursor-pointer"
                                                                                                         />
+                                                                                                        {isChecked && <CheckCircle size={12} className="absolute text-white pointer-events-none" />}
                                                                                                     </div>
-                                                                                                    <span className={`text-sm ${isChecked ? 'text-slate-700 dark:text-slate-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                                                    <span className={`text-sm ${isChecked ? 'text-white font-semibold' : 'text-slate-400'}`}>
                                                                                                         {item}
                                                                                                     </span>
                                                                                                 </label>
@@ -794,72 +855,76 @@ const TrafficManagement: React.FC = () => {
                                                                                     </div>
                                                                                 </div>
 
-                                                                                {/* Column 2: Observations */}
+                                                                                {/* Right Column: Observations */}
                                                                                 <div className="flex flex-col h-full">
-                                                                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-3">Observações</label>
+                                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-wider">Observações</label>
                                                                                     <textarea
                                                                                         rows={12}
                                                                                         value={step.observations || ''}
                                                                                         onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
                                                                                         disabled={!isActive && !isCompleted}
-                                                                                        placeholder="Adicione notas sobre esta etapa..."
-                                                                                        className="flex-1 w-full text-sm p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                                                                        placeholder="Adicione notas estratégicas..."
+                                                                                        className="flex-1 w-full text-sm p-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral outline-none resize-none placeholder:text-slate-600"
                                                                                     />
                                                                                 </div>
                                                                             </div>
                                                                         ) : (
-                                                                            /* Standard Observations for other steps */
-                                                                            <div className="mb-6">
-                                                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Observações</label>
+                                                                            /* Standard View for other steps */
+                                                                            <div>
+                                                                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-3 tracking-wider">Observações</label>
                                                                                 <textarea
-                                                                                    rows={3}
+                                                                                    rows={4}
                                                                                     value={step.observations || ''}
                                                                                     onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
                                                                                     disabled={!isActive && !isCompleted}
                                                                                     placeholder="Adicione notas sobre esta etapa..."
-                                                                                    className="w-full text-sm p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                                                                    className="w-full text-sm p-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral outline-none resize-none placeholder:text-slate-600"
                                                                                 />
                                                                             </div>
                                                                         )}
 
-                                                                        {/* Action Buttons */}
-                                                                        <div className="flex justify-end gap-4 mt-4">
-                                                                            {isCompleted && (
+                                                                        {/* Footer Actions - Corporate Style */}
+                                                                        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800/50">
+                                                                            <div>
                                                                                 <button
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        handleUndoStep(step, campaign.id);
+                                                                                        setTaskContext({ campaignName: campaign.name || '', stepLabel: config.label });
+                                                                                        setShowTaskModal(true);
                                                                                     }}
-                                                                                    className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                                                    className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-xs font-bold uppercase tracking-wider"
                                                                                 >
-                                                                                    Desfazer / Reabrir
+                                                                                    <Plus size={16} />
+                                                                                    Nova Tarefa
                                                                                 </button>
-                                                                            )}
+                                                                            </div>
 
-                                                                            {isActive && (
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        handleCompleteStep(step, campaign.id);
-                                                                                    }}
-                                                                                    className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md shadow-green-200 dark:shadow-none"
-                                                                                >
-                                                                                    <CheckCircle size={18} />
-                                                                                    Concluir Etapa
-                                                                                </button>
-                                                                            )}
+                                                                            <div className="flex gap-3">
+                                                                                {isCompleted && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleUndoStep(step, campaign.id);
+                                                                                        }}
+                                                                                        className="px-6 py-2.5 border border-slate-600 text-slate-400 rounded-xl font-bold text-sm hover:bg-slate-800 hover:text-white transition-colors"
+                                                                                    >
+                                                                                        Reabrir Etapa
+                                                                                    </button>
+                                                                                )}
 
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setTaskContext({ campaignName: campaign.name || '', stepLabel: config.label });
-                                                                                    setShowTaskModal(true);
-                                                                                }}
-                                                                                className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                                                            >
-                                                                                <Plus size={18} />
-                                                                                Nova Tarefa
-                                                                            </button>
+                                                                                {isActive && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            handleCompleteStep(step, campaign.id);
+                                                                                        }}
+                                                                                        className="flex items-center gap-2 px-8 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20 transform hover:-translate-y-0.5"
+                                                                                    >
+                                                                                        <CheckCircle size={16} />
+                                                                                        Concluir Etapa
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 )}
