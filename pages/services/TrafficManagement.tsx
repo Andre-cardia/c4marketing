@@ -421,184 +421,190 @@ const TrafficManagement: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Onboarding Section */}
+                {/* Onboarding Section - Corporate Look */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    {/* 1. Survey */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Send className="w-5 h-5 text-blue-500" />
-                            Pesquisa Inicial
-                        </h3>
+                    {/* 1. Survey - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+                        <div className="flex flex-col h-full justify-between relative z-10">
+                            <div>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-slate-800 rounded-lg">
+                                        <Send className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Pesquisa Inicial</h3>
+                                </div>
+                            </div>
 
-                        {/* Content */}
-                        <div className="space-y-4 relative z-10">
-                            {/* Always visible: Send Link */}
-                            <button
-                                onClick={() => {
-                                    const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
-                                    navigator.clipboard.writeText(url);
-                                    alert('Link copiado para a área de transferência!');
-                                }}
-                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Send size={16} />
-                                Enviar Pesquisa
-                            </button>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/traffic-survey/${trafficProject?.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link copiado para a área de transferência!');
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-brand-coral/90 hover:bg-brand-coral text-white rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <Send size={16} />
+                                    Enviar Pesquisa
+                                </button>
 
-                            {/* Visibility Logic for Responses & Validation */}
-                            {trafficProject?.survey_data && (
-                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
-                                        {trafficProject.survey_status === 'completed' ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                <div className="pt-4 border-t border-slate-800">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</span>
+                                        {trafficProject?.survey_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10 text-xs font-bold border border-emerald-400/20">
                                                 <CheckCircle size={12} /> Validado
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-amber-400 bg-amber-400/10 text-xs font-bold border border-amber-400/20">
                                                 Pendente
                                             </span>
                                         )}
                                     </div>
 
-                                    <button
-                                        onClick={handleOpenSurveyModal}
-                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
-                                    >
-                                        Ver Respostas Recebidas
-                                    </button>
+                                    {trafficProject?.survey_data ? (
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                onClick={handleOpenSurveyModal}
+                                                className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                                            >
+                                                Ver Respostas Recebidas
+                                            </button>
 
-                                    {trafficProject.survey_status !== 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('survey_status', 'completed')}
-                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
-                                        >
-                                            <CheckCircle size={16} />
-                                            Validar & Concluir
-                                        </button>
-                                    )}
-
-                                    {trafficProject.survey_status === 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('survey_status', 'pending')}
-                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
-                                        >
-                                            <ArrowLeft size={12} />
-                                            Desvalidar Formulário
-                                        </button>
+                                            {trafficProject.survey_status !== 'completed' ? (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('survey_status', 'completed')}
+                                                    className="w-full py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                >
+                                                    Validar Formulário
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('survey_status', 'pending')}
+                                                    className="flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors mt-1"
+                                                >
+                                                    <ArrowLeft size={10} /> Desvalidar Formulário
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                         <p className="text-xs text-center text-slate-600 py-2">
+                                            Aguardando envio...
+                                        </p>
                                     )}
                                 </div>
-                            )}
-
-                            {!trafficProject?.survey_data && (
-                                <p className="text-xs text-center text-slate-400">
-                                    Aguardando resposta do cliente...
-                                </p>
-                            )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* 2. Account Setup / Access Config */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-purple-500" />
-                            Configuração
-                        </h3>
-
-                        <div className="space-y-4 relative z-10">
-                            {/* always visible: Send Link (Red button style like Pesquisa Inicial) */}
-                            <button
-                                onClick={() => {
-                                    const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
-                                    navigator.clipboard.writeText(url);
-                                    alert('Link copiado para a área de transferência!');
-                                }}
-                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Settings size={16} />
-                                Enviar Formulário
-                            </button>
-
-                            {/* Visibility Logic for Responses & Validation - Always visible as requested */}
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
-                                    {trafficProject?.account_setup_status === 'completed' ? (
-                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-                                            <CheckCircle size={12} /> Contas Vinculadas
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
-                                            Pendente
-                                        </span>
-                                    )}
+                    {/* 2. Account Setup - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+                        <div className="flex flex-col h-full justify-between relative z-10">
+                            <div>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-slate-800 rounded-lg">
+                                        <Settings className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Configuração</h3>
                                 </div>
+                            </div>
 
+                            <div className="space-y-4">
                                 <button
-                                    onClick={handleOpenAccessModal}
-                                    className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/traffic-access/${trafficProject?.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link copiado para a área de transferência!');
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-brand-coral/90 hover:bg-brand-coral text-white rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
                                 >
-                                    Ver Respostas Recebidas
+                                    <Settings size={16} />
+                                    Enviar Formulário
                                 </button>
 
-                                {trafficProject?.account_setup_status !== 'completed' && (
-                                    <button
-                                        onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                        className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
-                                    >
-                                        <CheckCircle size={16} />
-                                        Validar & Concluir
-                                    </button>
-                                )}
+                                <div className="pt-4 border-t border-slate-800">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</span>
+                                        {trafficProject?.account_setup_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10 text-xs font-bold border border-emerald-400/20">
+                                                <CheckCircle size={12} /> Contas Vinculadas
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-amber-400 bg-amber-400/10 text-xs font-bold border border-amber-400/20">
+                                                Pendente
+                                            </span>
+                                        )}
+                                    </div>
 
-                                {trafficProject?.account_setup_status === 'completed' && (
-                                    <button
-                                        onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
-                                        className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
-                                    >
-                                        <ArrowLeft size={12} />
-                                        Desvalidar Formulário
-                                    </button>
-                                )}
+                                    <div className="flex flex-col gap-2">
+                                        <button
+                                            onClick={handleOpenAccessModal}
+                                            className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                                        >
+                                            Ver Respostas Recebidas
+                                        </button>
+
+                                        {trafficProject?.account_setup_status !== 'completed' ? (
+                                            <button
+                                                onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                                className="w-full py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                            >
+                                                Validar Configuração
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                                className="flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors mt-1"
+                                            >
+                                                <ArrowLeft size={10} /> Desvalidar
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* 3. Strategy Meeting */}
-                    <div
-                        onClick={() => navigate(`/projects/${id}/traffic/strategy`)}
-                        className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors cursor-pointer"
-                    >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Users className="w-5 h-5 text-amber-500" />
-                            Reunião Estratégica
-                        </h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 relative z-10">
-                            Registre os objetivos, KPIs e público-alvo definidos.
-                        </p>
-                        <span className="text-sm font-bold text-amber-600 flex items-center gap-1 relative z-10">
-                            Acessar Pauta <ArrowLeft className="rotate-180 w-4 h-4" />
-                        </span>
+                    {/* 3. Strategy Meeting - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group flex flex-col">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 bg-slate-800 rounded-lg">
+                                    <Users className="w-6 h-6 text-slate-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white">Reunião Estratégica</h3>
+                            </div>
+                            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                                Registre os objetivos, KPIs e público-alvo para as campanhas. Defina a rota estratégica.
+                            </p>
+                        </div>
+                        
+                        <div>
+                             <button
+                                onClick={() => navigate(`/projects/${id}/traffic/strategy`)}
+                                className="text-sm font-bold text-brand-coral hover:text-brand-coral/80 flex items-center gap-2 transition-colors"
+                            >
+                                Acessar Pauta <ArrowLeft className="rotate-180 w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
-                    {/* 4. Action: New Campaign */}
-                    <div className="flex items-center justify-center">
-                        <button
+                    {/* 4. New Campaign - Dashed Outline Style */}
+                    <div className="flex items-center justify-center h-full">
+                         <button
                             onClick={() => setShowCampaignModal(true)}
                             disabled={!isOnboardingComplete}
-                            className={`w-full h-full min-h-[160px] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all
+                            className={`w-full h-full min-h-[280px] rounded-2xl border border-dashed flex flex-col items-center justify-center gap-4 transition-all group
                             ${isOnboardingComplete
-                                    ? 'border-brand-coral bg-brand-coral/5 hover:bg-brand-coral/10 text-brand-coral cursor-pointer'
-                                    : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70'}`}
+                                    ? 'border-slate-700 hover:border-brand-coral/50 bg-slate-900/50 hover:bg-slate-900 cursor-pointer'
+                                    : 'border-slate-800 bg-slate-900/20 opacity-50 cursor-not-allowed'}`}
                         >
-                            <div className={`p-3 rounded-full ${isOnboardingComplete ? 'bg-brand-coral text-white shadow-lg shadow-brand-coral/30' : 'bg-slate-200 text-slate-400'}`}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isOnboardingComplete ? 'bg-slate-800 text-slate-400 group-hover:bg-brand-coral group-hover:text-white' : 'bg-slate-800 text-slate-600'}`}>
                                 <Plus size={24} />
                             </div>
-                            <span className="font-bold text-lg">Nova Campanha</span>
-                            {!isOnboardingComplete && <span className="text-xs">Conclua o onboarding acima</span>}
+                            <span className={`text-xs font-bold tracking-widest uppercase ${isOnboardingComplete ? 'text-slate-400 group-hover:text-white' : 'text-slate-600'}`}>
+                                Nova Campanha
+                            </span>
                         </button>
                     </div>
                 </div>
