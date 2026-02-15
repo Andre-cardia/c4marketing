@@ -442,7 +442,7 @@ const TrafficManagement: React.FC = () => {
                                         navigator.clipboard.writeText(url);
                                         alert('Link copiado para a área de transferência!');
                                     }}
-                                    className="w-full py-2.5 px-4 bg-brand-coral/90 hover:bg-brand-coral text-white rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+                                    className="w-full py-2.5 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2"
                                 >
                                     <Send size={16} />
                                     Enviar Pesquisa
@@ -466,7 +466,7 @@ const TrafficManagement: React.FC = () => {
                                         <div className="flex flex-col gap-2">
                                             <button
                                                 onClick={handleOpenSurveyModal}
-                                                className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                                                className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-transparent border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
                                             >
                                                 Ver Respostas Recebidas
                                             </button>
@@ -516,7 +516,7 @@ const TrafficManagement: React.FC = () => {
                                         navigator.clipboard.writeText(url);
                                         alert('Link copiado para a área de transferência!');
                                     }}
-                                    className="w-full py-2.5 px-4 bg-brand-coral/90 hover:bg-brand-coral text-white rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+                                    className="w-full py-2.5 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2"
                                 >
                                     <Settings size={16} />
                                     Enviar Formulário
@@ -539,7 +539,7 @@ const TrafficManagement: React.FC = () => {
                                     <div className="flex flex-col gap-2">
                                         <button
                                             onClick={handleOpenAccessModal}
-                                            className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors"
+                                            className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-transparent border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
                                         >
                                             Ver Respostas Recebidas
                                         </button>
@@ -582,7 +582,7 @@ const TrafficManagement: React.FC = () => {
                         <div>
                             <button
                                 onClick={() => navigate(`/projects/${id}/traffic/strategy`)}
-                                className="text-sm font-bold text-brand-coral hover:text-brand-coral/80 flex items-center gap-2 transition-colors"
+                                className="w-full py-3 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2"
                             >
                                 Acessar Pauta <ArrowLeft className="rotate-180 w-4 h-4" />
                             </button>
@@ -633,9 +633,9 @@ const TrafficManagement: React.FC = () => {
                                     <div className="px-8 py-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
                                         <div className="flex items-center gap-4">
                                             <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest border bg-transparent ${campaign.platform === 'google_ads' ? 'border-blue-500/30 text-blue-400' :
-                                                    campaign.platform === 'meta_ads' ? 'border-indigo-500/30 text-indigo-400' :
-                                                        campaign.platform === 'linkedin_ads' ? 'border-sky-500/30 text-sky-400' :
-                                                            'border-pink-500/30 text-pink-400'
+                                                campaign.platform === 'meta_ads' ? 'border-indigo-500/30 text-indigo-400' :
+                                                    campaign.platform === 'linkedin_ads' ? 'border-sky-500/30 text-sky-400' :
+                                                        'border-pink-500/30 text-pink-400'
                                                 }`}>
                                                 {formatPlatform(campaign.platform)}
                                             </span>
