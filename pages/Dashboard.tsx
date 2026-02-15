@@ -267,11 +267,11 @@ const Dashboard: React.FC = () => {
                 {/* Top Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Revenue Card */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-green-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-green-500/10"></div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-xl">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
                                     <DollarSign size={24} />
                                 </div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Receita Estimada (MRR)</span>
@@ -279,18 +279,18 @@ const Dashboard: React.FC = () => {
                             <div className="text-3xl font-black text-slate-800 dark:text-white">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(revenue).replace('R$', 'R$ ')}
                             </div>
-                            <div className="text-xs text-green-500 font-bold mt-2 flex items-center gap-1">
+                            <div className="text-xs text-emerald-500 font-bold mt-2 flex items-center gap-1">
                                 <TrendingUp size={12} /> +12% vs. mês anterior
                             </div>
                         </div>
                     </div>
 
                     {/* Active Projects Card */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10"></div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
                                     <Briefcase size={24} />
                                 </div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Projetos Ativos</span>
@@ -305,11 +305,11 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* Funnel Card */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-brand-coral/10 text-brand-coral rounded-xl">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
                                     <Target size={24} />
                                 </div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Taxa de Conversão</span>
@@ -325,13 +325,13 @@ const Dashboard: React.FC = () => {
 
                     {/* Critical Tasks Card */}
                     <div
-                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-red-300 dark:hover:border-red-900 transition-colors"
+                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-brand-coral/50 transition-colors"
                         onClick={handleOpenCriticalList}
                     >
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-red-500/10"></div>
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
                                     <AlertTriangle size={24} />
                                 </div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Tarefas Críticas</span>
@@ -339,7 +339,7 @@ const Dashboard: React.FC = () => {
                             <div className="text-3xl font-black text-slate-800 dark:text-white">
                                 {criticalTasks.length}
                             </div>
-                            <div className="text-xs text-red-500 font-bold mt-2 flex items-center gap-1 text-left">
+                            <div className="text-xs text-brand-coral font-bold mt-2 flex items-center gap-1 text-left">
                                 Clique para visualizar <ArrowRight size={12} />
                             </div>
                         </div>
@@ -572,7 +572,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => navigate('/projects')}
                         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
-                        <div className="bg-brand-coral/10 w-12 h-12 flex items-center justify-center rounded-2xl text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
+                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
                             <Briefcase className="w-6 h-6" />
                         </div>
                         <div>
@@ -585,7 +585,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => navigate('/proposals')}
                         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
-                        <div className="bg-blue-50 dark:bg-blue-900/20 w-12 h-12 flex items-center justify-center rounded-2xl text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
                             <FileText className="w-6 h-6" />
                         </div>
                         <div>
@@ -598,7 +598,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => navigate('/users')}
                         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
-                        <div className="bg-slate-100 dark:bg-slate-700 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-300 group-hover:bg-slate-800 dark:group-hover:bg-slate-600 group-hover:text-white transition-colors">
+                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
                             <Users className="w-6 h-6" />
                         </div>
                         <div>

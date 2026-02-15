@@ -7,7 +7,7 @@ interface Task {
     id?: string;
     project_id: number;
     title: string;
-    description: string;
+    description?: string;
     status: 'backlog' | 'in_progress' | 'approval' | 'done' | 'paused';
     priority: 'low' | 'medium' | 'high';
     assignee: string;
