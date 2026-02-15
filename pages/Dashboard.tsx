@@ -6,9 +6,9 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
     Users, Building, FileText, Calendar, LogOut, Plus, Link as LinkIcon,
-    ExternalLink, Trash2, Moon, Sun, Bell, DollarSign, TrendingUp,
+    ExternalLink, Trash2, Moon, Sun, Bell, LayoutDashboard, ListTodo,
     Briefcase, AlertTriangle, CheckCircle, Clock, Activity, Target,
-    X, ArrowRight
+    X, ArrowRight, BarChart2
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 
@@ -82,8 +82,9 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     // Derived State
-    const [revenue, setRevenue] = useState(0);
     const [criticalTasks, setCriticalTasks] = useState<Task[]>([]);
+    const [myPriorityTasks, setMyPriorityTasks] = useState<Task[]>([]);
+    const [deliveriesThisWeek, setDeliveriesThisWeek] = useState<number>(0);
 
     // Modal States
     const [showCriticalListModal, setShowCriticalListModal] = useState(false);
@@ -120,18 +121,55 @@ const Dashboard: React.FC = () => {
         return [];
     };
 
-    const calculateRevenue = async (acceptancesData: Acceptance[]) => {
-        let total = 0;
-        for (const acc of acceptancesData) {
-            if (acc.status === 'Ativo' || acc.status === 'Onboarding' || !acc.status) {
-                if (acc.contract_snapshot?.proposal?.services) {
-                    acc.contract_snapshot.proposal.services.forEach((s: any) => {
-                        total += Number(s.price || 0);
-                    });
-                }
-            }
-        }
-        setRevenue(total);
+    const calculateOperationalStats = (tasksData: Task[]) => {
+        // Calculate Deliveries for next 7 days
+        const today = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(today.getDate() + 7);
+
+        const deliveries = tasksData.filter(t => {
+            if (!t.due_date) return false;
+            const date = new Date(t.due_date);
+            return date >= today && date <= nextWeek && t.status !== 'done';
+        }).length;
+        setDeliveriesThisWeek(deliveries);
+
+        // Filter My Priority Tasks (Assuming 'Gestor' sees all high priority, others see assigned)
+        // For simplicity in this demo, showing all high priority not done
+        setMyPriorityTasks(tasksData.filter(t => t.priority === 'high' && t.status !== 'done'));
+    };
+
+    const getProjectProgress = (projectId: number) => {
+        const projectTasks = tasks.filter(t => t.project_id === projectId);
+        if (projectTasks.length === 0) return 0;
+        const done = projectTasks.filter(t => t.status === 'done').length;
+        return Math.round((done / projectTasks.length) * 100);
+    };
+
+    const getProjectServices = (acceptance: Acceptance) => {
+        if (!acceptance.contract_snapshot?.proposal?.services) return ['Consultoria Geral'];
+        return acceptance.contract_snapshot.proposal.services.map((s: any) => {
+            // Map IDs to readable names if needed, or use existing naming convention
+            // Assuming services have a 'name' or we derive from ID
+            // If service object structure is { id: 'traffic_management', price: ... }
+            const serviceMap: { [key: string]: string } = {
+                'traffic_management': 'Tráfego Pago',
+                'landing_page': 'Landing Page',
+                'social_media': 'Social Media',
+                'consulting': 'Consultoria',
+                'web_design': 'Website',
+                'crm_setup': 'Imp. CRM'
+            };
+            return serviceMap[s.id] || s.id || 'Serviço';
+        });
+    };
+
+    const getNextDeadline = (projectId: number) => {
+        const projectTasks = tasks.filter(t => t.project_id === projectId && t.status !== 'done' && t.due_date);
+        if (projectTasks.length === 0) return null;
+        // Sort by date
+        const sorted = [...projectTasks].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+        return sorted[0].due_date;
     };
 
     const fetchProposals = async () => {
@@ -161,7 +199,9 @@ const Dashboard: React.FC = () => {
             }));
 
             setTasks(enrichedTasks);
+            setTasks(enrichedTasks);
             setCriticalTasks(enrichedTasks.filter((t: Task) => t.priority === 'high' && t.status !== 'done'));
+            calculateOperationalStats(enrichedTasks);
         }
     };
 
@@ -266,31 +306,13 @@ const Dashboard: React.FC = () => {
 
                 {/* Top Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Revenue Card */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
-                                    <DollarSign size={24} />
-                                </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Receita Estimada (MRR)</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(revenue).replace('R$', 'R$ ')}
-                            </div>
-                            <div className="text-xs text-emerald-500 font-bold mt-2 flex items-center gap-1">
-                                <TrendingUp size={12} /> +12% vs. mês anterior
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Active Projects Card */}
+                    {/* Active Projects */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-blue-500 rounded-xl">
                                     <Briefcase size={24} />
                                 </div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Projetos Ativos</span>
@@ -299,48 +321,67 @@ const Dashboard: React.FC = () => {
                                 {clientStatusCounts.active}
                             </div>
                             <div className="text-xs text-slate-400 mt-2">
-                                {clientStatusCounts.onboarding} em onboarding
+                                + {clientStatusCounts.onboarding} em onboarding
                             </div>
                         </div>
                     </div>
 
-                    {/* Funnel Card */}
+                    {/* Deliveries This Week */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-purple-500/10"></div>
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-purple-500 rounded-xl">
+                                    <Target size={24} />
+                                </div>
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Entregas (7 dias)</span>
+                            </div>
+                            <div className="text-3xl font-black text-slate-800 dark:text-white">
+                                {deliveriesThisWeek}
+                            </div>
+                            <div className="text-xs text-purple-500 font-bold mt-2">
+                                Foco total!
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* My Priorities */}
+                    <div
+                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-brand-coral/50 transition-all"
+                        onClick={handleOpenCriticalList}
+                    >
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-red-500/10"></div>
+                        <div className="relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-red-500 rounded-xl">
+                                    <AlertTriangle size={24} />
+                                </div>
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Prioridades Altas</span>
+                            </div>
+                            <div className="text-3xl font-black text-slate-800 dark:text-white">
+                                {myPriorityTasks.length}
+                            </div>
+                            <div className="text-xs text-red-500 font-bold mt-2 flex items-center gap-1">
+                                Ver lista <ArrowRight size={12} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Active Notices */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
-                                    <Target size={24} />
+                                    <Bell size={24} />
                                 </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Taxa de Conversão</span>
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Avisos Ativos</span>
                             </div>
                             <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {proposals.length > 0 ? ((acceptances.length / proposals.length) * 100).toFixed(1) : 0}%
+                                {notices.length}
                             </div>
                             <div className="text-xs text-slate-400 mt-2">
-                                {proposals.length} propostas enviadas
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Critical Tasks Card */}
-                    <div
-                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-brand-coral/50 transition-colors"
-                        onClick={handleOpenCriticalList}
-                    >
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
-                                    <AlertTriangle size={24} />
-                                </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Tarefas Críticas</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {criticalTasks.length}
-                            </div>
-                            <div className="text-xs text-brand-coral font-bold mt-2 flex items-center gap-1 text-left">
-                                Clique para visualizar <ArrowRight size={12} />
+                                Fique atento
                             </div>
                         </div>
                     </div>
@@ -349,78 +390,114 @@ const Dashboard: React.FC = () => {
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
 
-                    {/* Left Column: Charts & Analysis */}
+                    {/* Left Column: Projects & Services */}
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Commercial Performance Chart */}
+
+                        {/* Service Progress Tracking */}
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-brand-coral" />
-                                    Performance Semestral
+                                    <LayoutDashboard className="w-5 h-5 text-brand-coral" />
+                                    Acompanhamento de Serviços
                                 </h3>
-                                <div className="flex gap-4 text-xs font-bold">
-                                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> Criadas</div>
-                                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-brand-coral"></div> Aceitas</div>
+                                <button onClick={() => navigate('/projects')} className="text-xs text-brand-coral font-bold hover:underline">Ver Todos os Projetos</button>
+                            </div>
+
+                            {acceptances.filter(a => a.status === 'Ativo').length === 0 ? (
+                                <p className="text-slate-400 text-center py-8">Nenhum projeto ativo com serviços rastreados.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
+                                                <th className="py-3 pl-2">Cliente / Projeto</th>
+                                                <th className="py-3">Serviços</th>
+                                                <th className="py-3 w-1/4">Progresso Geral</th>
+                                                <th className="py-3">Próximo Prazo</th>
+                                                <th className="py-3 text-right pr-2">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-sm">
+                                            {acceptances.filter(a => a.status === 'Ativo').slice(0, 5).map((project) => {
+                                                const progress = getProjectProgress(project.id);
+                                                const nextDeadline = getNextDeadline(project.id);
+                                                const services = getProjectServices(project);
+
+                                                return (
+                                                    <tr key={project.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                        <td className="py-4 pl-2 font-bold text-slate-800 dark:text-white">
+                                                            {project.company_name}
+                                                        </td>
+                                                        <td className="py-4">
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {services.slice(0, 2).map((s, i) => (
+                                                                    <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase rounded-md border border-slate-200 dark:border-slate-700">
+                                                                        {s}
+                                                                    </span>
+                                                                ))}
+                                                                {services.length > 2 && (
+                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 text-[10px] font-bold rounded-md">+{services.length - 2}</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 pr-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-brand-coral'}`}
+                                                                        style={{ width: `${progress}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                                <span className="text-xs font-bold text-slate-500 w-8 text-right">{progress}%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4">
+                                                            {nextDeadline ? (
+                                                                <div className="flex items-center gap-1.5 text-xs">
+                                                                    <Clock size={12} className={new Date(nextDeadline) < new Date() ? 'text-red-500' : 'text-slate-400'} />
+                                                                    <span className={new Date(nextDeadline) < new Date() ? 'text-red-500 font-bold' : 'text-slate-600 dark:text-slate-300'}>
+                                                                        {new Date(nextDeadline).toLocaleDateString()}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400">-</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-4 text-right pr-2">
+                                                            <button
+                                                                onClick={() => navigate('/projects')} // Ideally open specific project modal
+                                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors"
+                                                            >
+                                                                <ArrowRight size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            </div>
-
-                            {/* Simple CSS Bar Chart Implementation */}
-                            <div className="h-64 flex items-end justify-between gap-2">
-                                {(() => {
-                                    const months = [];
-                                    for (let i = 5; i >= 0; i--) {
-                                        const d = new Date();
-                                        d.setMonth(d.getMonth() - i);
-                                        months.push(d);
-                                    }
-
-                                    return months.map((date, idx) => {
-                                        const mKey = date.toISOString().slice(0, 7); // YYYY-MM
-                                        const created = proposals.filter(p => p.created_at.startsWith(mKey)).length;
-                                        const accepted = acceptances.filter(a => a.timestamp.startsWith(mKey)).length;
-                                        const max = Math.max(1, ...months.map(m => {
-                                            const k = m.toISOString().slice(0, 7);
-                                            return Math.max(
-                                                proposals.filter(p => p.created_at.startsWith(k)).length,
-                                                acceptances.filter(a => a.timestamp.startsWith(k)).length
-                                            );
-                                        }));
-
-                                        return (
-                                            <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group">
-                                                <div className="w-full flex justify-center items-end gap-1 h-full pb-2 relative">
-                                                    <div className="absolute -top-8 bg-slate-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                                                        {created} / {accepted}
-                                                    </div>
-                                                    <div style={{ height: `${(created / max) * 100}%` }} className="w-3 md:w-6 bg-slate-200 dark:bg-slate-700 rounded-t-lg transition-all duration-500 hover:bg-slate-300"></div>
-                                                    <div style={{ height: `${(accepted / max) * 100}%` }} className="w-3 md:w-6 bg-brand-coral rounded-t-lg transition-all duration-500 opacity-90 hover:opacity-100"></div>
-                                                </div>
-                                                <span className="text-xs text-slate-400 font-medium uppercase">{date.toLocaleString('default', { month: 'short' })}</span>
-                                            </div>
-                                        )
-                                    });
-                                })()}
-                            </div>
+                            )}
                         </div>
 
-                        {/* Recent Critical Tasks */}
+                        {/* Recent Critical Tasks (Redesigned) */}
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-red-500" />
+                                    <ListTodo className="w-5 h-5 text-red-500" />
                                     Prioridades
                                 </h3>
                                 <button onClick={handleOpenCriticalList} className="text-xs text-brand-coral font-bold hover:underline">Ver Todas</button>
                             </div>
 
                             {criticalTasks.length === 0 ? (
-                                <p className="text-slate-400 text-center py-8">Nenhuma tarefa crítica pendente.</p>
+                                <p className="text-slate-400 text-center py-8">Nenhuma tarefa crítica pendente. Tudo em dia!</p>
                             ) : (
                                 <div className="space-y-3">
                                     {criticalTasks.slice(0, 5).map(task => (
                                         <div
                                             key={task.id}
-                                            className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors group"
+                                            className="flex items-center justify-between p-4 bg-red-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl cursor-pointer hover:border-red-200 dark:hover:border-red-900/50 transition-colors group"
                                             onClick={() => handleOpenTask(task)}
                                         >
                                             <div>
@@ -428,11 +505,14 @@ const Dashboard: React.FC = () => {
                                                 <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                                                     <span className="font-semibold text-slate-600 dark:text-slate-400">{task.project_name}</span>
                                                     <span>•</span>
-                                                    <Clock size={12} /> Prazo: {new Date(task.due_date).toLocaleDateString()}
+                                                    <Clock size={12} className={new Date(task.due_date) < new Date() ? 'text-red-500' : ''} />
+                                                    <span className={new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}>
+                                                        {new Date(task.due_date).toLocaleDateString()}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-red-500 text-xs font-bold rounded-full shadow-sm">
+                                                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-red-500 text-xs font-bold rounded-full shadow-sm border border-slate-100 dark:border-slate-700">
                                                     Urgente
                                                 </span>
                                                 <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
