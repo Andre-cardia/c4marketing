@@ -412,7 +412,7 @@ const Account: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
             <Header />
             <main className="max-w-6xl mx-auto px-4 py-8">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-8">Minha Conta</h1>
@@ -422,7 +422,7 @@ const Account: React.FC = () => {
                     {/* Left Column: Profile & Password */}
                     <div className="space-y-8">
                         {/* Profile Section */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
                             <div className="h-24 bg-gradient-to-r from-brand-coral to-pink-600 opacity-90"></div>
                             <div className="px-6 pb-6">
                                 <div className="relative flex justify-center -mt-12 mb-4">
@@ -457,7 +457,7 @@ const Account: React.FC = () => {
                                             type="text"
                                             value={fullName}
                                             onChange={(e) => setFullName(e.target.value)}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         />
                                     </div>
                                     <div>
@@ -471,7 +471,7 @@ const Account: React.FC = () => {
                                                 setCalComLink(val);
                                             }}
                                             placeholder="Ex: andre-cardia/reuniao-da-equipe"
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         />
                                         <p className="text-[10px] text-slate-400 mt-1">Este link será usado para o botão "Agendar Reunião Interna".</p>
                                     </div>
@@ -481,7 +481,7 @@ const Account: React.FC = () => {
                                             type="text"
                                             value={email || ''}
                                             disabled
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
                                         />
                                     </div>
                                     <div>
@@ -490,7 +490,7 @@ const Account: React.FC = () => {
                                             type="text"
                                             value={getRoleLabel(userRole)}
                                             disabled
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
+                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
                                         />
                                     </div>
                                     <button
@@ -506,8 +506,8 @@ const Account: React.FC = () => {
                         </div>
 
                         {/* Password Change Section */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
                                 <Key className="text-slate-400" size={20} />
                                 <h3 className="font-bold text-slate-800 dark:text-white">Segurança</h3>
                             </div>
@@ -517,7 +517,7 @@ const Account: React.FC = () => {
                                         type={showPassword ? "text" : "password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         placeholder="Nova Senha"
                                     />
                                 </div>
@@ -526,7 +526,7 @@ const Account: React.FC = () => {
                                         type={showPassword ? "text" : "password"}
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                         placeholder="Confirmar Senha"
                                     />
                                     <button
@@ -554,8 +554,8 @@ const Account: React.FC = () => {
                     <div className="lg:col-span-2 space-y-8">
 
                         {/* Meetings Section */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
                                         <Calendar size={20} />
@@ -583,9 +583,9 @@ const Account: React.FC = () => {
                                 ) : (
                                     <div className="space-y-3">
                                         {myBookings.map(booking => (
-                                            <div key={booking.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-700 rounded-xl hover:border-brand-coral/50 transition-colors">
+                                            <div key={booking.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-800 rounded-xl hover:border-brand-coral/50 transition-colors">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
+                                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
                                                         <span className="text-xs font-bold text-slate-500 uppercase">
                                                             {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
                                                         </span>
@@ -679,7 +679,7 @@ const Account: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[500px] flex flex-col">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[500px] flex flex-col">
                             <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
@@ -710,7 +710,7 @@ const Account: React.FC = () => {
                                 ) : (
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-700">
+                                            <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
                                                 <th className="py-3 pl-2">Tarefa</th>
                                                 <th className="py-3">Projeto</th>
                                                 <th className="py-3">Prazo</th>

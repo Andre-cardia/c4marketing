@@ -188,8 +188,8 @@ const Projects: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-            <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+            <Header />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
                     <div>
@@ -203,7 +203,7 @@ const Projects: React.FC = () => {
                             placeholder="Buscar projeto..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:border-brand-coral outline-none transition-all w-64"
+                            className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
                         />
                     </div>
                 </div>
@@ -211,17 +211,17 @@ const Projects: React.FC = () => {
                 {loading ? (
                     <div className="p-12 text-center text-slate-400">Carregando projetos...</div>
                 ) : projects.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700">
+                    <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
                         <Folder className="w-12 h-12 mb-4 mx-auto opacity-20" />
                         <p>Nenhum projeto ativo encontrado.</p>
                         <p className="text-xs mt-2">Certifique-se de que os contratos foram aceitos e marcados como 'Ativo'.</p>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
                                         <th
                                             className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
                                             onClick={() => handleSort('company_name')}
@@ -278,7 +278,7 @@ const Projects: React.FC = () => {
                                                                 <button
                                                                     key={index}
                                                                     onClick={() => navigate(getServiceRoute(serviceId, project.id))}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-white dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 hover:border-brand-coral dark:hover:border-brand-coral transition-all text-xs font-medium group"
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-800 hover:border-brand-coral dark:hover:border-brand-coral transition-all text-xs font-medium group"
                                                                     title={getServiceLabel(serviceId)}
                                                                 >
                                                                     {getServiceIcon(serviceId)}

@@ -34,7 +34,7 @@ const NoticeCard: React.FC<NoticeCardProps> = ({
     const priorityConfig = {
         normal: {
             border: 'border-slate-200 dark:border-slate-700',
-            bg: 'bg-white dark:bg-slate-800',
+            bg: 'bg-white dark:bg-slate-900',
             icon: Info,
             iconColor: 'text-slate-400',
             label: 'Normal'

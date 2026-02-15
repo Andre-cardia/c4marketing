@@ -29,8 +29,8 @@ const AccessGuideModal: React.FC<AccessGuideModalProps> = ({ isOpen, onClose, da
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
                             <Key size={24} />
@@ -63,7 +63,7 @@ const AccessGuideModal: React.FC<AccessGuideModalProps> = ({ isOpen, onClose, da
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {sections.map(section => (
-                                <div key={section.title} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-700">
+                                <div key={section.title} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-800">
                                     <div className="flex items-center gap-2 mb-4 text-purple-600 dark:text-purple-400">
                                         <section.icon size={18} />
                                         <h3 className="font-bold">{section.title}</h3>
@@ -76,7 +76,7 @@ const AccessGuideModal: React.FC<AccessGuideModalProps> = ({ isOpen, onClose, da
                                                     <span className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
                                                         {formatLabel(key)}
                                                     </span>
-                                                    <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
+                                                    <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">
                                                         <span className={`font-mono ${isPassword(key) && !showPasswords ? 'blur-sm' : ''} text-slate-700 dark:text-slate-300`}>
                                                             {isPassword(key) && !showPasswords ? '••••••••' : data[key]}
                                                         </span>
@@ -101,7 +101,7 @@ const AccessGuideModal: React.FC<AccessGuideModalProps> = ({ isOpen, onClose, da
                 <div className="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-colors"
+                        className="px-6 py-2 bg-slate-800 dark:bg-slate-700 text-white font-bold rounded-xl hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
                     >
                         Fechar
                     </button>

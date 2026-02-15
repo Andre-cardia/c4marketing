@@ -135,10 +135,10 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-slate-50 dark:bg-slate-900 w-full h-full max-w-[95vw] max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-slate-50 dark:bg-slate-950 w-full h-full max-w-[95vw] max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
 
                 {/* Header */}
-                <div className="bg-white dark:bg-slate-800 px-8 py-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                             {project.company_name}
@@ -176,12 +176,12 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                     key={col.id}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, col.id)}
-                                    className={`w-80 flex flex-col h-full rounded-2xl bg-white dark:bg-slate-800 border-t-4 transition-colors ${colTasks.length === 0 && 'opacity-80'}`}
+                                    className={`w-80 flex flex-col h-full rounded-2xl bg-white dark:bg-slate-900 border-t-4 transition-colors ${colTasks.length === 0 && 'opacity-80'}`}
                                     style={{ borderColor: col.id === 'done' ? '#10b981' : col.id === 'backlog' ? '#cbd5e1' : col.id === 'in_progress' ? '#3b82f6' : col.id === 'approval' ? '#a855f7' : '#f59e0b' }}
                                 >
 
                                     {/* Column Header */}
-                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                                         <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
                                             <col.icon size={18} className={col.color} />
                                             {col.title}
@@ -199,7 +199,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, task.id)}
                                                 onClick={() => handleEditTask(task)}
-                                                className="bg-white dark:bg-slate-700 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-coral transition-all group relative animate-in fade-in zoom-in duration-200"
+                                                className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-coral transition-all group relative animate-in fade-in zoom-in duration-200"
                                             >
                                                 {task.priority === 'high' && (
                                                     <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" title="Prioridade Alta"></div>

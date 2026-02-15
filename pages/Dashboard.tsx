@@ -259,7 +259,7 @@ const Dashboard: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
             <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -267,7 +267,7 @@ const Dashboard: React.FC = () => {
                 {/* Top Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Revenue Card */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-green-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-green-500/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
@@ -286,7 +286,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* Active Projects Card */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
@@ -305,7 +305,7 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* Funnel Card */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
                         <div className="relative">
                             <div className="flex items-center gap-3 mb-4">
@@ -325,7 +325,7 @@ const Dashboard: React.FC = () => {
 
                     {/* Critical Tasks Card */}
                     <div
-                        className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group cursor-pointer hover:border-red-300 dark:hover:border-red-900 transition-colors"
+                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-red-300 dark:hover:border-red-900 transition-colors"
                         onClick={handleOpenCriticalList}
                     >
                         <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-red-500/10"></div>
@@ -352,7 +352,7 @@ const Dashboard: React.FC = () => {
                     {/* Left Column: Charts & Analysis */}
                     <div className="lg:col-span-2 space-y-8">
                         {/* Commercial Performance Chart */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <FileText className="w-5 h-5 text-brand-coral" />
@@ -404,7 +404,7 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Recent Critical Tasks */}
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <Activity className="w-5 h-5 text-red-500" />
@@ -432,7 +432,7 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                <span className="px-3 py-1 bg-white dark:bg-slate-800 text-red-500 text-xs font-bold rounded-full shadow-sm">
+                                                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-red-500 text-xs font-bold rounded-full shadow-sm">
                                                     Urgente
                                                 </span>
                                                 <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -448,7 +448,7 @@ const Dashboard: React.FC = () => {
                     <div className="space-y-8">
 
                         {/* Upcoming Meetings (Next 7 Days) */}
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <Calendar className="w-5 h-5 text-brand-coral" />
@@ -464,8 +464,8 @@ const Dashboard: React.FC = () => {
                             ) : (
                                 <div className="space-y-3">
                                     {upcomingBookings.slice(0, 5).map(booking => (
-                                        <div key={booking.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-700">
-                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm shrink-0">
+                                        <div key={booking.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm shrink-0">
                                                 <span className="text-[10px] font-bold text-slate-500 uppercase">
                                                     {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
                                                 </span>
@@ -496,7 +496,7 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Global Task Status */}
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
                                 <CheckCircle className="w-5 h-5 text-blue-500" />
                                 Status Global
@@ -534,7 +534,7 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Notices */}
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm flex-1">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <Bell className="w-5 h-5 text-brand-coral" />
@@ -570,7 +570,7 @@ const Dashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <button
                         onClick={() => navigate('/projects')}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
                         <div className="bg-brand-coral/10 w-12 h-12 flex items-center justify-center rounded-2xl text-brand-coral group-hover:bg-brand-coral group-hover:text-white transition-colors">
                             <Briefcase className="w-6 h-6" />
@@ -583,7 +583,7 @@ const Dashboard: React.FC = () => {
                     {/* ... other buttons ... */}
                     <button
                         onClick={() => navigate('/proposals')}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
                         <div className="bg-blue-50 dark:bg-blue-900/20 w-12 h-12 flex items-center justify-center rounded-2xl text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                             <FileText className="w-6 h-6" />
@@ -596,7 +596,7 @@ const Dashboard: React.FC = () => {
 
                     <button
                         onClick={() => navigate('/users')}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
                     >
                         <div className="bg-slate-100 dark:bg-slate-700 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-300 group-hover:bg-slate-800 dark:group-hover:bg-slate-600 group-hover:text-white transition-colors">
                             <Users className="w-6 h-6" />
@@ -612,7 +612,7 @@ const Dashboard: React.FC = () => {
                 {showCriticalListModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
                         <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-2xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
-                            <div className="bg-white dark:bg-slate-800 px-8 py-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                            <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                     <AlertTriangle className="text-red-500" />
                                     Tarefas Críticas
@@ -630,7 +630,7 @@ const Dashboard: React.FC = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {tasksToView.map(task => (
-                                            <div key={task.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex justify-between items-center group">
+                                            <div key={task.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex justify-between items-center group">
                                                 <div>
                                                     <h4 className="font-bold text-slate-800 dark:text-slate-200 text-lg">{task.title}</h4>
                                                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-500 mt-1">

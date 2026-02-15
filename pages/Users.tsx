@@ -243,8 +243,8 @@ const Users: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-            <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+            <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-end mb-8">
@@ -273,7 +273,7 @@ const Users: React.FC = () => {
                 </div>
 
                 {/* Users List */}
-                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                     {loading ? (
                         <div className="p-12 text-center text-slate-400">Carregando usuários...</div>
                     ) : users.length === 0 ? (
@@ -285,7 +285,7 @@ const Users: React.FC = () => {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                                    <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
                                         <th className="p-5 font-bold">Usuário</th>
                                         <th className="p-5 font-bold">Contato</th>
                                         <th className="p-5 font-bold">Nível de Acesso</th>
@@ -353,7 +353,7 @@ const Users: React.FC = () => {
             {/* Create User Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in duration-300 border border-slate-200 dark:border-slate-700">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in duration-300 border border-slate-200 dark:border-slate-800">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="bg-brand-coral/10 p-3 rounded-xl text-brand-coral">
                                 <Shield className="w-6 h-6" />
@@ -372,7 +372,7 @@ const Users: React.FC = () => {
                                     required
                                     value={newUser.name}
                                     onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
                                     placeholder="Ex: Ana Souza"
                                 />
                             </div>
@@ -384,7 +384,7 @@ const Users: React.FC = () => {
                                         required
                                         value={newUser.email}
                                         onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
                                         placeholder="email@c4.com"
                                     />
                                 </div>
@@ -395,7 +395,7 @@ const Users: React.FC = () => {
                                         required
                                         value={newUser.phone}
                                         onChange={e => setNewUser({ ...newUser, phone: e.target.value })}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
                                         placeholder="(11) 99999-9999"
                                     />
                                 </div>
@@ -408,7 +408,7 @@ const Users: React.FC = () => {
                                     required
                                     value={newUser.password}
                                     onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:border-brand-coral outline-none"
                                     placeholder="••••••••"
                                     minLength={6}
                                 />
@@ -461,7 +461,7 @@ const Users: React.FC = () => {
             {/* Notice Creation Modal */}
             {showNoticeModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="p-8">
                             <div className="flex justify-between items-start mb-6">
                                 <div>
