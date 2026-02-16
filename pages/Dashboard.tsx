@@ -118,28 +118,30 @@ const Dashboard: React.FC = () => {
 
     // -- Access Control Logic --
     const logAccess = async () => {
-        const lastLog = localStorage.getItem('lastAccessLog');
-        const now = new Date();
-
-        // Debounce: Log only if last log was > 30 minutes ago
-        if (lastLog) {
-            const lastDate = new Date(lastLog);
-            const diffInMinutes = (now.getTime() - lastDate.getTime()) / (1000 * 60);
-            if (diffInMinutes < 30) return;
-        }
-
         const { data: { user } } = await supabase.auth.getUser();
+
         if (user) {
+            const lastLogKey = `lastAccessLog_${user.id}`;
+            const lastLog = localStorage.getItem(lastLogKey);
+            const now = new Date();
+
+            // Debounce: Log only if last log was > 30 minutes ago
+            if (lastLog) {
+                const lastDate = new Date(lastLog);
+                const diffInMinutes = (now.getTime() - lastDate.getTime()) / (1000 * 60);
+                if (diffInMinutes < 30) return;
+            }
+
             await supabase.from('access_logs').insert([{
                 user_id: user.id,
                 user_email: user.email
             }]);
-            localStorage.setItem('lastAccessLog', now.toISOString());
+            localStorage.setItem(lastLogKey, now.toISOString());
         }
     };
 
     const fetchAccessLogs = async () => {
-        const { data } = await supabase.from('access_logs').select('*').order('accessed_at', { ascending: false }).limit(20);
+        const { data } = await supabase.from('access_logs').select('*').order('accessed_at', { ascending: false }).limit(100);
         if (data) {
             setAccessLogs(data);
         }
@@ -168,18 +170,29 @@ const Dashboard: React.FC = () => {
 
     // Re-enrich access logs when usersMap changes
     const enrichedAccessLogs = useMemo(() => {
-        return accessLogs.map(log => {
-            // Try finding user by ID (if app_users.id matches auth.id)
-            let user = usersMap.get(log.user_id);
-            // If not found, try by email (if log has email)
-            if (!user && log.user_email) {
-                user = usersEmailMap.get(log.user_email);
-            }
-            return {
-                ...log,
-                user
-            };
-        });
+        const uniqueUsers = new Set();
+        return accessLogs
+            .map(log => {
+                // Try finding user by ID (if app_users.id matches auth.id)
+                let user = usersMap.get(log.user_id);
+                // If not found, try by email (if log has email)
+                if (!user && log.user_email) {
+                    user = usersEmailMap.get(log.user_email);
+                }
+                return {
+                    ...log,
+                    user
+                };
+            })
+            .filter(log => {
+                const userIdentifier = log.user?.id || log.user_email || log.user_id;
+                if (uniqueUsers.has(userIdentifier)) {
+                    return false;
+                }
+                uniqueUsers.add(userIdentifier);
+                return true;
+            })
+            .slice(0, 8); // Show top 8 unique recent users
     }, [accessLogs, usersMap, usersEmailMap]);
 
     const fetchAcceptances = async () => {
