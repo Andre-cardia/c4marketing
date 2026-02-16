@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, ArrowRight, UserPlus, Lock } from 'lucide-react';
+import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
 const Home: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -11,6 +11,7 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -83,142 +84,257 @@ const Home: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-coral/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2"></div>
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
 
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay"></div>
+      {/* Animated Background Orbs */}
+      <div className="absolute top-[-20%] right-[-10%] w-[700px] h-[700px] bg-brand-coral/10 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '6s' }}></div>
+      <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-slate-600/10 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '8s' }}></div>
+      <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] bg-brand-coral/5 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '10s' }}></div>
 
-      <div className="w-full max-w-5xl grid lg:grid-cols-2 bg-white/5 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/10 relative z-10">
+      {/* Noise Texture */}
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]"></div>
 
-        {/* Left Side - Brand */}
-        <div className="p-12 lg:p-16 flex flex-col justify-between relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-brand-coral/20 to-transparent opacity-50"></div>
+      {/* Grid Pattern */}
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+          backgroundSize: '60px 60px'
+        }}
+      ></div>
 
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-12">
+      {/* Main Container */}
+      <div className="w-full max-w-5xl grid lg:grid-cols-2 relative z-10 gap-0">
+
+        {/* Left Side - Brand & Features */}
+        <div className="p-10 lg:p-14 flex flex-col justify-between relative">
+          {/* Logo */}
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-2">
               <img src="/logo.png" alt="C4 Marketing" className="h-10 brightness-0 invert opacity-90" />
             </div>
+            <div className="h-0.5 w-12 bg-gradient-to-r from-brand-coral to-transparent mt-4"></div>
+          </div>
 
-            <h1 className="text-5xl lg:text-6xl font-black text-white leading-tight mb-6">
-              Gestão de <br />
-              <span className="text-brand-coral">Alta Performance</span>
+          {/* Headline */}
+          <div className="mb-12">
+            <h1 className="text-5xl lg:text-6xl font-black text-white leading-[1.1] mb-6 tracking-tight">
+              Gestão de{' '}
+              <span className="bg-gradient-to-r from-brand-coral to-red-400 bg-clip-text text-transparent">
+                Alta Performance
+              </span>
             </h1>
             <p className="text-slate-400 text-lg leading-relaxed max-w-sm">
               Gerencie propostas, acompanhe aceites e controle contratos em um único lugar.
             </p>
           </div>
 
-          <div className="relative z-10 hidden lg:block">
-            <div className="flex items-center gap-2 text-slate-500 text-sm font-mono">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              System Online v2.4.0
+          {/* Feature Highlights */}
+          <div className="space-y-4 mb-12">
+            {[
+              { icon: <Shield size={16} />, text: 'Segurança corporativa de ponta a ponta' },
+              { icon: <Zap size={16} />, text: 'Inteligência artificial para análise comercial' },
+              { icon: <BarChart3 size={16} />, text: 'Dashboard com métricas em tempo real' },
+            ].map((feat, i) => (
+              <div key={i} className="flex items-center gap-3 group">
+                <div className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-brand-coral group-hover:bg-brand-coral/20 group-hover:border-brand-coral/30 transition-all duration-300">
+                  {feat.icon}
+                </div>
+                <span className="text-sm text-slate-500 group-hover:text-slate-300 transition-colors">{feat.text}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* System Status */}
+          <div className="hidden lg:flex items-center gap-3 text-sm">
+            <div className="flex items-center gap-2 text-slate-600 font-mono">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              System Online
             </div>
+            <span className="text-slate-700">•</span>
+            <span className="text-slate-700 font-mono">v3.0.0</span>
           </div>
         </div>
 
-        {/* Right Side - Login Form */}
-        <div className="bg-white p-12 lg:p-16 flex flex-col justify-center">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
-              {mode === 'login' ? 'Bem-vindo ao C4 Manager' : 'Primeiro Acesso'}
-            </h2>
-            <p className="text-slate-500">
-              {mode === 'login'
-                ? 'Faça login para acessar o painel administrativo.'
-                : 'Defina sua senha para ativar seu cadastro.'}
-            </p>
-          </div>
+        {/* Right Side - Glassmorphism Login Form */}
+        <div className="flex items-center justify-center p-4 lg:p-8">
+          <div className="w-full max-w-md bg-white/[0.04] backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-8 lg:p-10 shadow-2xl shadow-black/40 relative overflow-hidden">
 
-          {error && (
-            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm mb-6 border border-red-100 flex items-center gap-2">
-              <span className="font-bold">Erro:</span> {error}
-            </div>
-          )}
+            {/* Subtle glow on card */}
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-coral/10 rounded-full blur-[80px] pointer-events-none"></div>
+            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-slate-500/10 rounded-full blur-[80px] pointer-events-none"></div>
 
-          {successMessage && (
-            <div className="bg-green-50 text-green-600 p-4 rounded-xl text-sm mb-6 border border-green-100 flex items-center gap-2">
-              <span className="font-bold">Sucesso:</span> {successMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">E-mail Corporativo</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-brand-coral focus:bg-white bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300"
-                placeholder="nome@c4marketing.com.br"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">Senha</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-brand-coral focus:bg-white bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-400"
-                placeholder="••••••••"
-                required
-              />
+            {/* Header */}
+            <div className="relative mb-8">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2.5 bg-brand-coral/10 border border-brand-coral/20 rounded-xl">
+                  {mode === 'login' ? <KeyRound size={20} className="text-brand-coral" /> : <UserPlus size={20} className="text-brand-coral" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {mode === 'login' ? 'Bem-vindo de volta' : 'Primeiro Acesso'}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {mode === 'login'
+                      ? 'Acesse o painel administrativo'
+                      : 'Defina sua senha de acesso'}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {mode === 'register' && (
-              <div className="animate-in slide-in-from-top-4 duration-300 fade-in">
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">Confirmar Senha</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-brand-coral focus:bg-white bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-400"
-                  placeholder="••••••••"
-                  required
-                />
+            {/* Error */}
+            {error && (
+              <div className="bg-red-500/10 text-red-400 px-4 py-3 rounded-xl text-sm mb-5 border border-red-500/20 flex items-start gap-2">
+                <span className="font-bold text-red-400 shrink-0">✕</span>
+                <span>{error}</span>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-brand-dark text-white py-5 rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 flex items-center justify-center gap-3 group mt-4"
-            >
-              {loading ? 'Processando...' : (
-                <>
-                  {mode === 'login' ? 'Acessar Dashboard' : 'Criar Senha de Acesso'}
-                  {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : <Lock className="w-4 h-4" />}
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-8 text-center">
-            {mode === 'login' ? (
-              <p className="text-sm text-slate-500">
-                Primeiro acesso?{' '}
-                <button
-                  onClick={() => { setMode('register'); setError(null); }}
-                  className="text-brand-coral font-bold hover:underline"
-                >
-                  Criar senha
-                </button>
-              </p>
-            ) : (
-              <p className="text-sm text-slate-500">
-                Já tem conta?{' '}
-                <button
-                  onClick={() => { setMode('login'); setError(null); }}
-                  className="text-brand-coral font-bold hover:underline"
-                >
-                  Fazer login
-                </button>
-              </p>
+            {/* Success */}
+            {successMessage && (
+              <div className="bg-emerald-500/10 text-emerald-400 px-4 py-3 rounded-xl text-sm mb-5 border border-emerald-500/20 flex items-start gap-2">
+                <span className="font-bold shrink-0">✓</span>
+                <span>{successMessage}</span>
+              </div>
             )}
+
+            {/* Form */}
+            <form onSubmit={handleAuth} className="space-y-5">
+              {/* Email */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
+                  E-mail corporativo
+                </label>
+                <div className="relative group">
+                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
+                    placeholder="nome@c4marketing.com.br"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
+                  Senha
+                </label>
+                <div className="relative group">
+                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password (Register mode) */}
+              {mode === 'register' && (
+                <div className="space-y-2 animate-in slide-in-from-top-4 duration-300 fade-in">
+                  <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
+                    Confirmar Senha
+                  </label>
+                  <div className="relative group">
+                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full relative bg-white/[0.04] backdrop-blur-md border border-white/[0.12] text-white py-4 rounded-xl font-bold transition-all hover:bg-white/[0.08] hover:border-brand-coral/30 hover:-translate-y-0.5 flex items-center justify-center gap-3 group mt-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 overflow-hidden"
+              >
+                {/* Button shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+
+                <span className="relative z-10 flex items-center gap-3">
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      {mode === 'login' ? 'Acessar Dashboard' : 'Criar Senha de Acesso'}
+                      {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : <Lock className="w-4 h-4" />}
+                    </>
+                  )}
+                </span>
+              </button>
+            </form>
+
+            {/* Mode Toggle */}
+            <div className="mt-8 text-center">
+              {mode === 'login' ? (
+                <p className="text-sm text-slate-600">
+                  Primeiro acesso?{' '}
+                  <button
+                    onClick={() => { setMode('register'); setError(null); }}
+                    className="text-brand-coral font-bold hover:text-white transition-colors"
+                  >
+                    Criar senha
+                  </button>
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600">
+                  Já tem conta?{' '}
+                  <button
+                    onClick={() => { setMode('login'); setError(null); }}
+                    className="text-brand-coral font-bold hover:text-white transition-colors"
+                  >
+                    Fazer login
+                  </button>
+                </p>
+              )}
+            </div>
+
+            {/* Security Badge */}
+            <div className="mt-6 pt-5 border-t border-white/[0.05] text-center">
+              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-700 font-medium uppercase tracking-wider">
+                <Shield size={10} />
+                Conexão segura • Dados criptografados
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Mobile System Status */}
+      <div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs text-slate-700 font-mono z-20">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+        </span>
+        v3.0.0
       </div>
     </div>
   );
