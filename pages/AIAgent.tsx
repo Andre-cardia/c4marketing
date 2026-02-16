@@ -49,17 +49,17 @@ export default function AIAgent() {
                     <button
                         onClick={runAnalysis}
                         disabled={loading}
-                        className="group relative flex items-center gap-3 px-8 py-3 bg-brand-coral/10 hover:bg-brand-coral/20 text-brand-coral rounded-full font-medium transition-all shadow-[0_0_20px_rgba(255,100,100,0.1)] hover:shadow-[0_0_30px_rgba(255,100,100,0.2)] disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-md border border-brand-coral/20 hover:border-brand-coral/40"
+                        className="group relative flex items-center gap-2 px-6 py-2.5 bg-brand-coral/10 hover:bg-brand-coral/20 text-brand-coral rounded-full font-medium transition-all shadow-[0_0_20px_rgba(255,100,100,0.1)] hover:shadow-[0_0_30px_rgba(255,100,100,0.2)] disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-md border border-brand-coral/20 hover:border-brand-coral/40"
                     >
                         {loading ? (
                             <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                <span className="tracking-wide">ANALISANDO...</span>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="tracking-wide text-xs font-bold">ANALISANDO...</span>
                             </>
                         ) : (
                             <>
-                                <Sparkles className="w-5 h-5 text-brand-coral group-hover:scale-110 transition-transform duration-500" />
-                                <span className="tracking-wide">NOVA ANÁLISE</span>
+                                <Sparkles className="w-4 h-4 text-brand-coral group-hover:scale-110 transition-transform duration-500" />
+                                <span className="tracking-wide text-xs font-bold">NOVA ANÁLISE</span>
                             </>
                         )}
                         <div className="absolute inset-0 rounded-full ring-1 ring-white/5 group-hover:ring-brand-coral/20 transition-all pointer-events-none" />
