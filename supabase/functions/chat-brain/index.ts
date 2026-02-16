@@ -72,7 +72,8 @@ Deno.serve(async (req) => {
             if (meta.type === 'chat_log') {
                 return `[Histórico de Conversa - ${meta.role} - ${meta.timestamp}]: ${d.content}`;
             }
-            return `[Documento - Fonte: ${meta.source || 'Desconhecida'}]: ${d.content}`;
+            const sourceInfo = meta.source || meta.title || 'Desconhecida';
+            return `[Documento - Fonte: ${sourceInfo}]: ${d.content}`;
         }).join('\n---\n') || 'Nenhum contexto encontrado.';
 
         const systemPrompt = `Você é o "Segundo Cérebro" corporativo. Você é responsavel por:analisar e arquitetar soluções de marketing digital para os clientes da C4 Marketing; analisar todas os dados

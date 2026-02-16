@@ -167,7 +167,8 @@ export default function BrainManager() {
                         type: 'database_record',
                         source_table: 'app_users',
                         source_id: u.id,
-                        title: `Usuário: ${u.email}`
+                        title: `Usuário: ${u.email}`,
+                        source: `Usuário: ${u.email}`
                     });
                     count++;
                 }
@@ -186,14 +187,15 @@ export default function BrainManager() {
                     Detalhes Financeiros: Valor Mensal (MRR): R$ ${p.monthly_fee}, Taxa de Setup: R$ ${p.setup_fee}.
                     Vigência/Duração do Contrato Proposto: ${p.contract_duration} meses.
                     Serviços Incluídos: ${services}.
-                    Data de Criação da Proposta: ${new Date(p.created_at).toLocaleDateString()}.
+                    Data de Criação da Proposta: ${new Date(p.created_at).toLocaleDateString('pt-BR')}.
                     ID da Proposta: ${p.id}.`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'proposals',
                         source_id: p.id.toString(),
-                        title: `Proposta: ${p.company_name}`
+                        title: `Proposta: ${p.company_name}`,
+                        source: `Proposta: ${p.company_name}`
                     });
                     count++;
                 }
@@ -206,15 +208,16 @@ export default function BrainManager() {
                     const content = `[CONTRATO ATIVO] Contrato vigente com a empresa ${acc.company_name} (CNPJ: ${acc.cnpj || 'Não Informado'}).
                     Cliente Responsável: ${acc.name} (Email: ${acc.email}).
                     Status do Contrato: ${acc.status}.
-                    Data de Início do Contrato (Data de Aceite): ${new Date(acc.timestamp).toLocaleDateString()}.
-                    Data de Término/Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString() : 'Indeterminado'}.
+                    Data de Início do Contrato (Data de Aceite): ${new Date(acc.timestamp).toLocaleDateString('pt-BR')}.
+                    Data de Término/Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString('pt-BR') : 'Indeterminado'}.
                     ID do Contrato: ${acc.id}.`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'acceptances',
                         source_id: acc.id.toString(),
-                        title: `Contrato: ${acc.company_name}`
+                        title: `Contrato: ${acc.company_name}`,
+                        source: `Contrato: ${acc.company_name}`
                     });
                     count++;
                 }
@@ -238,7 +241,7 @@ export default function BrainManager() {
 
                     const content = `[PROJETO DE TRÁFEGO PAGO] Projeto de Gestão de Tráfego para ${clientName}.
                     Status do Projeto: ${tp.account_setup_status === 'completed' ? 'Configurado' : 'Em Configuração'}.
-                    Data de Início do Projeto: ${new Date(tp.created_at).toLocaleDateString()}.
+                    Data de Início do Projeto: ${new Date(tp.created_at).toLocaleDateString('pt-BR')}.
                     Objetivo da Campanha: ${tp.strategy_meeting_notes || 'Não especificado'}.
                     ID do Projeto: ${tp.id}.`;
 
@@ -246,7 +249,8 @@ export default function BrainManager() {
                         type: 'database_record',
                         source_table: 'traffic_projects',
                         source_id: tp.id,
-                        title: `Projeto Tráfego: ${clientName}`
+                        title: `Projeto Tráfego: ${clientName}`,
+                        source: `Projeto Tráfego: ${clientName}`
                     });
                     count++;
                 }
