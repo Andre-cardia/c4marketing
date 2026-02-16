@@ -148,7 +148,7 @@ const Proposals: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-            <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+            <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-end mb-8">
@@ -158,7 +158,7 @@ const Proposals: React.FC = () => {
                     </div>
                     <button
                         onClick={() => navigate('/proposals/new')}
-                        className="bg-brand-coral hover:bg-brand-coral/90 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-brand-coral/25 flex items-center gap-2"
+                        className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-brand-coral/10 flex items-center gap-2"
                     >
                         <Plus size={20} />
                         Nova Proposta
