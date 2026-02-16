@@ -206,9 +206,13 @@ function getMonthlyFee(acc: any): number {
     if (acc.proposal && acc.proposal.monthly_fee != null) {
         return Number(acc.proposal.monthly_fee) || 0;
     }
-    // Fallback to contract_snapshot
+    // Fallback to contract_snapshot.proposal.monthly_fee
     if (acc.contract_snapshot?.proposal?.monthly_fee != null) {
         return Number(acc.contract_snapshot.proposal.monthly_fee) || 0;
+    }
+    // Manually created projects store value as "value" instead of "monthly_fee"
+    if (acc.contract_snapshot?.proposal?.value != null) {
+        return Number(acc.contract_snapshot.proposal.value) || 0;
     }
     // Also check top-level contract_snapshot fields (some snapshots store differently)
     if (acc.contract_snapshot?.monthly_fee != null) {
