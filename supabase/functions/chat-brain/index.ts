@@ -53,10 +53,7 @@ Deno.serve(async (req) => {
         // Let's configure the client with `db: { schema: 'brain' }`.
 
         // 2. Search for similar documents using Public RPC wrapper
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
+        // supabaseClient is already defined above
 
         const { data: documents, error: searchError } = await supabaseClient
             .rpc('match_brain_documents', {
