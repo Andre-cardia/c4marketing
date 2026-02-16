@@ -39,12 +39,9 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // Insert into brain.documents
-        // Note: To insert into a table in a specific schema, we usually need to specify the schema in the client or use table('documents', { schema: 'brain' })
+        // Call RPC function to insert into brain.documents
         const { error } = await supabaseClient
-            .schema('brain')
-            .from('documents')
-            .insert({
+            .rpc('insert_brain_document', {
                 content,
                 metadata,
                 embedding,

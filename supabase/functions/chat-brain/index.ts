@@ -52,17 +52,17 @@ Deno.serve(async (req) => {
         // BETTER APPROACH: Since we are in an Edge Function using Service Role, we can use the `rpc` call but we might need to specify the schema `brain` when creating the client?
         // Let's configure the client with `db: { schema: 'brain' }`.
 
-        const brainClient = createClient(
+        // 2. Search for similar documents using Public RPC wrapper
+        const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-            { db: { schema: 'brain' } } // This sets the search path/schema context
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        const { data: documents, error: searchError } = await brainClient
-            .rpc('match_documents', {
+        const { data: documents, error: searchError } = await supabaseClient
+            .rpc('match_brain_documents', {
                 query_embedding: queryEmbedding,
-                match_threshold: 0.5, // Adjust similarity threshold
-                match_count: 5 // Retrieve top 5 chunks
+                match_threshold: 0.5,
+                match_count: 5
             })
 
         if (searchError) {
