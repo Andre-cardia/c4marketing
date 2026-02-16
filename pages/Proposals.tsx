@@ -130,6 +130,22 @@ const Proposals: React.FC = () => {
         }
     };
 
+    const calculateExpirationDate = (timestamp: string, snapshot: any) => {
+        if (!timestamp || !snapshot?.proposal?.contract_duration) return '';
+        try {
+            const date = new Date(timestamp);
+            const duration = Number(snapshot.proposal.contract_duration);
+
+            if (isNaN(date.getTime()) || isNaN(duration)) return '';
+
+            date.setMonth(date.getMonth() + duration);
+            return date.toISOString().split('T')[0];
+        } catch (e) {
+            console.error('Error calculating expiration date', e);
+            return '';
+        }
+    };
+
     const handleExpirationChange = async (id: number, date: string) => {
         setAcceptances(prev => prev.map(acc =>
             acc.id === id ? { ...acc, expiration_date: date } : acc
