@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard } from 'lucide-react';
+import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 import CreateProjectModal from '../components/projects/CreateProjectModal';
@@ -35,6 +35,7 @@ const Projects: React.FC = () => {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
     const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [projectToEdit, setProjectToEdit] = useState<Project | undefined>(undefined);
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('darkMode') === 'true';
@@ -189,6 +190,32 @@ const Projects: React.FC = () => {
         }
     };
 
+    const handleDeleteProject = async (project: Project) => {
+        if (!window.confirm(`Tem certeza que deseja excluir o projeto "${project.company_name}"?`)) return;
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('acceptances')
+                .update({ status: 'Inativo' })
+                .eq('id', project.id);
+
+            if (error) throw error;
+
+            fetchProjects();
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            alert('Erro ao excluir projeto.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEditProject = (project: Project) => {
+        setProjectToEdit(project);
+        setShowCreateModal(true);
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
             <Header />
@@ -253,6 +280,7 @@ const Projects: React.FC = () => {
                                             </div>
                                         </th>
                                         <th className="p-5 font-bold">Serviços Contratados</th>
+                                        <th className="p-5 font-bold text-center">Ações</th>
                                         <th className="p-5 font-bold text-center">Tarefas</th>
                                     </tr>
                                 </thead>
@@ -304,6 +332,24 @@ const Projects: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="p-5 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => handleEditProject(project)}
+                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors"
+                                                        title="Editar Projeto"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProject(project)}
+                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                                                        title="Excluir Projeto"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="p-5 text-center">
                                                 <button
                                                     onClick={() => setSelectedProjectForKanban(project)}
                                                     className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 hover:bg-brand-coral hover:text-white text-brand-coral rounded-lg transition-all font-bold text-xs"
@@ -329,10 +375,15 @@ const Projects: React.FC = () => {
 
             <CreateProjectModal
                 isOpen={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setProjectToEdit(undefined);
+                }}
+                projectToEdit={projectToEdit}
                 onProjectCreated={() => {
                     fetchProjects();
                     setShowCreateModal(false);
+                    setProjectToEdit(undefined);
                 }}
             />
         </div>
