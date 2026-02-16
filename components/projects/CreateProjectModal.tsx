@@ -56,6 +56,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                     name: formData.responsibleName,
                     timestamp: new Date(formData.startDate).toISOString(),
                     status: 'Ativo',
+                    // Required fields by schema, but not asked in form
+                    email: 'nao_informado@exemplo.com', // Placeholder to satisfy NOT NULL
+                    cpf: '000.000.000-00', // Placeholder to satisfy NOT NULL
+                    cnpj: '00.000.000/0000-00', // Placeholder (if required)
                     contract_snapshot: {
                         proposal: {
                             services: servicesData,
