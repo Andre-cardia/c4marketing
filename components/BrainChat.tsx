@@ -84,13 +84,14 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                         <div className={`max-w-[85%] space-y-2 ${msg.role === 'user' ? 'items-end flex flex-col' : ''}`}>
                             <div
                                 className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.role === 'user'
-                                        ? 'bg-indigo-600 text-white rounded-br-none'
-                                        : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
+                                    ? 'bg-indigo-600 text-white rounded-br-none'
+                                    : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
                                     }`}
                             >
-                                <ReactMarkdown className="prose prose-invert prose-sm max-w-none">
-                                    {msg.content}
-                                </ReactMarkdown>
+                                {/* <ReactMarkdown className="prose prose-invert prose-sm max-w-none">
+                                        {msg.content}
+                                    </ReactMarkdown> */}
+                                <div className="whitespace-pre-wrap">{msg.content}</div>
                             </div>
 
                             {/* Sources */}
