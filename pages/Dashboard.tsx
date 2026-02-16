@@ -342,12 +342,21 @@ const Dashboard: React.FC = () => {
     };
 
     const handleDeleteNotice = async (id: string) => {
-        if (userRole !== 'gestor') return; // Security check
+        if (userRole !== 'gestor') return;
 
-        const { error } = await supabase.from('notices').delete().eq('id', id);
-        if (!error) {
-            setNotices(notices.filter(n => n.id !== id));
+        if (!confirm('Tem certeza que deseja excluir este aviso?')) return;
+
+        const { error, count } = await supabase.from('notices').delete({ count: 'exact' }).eq('id', id);
+        if (error) {
+            console.error('Erro ao excluir aviso:', error);
+            alert('Erro ao excluir aviso. Tente novamente.');
+            return;
         }
+        if (count === 0) {
+            alert('Não foi possível excluir o aviso. Verifique suas permissões.');
+            return;
+        }
+        setNotices(notices.filter(n => n.id !== id));
     };
 
     const handleCreateNotice = async (message: string, priority: 'normal' | 'importante' | 'urgente') => {
