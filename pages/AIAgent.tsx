@@ -41,7 +41,7 @@ export default function AIAgent() {
                             <Bot className="w-8 h-8 text-brand-coral drop-shadow-[0_0_8px_rgba(255,100,100,0.5)]" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-light text-white tracking-tight">Gerente Geral <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">IA</span></h1>
+                            <h1 className="text-3xl font-light text-white tracking-tight">AI Manager</h1>
                             <p className="text-slate-400 text-sm font-light tracking-wide">Monitoramento inteligente e análise estratégica</p>
                         </div>
                     </div>

@@ -31,8 +31,6 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/dashboard')}>
           <img src="/logo.png" alt="C4 Marketing" className="h-8 dark:brightness-0 dark:invert" />
-          <span className="text-slate-300 dark:text-slate-600">|</span>
-          <h1 className="font-bold text-slate-700 dark:text-slate-300 text-sm tracking-wide">DASHBOARD</h1>
         </div>
         <div className="flex items-center gap-4">
           <button
@@ -49,7 +47,7 @@ const Header: React.FC = () => {
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
             >
               <span className="p-0.5 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[10px] w-4 h-4 flex items-center justify-center font-bold">AI</span>
-              IA Gerente
+              AI Manager
             </button>
           )}
 
