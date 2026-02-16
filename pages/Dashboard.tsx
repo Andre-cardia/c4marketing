@@ -380,57 +380,88 @@ const Dashboard: React.FC = () => {
                     {/* Left Column: Global Status, Projects, Notices */}
                     <div className="lg:col-span-2 space-y-8">
 
-                        {/* Global Status Bar Chart */}
+                        {/* Global Status Bar Chart (Vertical & Monthly) */}
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-6">
-                                <BarChart2 className="w-5 h-5 text-brand-coral" />
-                                Status Global de Tarefas
-                            </h3>
-
-                            <div className="space-y-6">
-                                {/* Bar Chart Container */}
-                                <div className="space-y-4">
-                                    {/* Backlog */}
-                                    <div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                            <span>Backlog</span>
-                                            <span>{taskStatusCounts.backlog} tarefas</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div style={{ width: `${(taskStatusCounts.backlog / tasks.length) * 100}%` }} className="h-full bg-slate-400 rounded-full"></div>
-                                        </div>
-                                    </div>
-                                    {/* In Progress */}
-                                    <div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                            <span>Em Execução</span>
-                                            <span>{taskStatusCounts.in_progress} tarefas</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div style={{ width: `${(taskStatusCounts.in_progress / tasks.length) * 100}%` }} className="h-full bg-blue-500 rounded-full"></div>
-                                        </div>
-                                    </div>
-                                    {/* Approval */}
-                                    <div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                            <span>Aprovação</span>
-                                            <span>{taskStatusCounts.approval} tarefas</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div style={{ width: `${(taskStatusCounts.approval / tasks.length) * 100}%` }} className="h-full bg-purple-500 rounded-full"></div>
-                                        </div>
-                                    </div>
-                                    {/* Done */}
-                                    <div>
-                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                            <span>Finalizado</span>
-                                            <span>{taskStatusCounts.done} tarefas</span>
-                                        </div>
-                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div style={{ width: `${(taskStatusCounts.done / tasks.length) * 100}%` }} className="h-full bg-emerald-500 rounded-full"></div>
-                                        </div>
-                                    </div>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <BarChart2 className="w-5 h-5 text-brand-coral" />
+                                    Volume de Tarefas (Por Mês)
+                                </h3>
+                                {/* Legend */}
+                                <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-slate-500">Backlog</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-slate-500">Exec.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500"></div><span className="text-slate-500">Aprov.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-slate-500">Final.</span></div>
                                 </div>
+                            </div>
+
+                            <div className="h-64 flex items-end gap-2 sm:gap-4 md:gap-8">
+                                {(() => {
+                                    const months = [];
+                                    const today = new Date();
+                                    // Generate last 1 month and next 4 months
+                                    for (let i = -1; i < 5; i++) {
+                                        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+                                        months.push(d);
+                                    }
+
+                                    const data = months.map(month => {
+                                        const monthKey = month.toISOString().slice(0, 7); // YYYY-MM
+                                        const monthTasks = tasks.filter(t => t.due_date && t.due_date.startsWith(monthKey));
+
+                                        return {
+                                            monthLabel: month.toLocaleDateString('pt-BR', { month: 'short' }),
+                                            backlog: monthTasks.filter(t => t.status === 'backlog').length,
+                                            in_progress: monthTasks.filter(t => t.status === 'in_progress').length,
+                                            approval: monthTasks.filter(t => t.status === 'approval').length,
+                                            done: monthTasks.filter(t => t.status === 'done').length,
+                                            total: monthTasks.length
+                                        };
+                                    });
+
+                                    const maxTotal = Math.max(...data.map(d => d.total), 1); // Avoid div by zero
+
+                                    return data.map((d, index) => (
+                                        <div key={index} className="flex-1 flex flex-col items-center group relative">
+                                            {/* Tooltip */}
+                                            <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs p-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-10">
+                                                <div className="font-bold mb-1">{d.monthLabel} - {d.total} Tarefas</div>
+                                                <div className="flex gap-2">
+                                                    <span className="text-slate-300">B: {d.backlog}</span>
+                                                    <span className="text-blue-300">E: {d.in_progress}</span>
+                                                    <span className="text-purple-300">A: {d.approval}</span>
+                                                    <span className="text-emerald-300">F: {d.done}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Bar Stack */}
+                                            <div className="w-full max-w-[40px] bg-slate-50 dark:bg-slate-800 rounded-t-xl overflow-hidden relative flex flex-col-reverse" style={{ height: '200px' }}>
+                                                {/* Background track handled by container bg */}
+
+                                                {/* Stacked Segments (flex-col-reverse fills from bottom) */}
+                                                {d.total > 0 ? (
+                                                    <>
+                                                        <div style={{ height: `${(d.backlog / maxTotal) * 100}%` }} className="bg-slate-300 w-full transition-all duration-500 hover:bg-slate-400"></div>
+                                                        <div style={{ height: `${(d.in_progress / maxTotal) * 100}%` }} className="bg-blue-500 w-full transition-all duration-500 hover:bg-blue-600"></div>
+                                                        <div style={{ height: `${(d.approval / maxTotal) * 100}%` }} className="bg-purple-500 w-full transition-all duration-500 hover:bg-purple-600"></div>
+                                                        <div style={{ height: `${(d.done / maxTotal) * 100}%` }} className="bg-emerald-500 w-full transition-all duration-500 hover:bg-emerald-600"></div>
+                                                    </>
+                                                ) : (
+                                                    <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 absolute bottom-0"></div>
+                                                )}
+                                            </div>
+
+                                            {/* Label */}
+                                            <div className="mt-3 text-xs font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                                {d.monthLabel}
+                                            </div>
+                                            <div className="text-[10px] font-bold text-slate-300 dark:text-slate-600">
+                                                {d.total}
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
                             </div>
                         </div>
 
