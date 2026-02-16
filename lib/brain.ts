@@ -47,3 +47,87 @@ export async function askBrain(query: string): Promise<AskBrainResponse> {
 
     return data;
 }
+// --- Chat History Management (Phase 3) ---
+
+export interface ChatSession {
+    id: string;
+    title: string;
+    created_at: string;
+}
+
+export interface ChatMessage {
+    id: string;
+    session_id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    created_at: string;
+}
+
+/**
+ * Creates a new chat session.
+ */
+export async function createChatSession(title: string = 'Nova Conversa'): Promise<ChatSession> {
+    const { data, error } = await supabase
+        .rpc('create_chat_session', { title })
+        .select()
+        .single();
+
+    // Fallback: If RPC returns a string UUID, we construct the object locally or fetch it. 
+    // The previous migration returns UUID. 
+    // Let's refetch or just return basic object if needed, but RPC logic in migration returned `new_id`.
+    // Wait, the migration function returns UUID. We need to fetch the session details then.
+
+    if (error) throw error;
+
+    // Since RPC returns UUID, let's just return a constructed object or re-fetch.
+    // Actually, let's just use the table insert directly since we created public views/proxies?
+    // No, we created a function `create_chat_session`. It returns UUID.
+
+    return {
+        id: data as unknown as string,
+        title,
+        created_at: new Date().toISOString()
+    };
+}
+
+/**
+ * Lists all chat sessions for the current user.
+ */
+export async function getChatSessions(): Promise<ChatSession[]> {
+    const { data, error } = await supabase
+        .from('chat_sessions_view')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+}
+
+/**
+ * Gets messages for a specific session.
+ */
+export async function getChatMessages(sessionId: string): Promise<ChatMessage[]> {
+    const { data, error } = await supabase
+        .from('chat_messages_view')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data;
+}
+
+/**
+ * Adds a message to a session (User or Assistant).
+ */
+export async function addChatMessage(sessionId: string, role: 'user' | 'assistant', content: string) {
+    const { data, error } = await supabase
+        .rpc('add_chat_message', {
+            p_session_id: sessionId,
+            p_role: role,
+            p_content: content
+        });
+
+    if (error) throw error;
+    return data;
+}

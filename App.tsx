@@ -30,6 +30,7 @@ import AIAgent from './pages/AIAgent';
 import { UserRoleProvider } from './lib/UserRoleContext';
 import { ThemeProvider } from './lib/ThemeContext';
 import { BrainChat } from './components/BrainChat';
+import BrainManager from './pages/BrainManager';
 
 const App: React.FC = () => {
   const [isBrainOpen, setIsBrainOpen] = React.useState(false);
@@ -59,6 +60,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}>
                     <Account />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/brain"
+                element={
+                  <ProtectedRoute allowedRoles={['gestor']}>
+                    <BrainManager />
                   </ProtectedRoute>
                 }
               />

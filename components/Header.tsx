@@ -51,6 +51,17 @@ const Header: React.FC = () => {
             </button>
           )}
 
+          {/* Brain Manager - only for gestor */}
+          {!loading && userRole === 'gestor' && (
+            <button
+              onClick={() => navigate('/brain')}
+              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/brain' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+            >
+              <span className="p-0.5 rounded bg-slate-800 text-white text-[10px] w-4 h-4 flex items-center justify-center font-bold">🧠</span>
+              Cérebro
+            </button>
+          )}
+
           {/* Comercial Dropdown - only for gestor */}
           {!loading && userRole === 'gestor' && (
             <div className="relative group">
