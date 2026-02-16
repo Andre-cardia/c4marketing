@@ -130,6 +130,25 @@ const Proposals: React.FC = () => {
         }
     };
 
+    const handleExpirationChange = async (id: number, date: string) => {
+        setAcceptances(prev => prev.map(acc =>
+            acc.id === id ? { ...acc, expiration_date: date } : acc
+        ));
+
+        try {
+            const { error } = await supabase
+                .from('acceptances')
+                .update({ expiration_date: date })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating expiration date:', error);
+            alert('Erro ao atualizar data de validade.');
+            fetchAcceptances();
+        }
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'Ativo': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
@@ -267,8 +286,9 @@ const Proposals: React.FC = () => {
                                     <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
                                         <th className="p-5 font-bold">Data</th>
                                         <th className="p-5 font-bold">Cliente</th>
-                                        <th className="p-5 font-bold">Empresa</th>
+                                        <th className="p-5 font-bold">Empresa (CNPJ)</th>
                                         <th className="p-5 font-bold">Contrato</th>
+                                        <th className="p-5 font-bold">Validade</th>
                                         <th className="p-5 font-bold">Status</th>
                                         <th className="p-5 font-bold text-right">Ações</th>
                                     </tr>
@@ -295,9 +315,16 @@ const Proposals: React.FC = () => {
                                                 {acc.email && <div className="text-xs text-slate-400 pl-6">{acc.email}</div>}
                                             </td>
                                             <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span>{acc.company_name}</span>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
+                                                        <span className="font-semibold text-slate-700 dark:text-slate-200">{acc.company_name}</span>
+                                                    </div>
+                                                    {acc.cnpj && (
+                                                        <div className="text-xs text-slate-400 pl-6 font-mono">
+                                                            {acc.cnpj}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="p-5">
@@ -311,6 +338,14 @@ const Proposals: React.FC = () => {
                                                     <FileText className="w-4 h-4" />
                                                     Visualizar
                                                 </a>
+                                            </td>
+                                            <td className="p-5">
+                                                <input
+                                                    type="date"
+                                                    value={acc.expiration_date || ''}
+                                                    onChange={(e) => handleExpirationChange(acc.id, e.target.value)}
+                                                    className="bg-transparent border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-600 dark:text-slate-300 outline-none focus:border-brand-coral transition-colors"
+                                                />
                                             </td>
                                             <td className="p-5">
                                                 <select
