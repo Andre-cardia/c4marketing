@@ -165,7 +165,7 @@ const WebsiteManagement: React.FC = () => {
 
     const isSetupComplete = webProject?.account_setup_status === 'completed' && webProject?.briefing_status === 'completed';
 
-    if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">Carregando...</div>;
+    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">Carregando...</div>;
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20">
@@ -187,210 +187,237 @@ const WebsiteManagement: React.FC = () => {
                         </h1>
                         <p className="text-xl text-slate-600 dark:text-slate-400 mt-2 font-medium">
                             {companyName}
-                            <span className="ml-4 text-xs font-mono text-slate-400">CNPJ: (Carregado do contrato)</span>
                         </p>
                     </div>
                 </div>
 
-                {/* Onboarding Section - Grid Layout */}
+                {/* Onboarding Section - Dark Corporate Look */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
 
-                    {/* 1. Send Survey */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Send className="w-5 h-5 text-blue-500" />
-                            Pesquisa Inicial
-                        </h3>
+                    {/* 1. Survey - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+                        <div className="flex flex-col h-full justify-between relative z-10">
+                            <div>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-slate-800 rounded-lg">
+                                        <Send className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Pesquisa Inicial</h3>
+                                </div>
+                            </div>
 
-                        <div className="space-y-4 relative z-10">
-                            {/* always visible: Send Link */}
-                            <button
-                                onClick={() => {
-                                    const url = `${window.location.origin}/external/website-survey/${webProject?.id}`;
-                                    navigator.clipboard.writeText(url);
-                                    alert('Link copiado para a área de transferência!');
-                                }}
-                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Send size={16} />
-                                Enviar Pesquisa
-                            </button>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/website-survey/${webProject?.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link copiado para a área de transferência!');
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Send size={16} />
+                                    Enviar Pesquisa
+                                </button>
 
-                            {/* Validation Logic */}
-                            {webProject?.survey_data && (
-                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
-                                        {webProject.survey_status === 'completed' ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                <div className="pt-4 border-t border-slate-800">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</span>
+                                        {webProject?.survey_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10 text-xs font-bold border border-emerald-400/20">
                                                 <CheckCircle size={12} /> Validado
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-amber-400 bg-amber-400/10 text-xs font-bold border border-amber-400/20">
                                                 Pendente
                                             </span>
                                         )}
                                     </div>
-                                    <button
-                                        onClick={handleOpenSurveyModal}
-                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
-                                    >
-                                        Ver Respostas Recebidas
-                                    </button>
-                                    {webProject.survey_status !== 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('survey_status', 'completed')}
-                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
-                                        >
-                                            <CheckCircle size={16} /> Validar & Concluir
-                                        </button>
-                                    )}
-                                    {webProject.survey_status === 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('survey_status', 'pending')}
-                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
-                                        >
-                                            <ArrowLeft size={12} />
-                                            Desvalidar Formulário
-                                        </button>
+
+                                    {webProject?.survey_data ? (
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                onClick={handleOpenSurveyModal}
+                                                className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-transparent border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+                                            >
+                                                Ver Respostas Recebidas
+                                            </button>
+
+                                            {webProject.survey_status !== 'completed' ? (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('survey_status', 'completed')}
+                                                    className="w-full py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                >
+                                                    Validar Formulário
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('survey_status', 'pending')}
+                                                    className="flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors mt-1"
+                                                >
+                                                    <ArrowLeft size={10} /> Desvalidar Formulário
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-center text-slate-600 py-2">
+                                            Aguardando envio...
+                                        </p>
                                     )}
                                 </div>
-                            )}
-                            {!webProject?.survey_data && (
-                                <p className="text-xs text-center text-slate-400 italic">
-                                    Aguardando resposta do cliente...
-                                </p>
-                            )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* 2. Account Setup */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-blue-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-blue-500" />
-                            Configuração
-                        </h3>
-                        <div className="space-y-4 relative z-10">
-                            {/* always visible: Send Link */}
-                            <button
-                                onClick={() => {
-                                    const url = `${window.location.origin}/external/access-guide/${webProject?.id}?type=website`;
-                                    navigator.clipboard.writeText(url);
-                                    alert('Link copiado para a área de transferência!');
-                                }}
-                                className="w-full py-2.5 px-4 bg-brand-coral text-white rounded-xl font-bold text-sm hover:bg-red-500 shadow-md shadow-brand-coral/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Send size={16} />
-                                Enviar Guia de Acesso
-                            </button>
+                    {/* 2. Account Setup - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group">
+                        <div className="flex flex-col h-full justify-between relative z-10">
+                            <div>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-slate-800 rounded-lg">
+                                        <Settings className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-white">Configuração</h3>
+                                </div>
+                            </div>
 
-                            {webProject?.access_guide_data ? (
-                                <div className="pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</span>
-                                        {webProject.account_setup_status === 'completed' ? (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/external/access-guide/${webProject?.id}?type=website`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link copiado para a área de transferência!');
+                                    }}
+                                    className="w-full py-2.5 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Settings size={16} />
+                                    Enviar Guia de Acesso
+                                </button>
+
+                                <div className="pt-4 border-t border-slate-800">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</span>
+                                        {webProject?.account_setup_status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-emerald-400 bg-emerald-400/10 text-xs font-bold border border-emerald-400/20">
                                                 <CheckCircle size={12} /> Validado
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-amber-400 bg-amber-400/10 text-xs font-bold border border-amber-400/20">
                                                 Pendente
                                             </span>
                                         )}
                                     </div>
-                                    <button
-                                        onClick={handleOpenAccessGuideModal}
-                                        className="w-full py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:shadow-sm"
-                                    >
-                                        Ver Respostas Recebidas
-                                    </button>
-                                    {webProject.account_setup_status !== 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
-                                            className="w-full py-2.5 text-sm font-bold text-green-600 hover:text-green-700 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm shadow-green-100/50 dark:shadow-none"
-                                        >
-                                            <CheckCircle size={16} /> Validar & Concluir
-                                        </button>
-                                    )}
-                                    {webProject.account_setup_status === 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
-                                            className="w-full py-1 text-xs font-bold text-slate-400 hover:text-red-500 transition-colors flex items-center justify-center gap-1 pt-1"
-                                        >
-                                            <ArrowLeft size={12} />
-                                            Desvalidar Formulário
-                                        </button>
+
+                                    {webProject?.access_guide_data ? (
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                onClick={handleOpenAccessGuideModal}
+                                                className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white bg-transparent border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+                                            >
+                                                Ver Respostas Recebidas
+                                            </button>
+
+                                            {webProject.account_setup_status !== 'completed' ? (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('account_setup_status', 'completed')}
+                                                    className="w-full py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                >
+                                                    Validar Configuração
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleUpdateStatus('account_setup_status', 'pending')}
+                                                    className="flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors mt-1"
+                                                >
+                                                    <ArrowLeft size={10} /> Desvalidar
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-center text-slate-600 py-2">
+                                            Aguardando dados de acesso...
+                                        </p>
                                     )}
                                 </div>
-                            ) : (
-                                <p className="text-xs text-center text-slate-400 italic">
-                                    Aguardando dados de acesso...
-                                </p>
-                            )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* 3. Briefing Meeting */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group hover:border-amber-300 transition-colors">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 dark:bg-amber-900/20 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 relative z-10 flex items-center gap-2">
-                            <Users className="w-5 h-5 text-amber-500" />
-                            Reunião de Briefing
-                        </h3>
-                        {webProject?.briefing_status === 'completed' ? (
-                            <div className="relative z-10">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold ring-1 ring-green-500/20">
+                    {/* 3. Briefing Meeting - Dark Corporate Style */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg relative overflow-hidden group flex flex-col">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 bg-slate-800 rounded-lg">
+                                    <Users className="w-6 h-6 text-slate-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white">Reunião de Briefing</h3>
+                            </div>
+                            {webProject?.briefing_status === 'completed' ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-emerald-400 bg-emerald-400/10 text-xs font-bold border border-emerald-400/20">
                                     <CheckCircle size={14} /> Briefing Realizado
                                 </span>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 relative z-10">
-                                <p className="text-sm text-slate-500">Alinhe as expectativas e o design da página.</p>
+                            ) : (
+                                <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                                    Alinhe as expectativas e o design do site.
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            {webProject?.briefing_status !== 'completed' ? (
                                 <button
                                     onClick={() => handleUpdateStatus('briefing_status', 'completed')}
-                                    className="w-full py-2 border border-amber-500 text-amber-600 rounded-xl font-bold text-sm hover:bg-amber-50 transition-colors"
+                                    className="w-full py-3 px-4 bg-transparent border border-brand-coral text-brand-coral hover:bg-brand-coral/10 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2"
                                 >
                                     Confirmar Reunião
                                 </button>
-                            </div>
-                        )}
+                            ) : (
+                                <button
+                                    onClick={() => handleUpdateStatus('briefing_status', 'pending')}
+                                    className="flex items-center justify-center gap-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors mt-2 w-full"
+                                >
+                                    <ArrowLeft size={10} /> Reabrir Briefing
+                                </button>
+                            )}
+                        </div>
                     </div>
 
-                    {/* 4. Action: New Website Button */}
-                    <div className="flex items-center justify-center">
+                    {/* 4. Action: New Website Button - Dashed Outline Style */}
+                    <div className="flex items-center justify-center h-full">
                         <button
                             onClick={handleCreateWebsite}
-                            className="w-full h-full min-h-[160px] rounded-2xl border-2 border-dashed border-slate-300 hover:border-brand-coral bg-slate-50 dark:bg-slate-800/50 hover:bg-brand-coral/5 transition-all flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-brand-coral group cursor-pointer"
+                            className="w-full h-full min-h-[280px] rounded-2xl border border-dashed border-slate-700 hover:border-brand-coral/50 bg-slate-900/50 hover:bg-slate-900 transition-all flex flex-col items-center justify-center gap-4 group cursor-pointer"
                         >
-                            <div className="p-3 rounded-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 group-hover:border-brand-coral transition-colors">
-                                <Plus size={24} className="group-hover:scale-110 transition-transform" />
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-800 text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-all">
+                                <Plus size={24} />
                             </div>
-                            <span className="font-bold text-lg">Novo Web Site</span>
+                            <span className="text-xs font-bold tracking-widest uppercase text-slate-400 group-hover:text-white">
+                                Novo Web Site
+                            </span>
                         </button>
                     </div>
                 </div>
 
                 {/* Websites List */}
                 <div className="space-y-8">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white border-l-4 border-cyan-500 pl-4">Sites em Produção</h2>
+                    <div className="flex items-center gap-3 mb-6 border-l-4 border-cyan-500 pl-4">
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Sites em Produção</h2>
+                    </div>
 
                     {websites.map(page => (
-                        <div key={page.id} className="bg-white dark:bg-slate-800 p-0 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden">
+                        <div key={page.id} className="bg-slate-900 border border-slate-800 p-0 rounded-2xl shadow-lg relative overflow-hidden">
                             {/* Page Header */}
-                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+                            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
                                 <div className="flex items-center gap-3">
-                                    <span className="p-2 bg-cyan-100 text-cyan-600 rounded-lg">
+                                    <span className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">
                                         <Globe size={20} />
                                     </span>
-                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">{page.name}</h3>
+                                    <h3 className="text-lg font-bold text-white">{page.name}</h3>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="text-xs font-mono text-slate-400">{new Date(page.created_at).toLocaleDateString()}</span>
+                                    <span className="text-xs font-mono text-slate-500">{new Date(page.created_at).toLocaleDateString()}</span>
                                     <button
                                         onClick={() => handleDeletePage(page.id)}
-                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                         title="Apagar Site"
                                     >
                                         <Trash2 size={18} />
@@ -412,27 +439,27 @@ const WebsiteManagement: React.FC = () => {
                                                 key={step.id}
                                                 disabled={!isNext && !isCompleted}
                                                 onClick={() => {
-                                                    if (isNext || (isCompleted && idx !== currentIndex)) { // Allow rollback or advance
+                                                    if (isNext || (isCompleted && idx !== currentIndex)) {
                                                         handleUpdatePageStatus(page.id, step.id as any);
                                                     }
                                                 }}
                                                 className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all group relative overflow-hidden
                                                     ${isCurrent
-                                                        ? 'border-brand-coral/50 bg-gradient-to-br from-brand-coral/10 to-brand-coral/5'
+                                                        ? 'border-brand-coral/50 bg-brand-coral/10'
                                                         : isCompleted
-                                                            ? 'border-cyan-200 bg-cyan-50 dark:bg-cyan-900/10 dark:border-cyan-900/30'
-                                                            : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 opacity-60 cursor-default'
+                                                            ? 'border-emerald-500/20 bg-emerald-500/5'
+                                                            : 'border-slate-800 bg-slate-900/50 opacity-60 cursor-default'
                                                     }
-                                                    ${isNext ? 'hover:border-brand-coral hover:bg-white dark:hover:bg-slate-800 hover:text-brand-coral cursor-pointer border-dashed hover:shadow-md' : ''}
+                                                    ${isNext ? 'hover:border-brand-coral hover:bg-slate-800 hover:text-brand-coral cursor-pointer border-dashed hover:shadow-md' : ''}
                                                 `}
                                             >
                                                 <div className={`mb-3 transition-transform group-hover:scale-110 
-                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-cyan-500' : 'text-slate-400'}
+                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-emerald-400' : 'text-slate-500'}
                                                 `}>
                                                     <step.icon size={28} />
                                                 </div>
                                                 <span className={`text-sm font-bold text-center
-                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-cyan-700 dark:text-cyan-400' : 'text-slate-400'}
+                                                    ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-emerald-400' : 'text-slate-500'}
                                                 `}>
                                                     {step.label}
                                                 </span>
@@ -447,9 +474,9 @@ const WebsiteManagement: React.FC = () => {
                     ))}
 
                     {websites.length === 0 && (
-                        <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                            <p className="text-slate-400 font-medium mb-2">Nenhum Site criado.</p>
-                            <p className="text-slate-500 text-sm">Clique em "Novo Web Site" acima para começar.</p>
+                        <div className="text-center py-16 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
+                            <p className="text-slate-500 mb-4">Nenhum Site criado.</p>
+                            <p className="text-slate-600 text-sm">Clique em "Novo Web Site" acima para começar.</p>
                         </div>
                     )}
                 </div>
