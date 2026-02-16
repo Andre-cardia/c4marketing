@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import {
     MessageSquare, Plus, FileText, Upload, Send, Bot, User,
-    MoreHorizontal, Trash2, Search, Paperclip, Loader2, X
+    MoreHorizontal, Trash2, Search, Paperclip, Loader2, X, RefreshCw, Database
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import { supabase } from '../lib/supabase';
 import {
     createChatSession, getChatSessions, getChatMessages, addChatMessage,
     addToBrain, askBrain, ChatSession, ChatMessage
