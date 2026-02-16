@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         const { data: documents, error: searchError } = await supabaseClient
             .rpc('match_brain_documents', {
                 query_embedding: queryEmbedding,
-                match_threshold: 0.5,
+                match_threshold: 0.2, // Lowered to 0.2 to improve recall with text-embedding-3-small
                 match_count: 5
             })
 
@@ -69,9 +69,10 @@ Deno.serve(async (req) => {
         // 3. Construct prompt for LLM
         const contextText = documents?.map(d => `${d.content} (Source: ${JSON.stringify(d.metadata)})`).join('\n---\n') || 'No context found.'
 
-        const systemPrompt = `Você é o "Segundo Cérebro" corporativo. Use o contexto abaixo para responder à pergunta do usuário.
-    Se a resposta não estiver no contexto, diga que não sabe, mas tente ser útil com o que tem.
-    Sempre responda em Português do Brasil.
+        const systemPrompt = `Você é o "Segundo Cérebro" corporativo. Você é responsavel por:analisar e arquitetar soluções de marketing digital para os clientes da C4 Marketing; analisar todas os dados
+        e informações que tiver acesso e planejar as melhores estratégias comerciais, financeiras, de marketing, de RH, para a C4 Marketing. Também ajudará na solução de crises com clientes. Use o contexto abaixo para responder à pergunta do usuário.
+        Se a resposta não estiver no contexto, diga que não sabe, mas tente ser útil com o que tem.
+        Sempre responda em Português do Brasil.
     
     Contexto:
     ${contextText}`
