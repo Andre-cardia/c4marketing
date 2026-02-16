@@ -136,18 +136,19 @@ function computeMonthlyMetrics(
 
     const now = new Date();
 
+    // Calculate the CURRENT active MRR once — based on all contracts active RIGHT NOW
+    // This is the projected MRR for every month, assuming all active contracts remain
+    const currentlyActiveContracts = acceptances.filter(a => isActiveContract(a));
+    const currentActiveMRR = currentlyActiveContracts.reduce((sum, acc) => sum + getMonthlyFee(acc), 0);
+    const currentActiveCount = currentlyActiveContracts.length;
+
     for (let m = 0; m < 12; m++) {
         const monthKey = `${year}-${String(m + 1).padStart(2, '0')}`;
         const monthStart = new Date(year, m, 1);
         const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
 
-        // Don't calculate data for future months — project MRR from current active base
+        // Future months: project current active MRR
         if (monthStart > now) {
-            // For forecast: project the last known MRR into future months
-            const lastRealMonth = result.length > 0 ? result[result.length - 1] : null;
-            const projectedMRR = lastRealMonth ? lastRealMonth.mrr : 0;
-            const projectedClients = lastRealMonth ? lastRealMonth.activeClients : 0;
-
             result.push({
                 month: monthKey,
                 monthLabel: monthLabels[m],
@@ -156,7 +157,7 @@ function computeMonthlyMetrics(
                 setupRevenue: 0, totalRevenue: 0,
                 activeClients: 0,
                 isForecast: true,
-                forecastMRR: projectedMRR,
+                forecastMRR: currentActiveMRR,
             });
             continue;
         }
@@ -227,7 +228,7 @@ function computeMonthlyMetrics(
             totalRevenue: mrr + setupRevenue,
             activeClients: activeContracts.length,
             isForecast: false,
-            forecastMRR: mrr,  // for past months, forecast = actual
+            forecastMRR: currentActiveMRR,  // projected MRR based on current active contracts
         });
     }
 
