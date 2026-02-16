@@ -263,10 +263,14 @@ const Account: React.FC = () => {
                 throw new Error('Você deve selecionar uma imagem para upload.');
             }
 
+            // 0. Get User ID for RLS
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Usuário não autenticado.');
+
             const file = event.target.files[0];
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const filePath = `${user.id}/${fileName}`; // Use ID folder for RLS
 
             // 1. Upload to Storage
             let { error: uploadError } = await supabase.storage
