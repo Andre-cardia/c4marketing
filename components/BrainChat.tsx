@@ -41,10 +41,10 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                 content: response.answer,
                 sources: response.documents
             }]);
-        } catch (error) {
+        } catch (error: any) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: 'Desculpe, tive um problema ao acessar o cérebro. Tente novamente mais tarde.'
+                content: `Desculpe, tive um problema ao acessar o cérebro. Detalhes do erro: ${error.message || JSON.stringify(error)}`
             }]);
         } finally {
             setLoading(false);
