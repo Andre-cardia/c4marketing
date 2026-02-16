@@ -519,6 +519,45 @@ const CommercialDashboard: React.FC = () => {
                         </p>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={async () => {
+                                if (!context) return;
+                                const content = `
+Relatório Comercial - ${selectedYear}
+MRR Atual: ${formatCompact(context.currentMRR)} (Crescimento: ${context.mrrGrowth}%)
+Receita Acumulada: ${formatCompact(context.accumulatedRevenue)}
+ARR (Run Rate): ${formatCompact(context.actualARR)}
+Conversão Média: ${context.averageConversionRate}%
+Churn Médio: ${context.averageChurnRate}%
+Clientes Ativos: ${context.currentActiveClients}
+
+Detalhamento Mensal:
+${context.months.map(m =>
+                                    `- ${m.monthLabel}: MRR ${formatCurrency(m.mrr)}, Receita ${formatCurrency(m.totalRevenue)}, Novos ${m.newContracts}, Churn ${m.churnedContracts}`
+                                ).join('\n')}
+                                `.trim();
+
+                                try {
+                                    alert('Salvando dados no cérebro... Aguarde.');
+                                    await import('../lib/brain').then(m => m.addToBrain(content, {
+                                        source: 'CommercialDashboard',
+                                        year: selectedYear,
+                                        type: 'report'
+                                    }));
+                                    alert('✅ Dados salvos no Cérebro com sucesso!');
+                                } catch (e) {
+                                    alert('❌ Erro ao salvar no cérebro.');
+                                    console.error(e);
+                                }
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all text-sm font-bold"
+                        >
+                            <Bot size={16} />
+                            Salvar no Cérebro
+                        </button>
+                    </div>
+
                     {/* Year selectors */}
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col gap-1">
