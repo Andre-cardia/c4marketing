@@ -270,6 +270,8 @@ const Dashboard: React.FC = () => {
     };
 
     const handleDeleteNotice = async (id: string) => {
+        if (userRole !== 'gestor') return; // Security check
+
         const { error } = await supabase.from('notices').delete().eq('id', id);
         if (!error) {
             setNotices(notices.filter(n => n.id !== id));
