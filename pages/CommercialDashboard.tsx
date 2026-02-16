@@ -336,7 +336,7 @@ const CommercialChatbot: React.FC<{
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-br from-brand-coral to-orange-600 text-white rounded-2xl shadow-2xl shadow-brand-coral/30 hover:shadow-brand-coral/50 transition-all hover:scale-105 group"
+                className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all hover:scale-105 group"
                 title="Diretor Comercial IA"
             >
                 <Bot size={24} className="group-hover:animate-pulse" />
@@ -350,7 +350,7 @@ const CommercialChatbot: React.FC<{
         return (
             <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex items-center gap-3 px-4 py-3 cursor-pointer hover:border-slate-700 transition-all"
                 onClick={() => setIsMinimized(false)}>
-                <Bot size={18} className="text-brand-coral" />
+                <Bot size={18} className="text-indigo-400" />
                 <span className="text-sm font-bold text-white">Diretor Comercial IA</span>
                 <span className="text-xs text-slate-500">{messages.length} msgs</span>
                 <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); setIsMinimized(false); }}
@@ -364,7 +364,7 @@ const CommercialChatbot: React.FC<{
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/50">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-brand-coral to-orange-600 rounded-xl">
+                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl">
                         <Bot size={18} className="text-white" />
                     </div>
                     <div>
@@ -394,7 +394,7 @@ const CommercialChatbot: React.FC<{
                         <div className="space-y-2">
                             {['Qual a tendência do MRR?', 'Analise o churn deste ano', 'Previsão para próximo trimestre'].map(q => (
                                 <button key={q} onClick={() => { setInput(q); }}
-                                    className="block w-full text-left text-xs text-slate-400 hover:text-brand-coral bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2 rounded-xl transition-colors">
+                                    className="block w-full text-left text-xs text-slate-400 hover:text-indigo-400 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2 rounded-xl transition-colors">
                                     💬 {q}
                                 </button>
                             ))}
@@ -405,7 +405,7 @@ const CommercialChatbot: React.FC<{
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                            ? 'bg-brand-coral text-white rounded-br-md'
+                            ? 'bg-indigo-600 text-white rounded-br-md shadow-lg shadow-indigo-600/20'
                             : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-md'
                             }`}>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -428,20 +428,20 @@ const CommercialChatbot: React.FC<{
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+            <div className="p-4 border-t border-slate-800 bg-slate-900/30 backdrop-blur-md">
                 <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex items-center gap-2">
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Pergunte ao Diretor Comercial..."
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-brand-coral focus:ring-1 focus:ring-brand-coral/20 outline-none transition-all"
+                        className="flex-1 bg-transparent border border-slate-800 hover:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
                         disabled={isLoading}
                     />
                     <button
                         type="submit"
                         disabled={isLoading || !input.trim()}
-                        className="p-2.5 bg-brand-coral text-white rounded-xl hover:bg-brand-coral/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        className="p-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-600/20"
                     >
                         <Send size={16} />
                     </button>
