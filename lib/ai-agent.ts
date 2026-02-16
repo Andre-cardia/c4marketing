@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const BASE_URL = import.meta.env.DEV ? '/api/openai' : 'https://api.openai.com';
 
 export interface AgentReport {
     executiveSummary: string;
@@ -114,7 +115,30 @@ async function fetchSystemContext() {
  */
 export async function analyzeSystem(): Promise<AgentReport> {
     if (!OPENAI_API_KEY) {
+        console.error('Missing OpenAI API Key');
         throw new Error('OpenAI API Key is missing. Please check your .env file.');
+    }
+
+    console.log('Starting AI Analysis...');
+    console.log('API Key present:', OPENAI_API_KEY.slice(0, 8) + '...');
+
+    // Test Connection First
+    try {
+        console.log('Testing OpenAI connection...');
+        const testResponse = await fetch(`${BASE_URL}/v1/models`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            }
+        });
+        if (!testResponse.ok) {
+            console.error('Connection test failed:', await testResponse.text());
+        } else {
+            console.log('Connection test successful.');
+        }
+    } catch (e) {
+        console.error('Connection test error (CORS/Network):', e);
+        throw new Error('Falha de conexão com OpenAI (CORS/Rede). Verifique se sua chave permite acesso via browser ou use um servidor backend.');
     }
 
     const context = await fetchSystemContext();
@@ -170,7 +194,7 @@ export async function analyzeSystem(): Promise<AgentReport> {
   `;
 
     try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -199,8 +223,12 @@ export async function analyzeSystem(): Promise<AgentReport> {
             ...reportData,
             timestamp: new Date().toISOString()
         };
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error calling OpenAI:', error);
+        // Enhance error message for user
+        if (error.message === 'Failed to fetch') {
+            throw new Error('Erro de conexão (CORS/Network). Verifique sua internet ou a validade da chave API. O navegador pode estar bloqueando a requisição.');
+        }
         throw error;
     }
 }
