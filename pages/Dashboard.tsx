@@ -70,6 +70,18 @@ interface Booking {
     meetingUrl?: string;
 }
 
+interface AccessLog {
+    id: string;
+    user_id: string;
+    accessed_at: string;
+    user_email?: string;
+    user?: {
+        full_name: string;
+        avatar_url?: string;
+        email: string;
+    };
+}
+
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { userRole, fullName, email, avatarUrl, loading: roleLoading } = useUserRole();
@@ -80,6 +92,8 @@ const Dashboard: React.FC = () => {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+    const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
+    const [usersMap, setUsersMap] = useState<Map<string, any>>(new Map());
     const [loading, setLoading] = useState(true);
 
     // Derived State
@@ -96,9 +110,39 @@ const Dashboard: React.FC = () => {
 
     // Notice Modal
     const [showNoticeModal, setShowNoticeModal] = useState(false);
+    const [showAccessReportModal, setShowAccessReportModal] = useState(false);
 
     // User Avatar Map
     const [userAvatars, setUserAvatars] = useState<{ [email: string]: string }>({});
+
+    // -- Access Control Logic --
+    const logAccess = async () => {
+        const lastLog = localStorage.getItem('lastAccessLog');
+        const now = new Date();
+
+        // Debounce: Log only if last log was > 30 minutes ago
+        if (lastLog) {
+            const lastDate = new Date(lastLog);
+            const diffInMinutes = (now.getTime() - lastDate.getTime()) / (1000 * 60);
+            if (diffInMinutes < 30) return;
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('access_logs').insert([{
+                user_id: user.id,
+                user_email: user.email
+            }]);
+            localStorage.setItem('lastAccessLog', now.toISOString());
+        }
+    };
+
+    const fetchAccessLogs = async () => {
+        const { data } = await supabase.from('access_logs').select('*').order('accessed_at', { ascending: false }).limit(20);
+        if (data) {
+            setAccessLogs(data);
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -113,10 +157,21 @@ const Dashboard: React.FC = () => {
             fetchUsersCount(),
             fetchNotices(),
             fetchAllTasks(acceptancesData),
-            fetchUpcomingBookings()
+            fetchUpcomingBookings(),
+            fetchUsersCount(),
+            fetchAccessLogs(),
+            logAccess()
         ]);
         setLoading(false);
     };
+
+    // Re-enrich access logs when usersMap changes
+    const enrichedAccessLogs = useMemo(() => {
+        return accessLogs.map(log => ({
+            ...log,
+            user: usersMap.get(log.user_id)
+        }));
+    }, [accessLogs, usersMap]);
 
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
@@ -187,17 +242,22 @@ const Dashboard: React.FC = () => {
         const { count, data } = await supabase.from('app_users').select('*', { count: 'exact' });
         if (count !== null) setTotalUsers(count);
 
-        // Build Avatar Map
+        // Build Avatar Map & Users Map
         if (data) {
             const map: { [email: string]: string } = {};
+            const uMap = new Map();
             data.forEach((u: any) => {
                 if (u.email && u.avatar_url) {
                     map[u.email] = u.avatar_url;
                 }
+                uMap.set(u.id, u);
             });
             setUserAvatars(map);
+            setUsersMap(uMap);
         }
     };
+
+
 
     const fetchNotices = async () => {
         const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(10);
@@ -682,6 +742,64 @@ const Dashboard: React.FC = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Recent Access & Report */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Activity className="w-5 h-5 text-brand-coral" />
+                                    Acessos Recentes
+                                </h3>
+                                {userRole === 'gestor' && (
+                                    <button
+                                        onClick={() => setShowAccessReportModal(true)}
+                                        className="text-xs flex items-center gap-1 text-slate-500 hover:text-brand-coral transition-colors font-bold"
+                                    >
+                                        <FileText size={12} /> Relatório
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                {enrichedAccessLogs.length === 0 ? (
+                                    <p className="text-slate-400 text-center py-4 text-sm">Nenhum acesso registrado.</p>
+                                ) : (
+                                    enrichedAccessLogs.map(log => {
+                                        const timeAgo = (() => {
+                                            const diff = new Date().getTime() - new Date(log.accessed_at).getTime();
+                                            const mins = Math.floor(diff / 60000);
+                                            if (mins < 60) return `${mins}m atrás`;
+                                            const hours = Math.floor(mins / 60);
+                                            if (hours < 24) return `${hours}h atrás`;
+                                            return new Date(log.accessed_at).toLocaleDateString() + ' ' + new Date(log.accessed_at).toLocaleTimeString().slice(0, 5);
+                                        })();
+
+                                        return (
+                                            <div key={log.id} className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    {log.user?.avatar_url ? (
+                                                        <img src={log.user.avatar_url} alt={log.user.full_name} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                                            <Users size={14} className="text-slate-400" />
+                                                        </div>
+                                                    )}
+                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-baseline">
+                                                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate pr-2">
+                                                            {log.user?.full_name || log.user_email || 'Usuário'}
+                                                        </h4>
+                                                        <span className="text-[10px] text-slate-400 whitespace-nowrap">{timeAgo}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -801,6 +919,91 @@ const Dashboard: React.FC = () => {
                     authorName={fullName}
                     authorAvatar={avatarUrl}
                 />
+
+                {/* Monthly Access Report Modal */}
+                {showAccessReportModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                            <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                        <FileText className="text-brand-coral" />
+                                        Relatório Mensal de Acesso
+                                    </h2>
+                                    <p className="text-sm text-slate-500 mt-1">Desempenho da equipe neste mês</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowAccessReportModal(false)}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 transition-colors"
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div className="p-8 overflow-y-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 text-xs uppercase text-slate-500 tracking-wider">
+                                            <th className="pb-4 pl-2 font-bold">Colaborador</th>
+                                            <th className="pb-4 text-center font-bold">Acessos (Mês)</th>
+                                            <th className="pb-4 text-center font-bold">Tarefas Atribuídas</th>
+                                            <th className="pb-4 text-center font-bold text-emerald-500">Concluídas</th>
+                                            <th className="pb-4 text-center font-bold text-red-500">Atrasadas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm font-medium">
+                                        {(() => {
+                                            // Calculate Stats
+                                            const currentMonth = new Date().toISOString().slice(0, 7);
+                                            const stats = Array.from(usersMap.values()).map(user => {
+                                                const userLogs = accessLogs.filter(l => l.user_id === user.id && l.accessed_at.startsWith(currentMonth)).length;
+                                                // Note: Tasks normally don't have assignee_id linked clearly in this demo interface (it was assignee name string). 
+                                                // We will match by Name fuzzy or assume we can't fully link without ID.
+                                                // For this demo, we will try to match by name if user.full_name is in task.assignee
+                                                const userTasks = tasks.filter(t => t.assignee && t.assignee.includes(user.full_name || '')); // Fuzzy match
+
+                                                const totalTasks = userTasks.length;
+                                                const completed = userTasks.filter(t => t.status === 'done').length;
+                                                const overdue = userTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
+
+                                                // If no logs and no tasks, skip? No, show all users.
+                                                return { user, userLogs, totalTasks, completed, overdue };
+                                            }).sort((a, b) => b.userLogs - a.userLogs); // Sort by visibility
+
+                                            return stats.map(({ user, userLogs, totalTasks, completed, overdue }) => (
+                                                <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="py-4 pl-2">
+                                                        <div className="flex items-center gap-3">
+                                                            {user.avatar_url ? (
+                                                                <img src={user.avatar_url} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold">
+                                                                    {user.full_name?.charAt(0) || '?'}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <div className="font-bold text-slate-800 dark:text-white">{user.full_name}</div>
+                                                                <div className="text-xs text-slate-400">{user.email}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 text-center text-slate-600 dark:text-slate-300">
+                                                        <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full font-bold">
+                                                            {userLogs}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 text-center text-slate-600 dark:text-slate-300">{totalTasks}</td>
+                                                    <td className="py-4 text-center font-bold text-emerald-500">{completed}</td>
+                                                    <td className="py-4 text-center font-bold text-red-500">{overdue}</td>
+                                                </tr>
+                                            ));
+                                        })()}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </main>
         </div>
     );
