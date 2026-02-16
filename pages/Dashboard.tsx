@@ -451,70 +451,67 @@ const Dashboard: React.FC = () => {
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
-                                                <th className="py-3 pl-2">Cliente / Projeto</th>
-                                                <th className="py-3">Serviços</th>
+                                                <th className="py-3 pl-2">Cliente</th>
+                                                <th className="py-3">Serviço</th>
                                                 <th className="py-3 w-1/4">Progresso Geral</th>
                                                 <th className="py-3">Próximo Prazo</th>
                                                 <th className="py-3 text-right pr-2">Ação</th>
                                             </tr>
                                         </thead>
                                         <tbody className="text-sm">
-                                            {acceptances.filter(a => a.status === 'Ativo').slice(0, 5).map((project) => {
-                                                const progress = getProjectProgress(project.id);
-                                                const nextDeadline = getNextDeadline(project.id);
-                                                const services = getProjectServices(project);
+                                            {acceptances
+                                                .filter(a => a.status === 'Ativo')
+                                                .slice(0, 5)
+                                                .map((project) => {
+                                                    const services = getProjectServices(project);
+                                                    const progress = getProjectProgress(project.id);
+                                                    const nextDeadline = getNextDeadline(project.id);
 
-                                                return (
-                                                    <tr key={project.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                                        <td className="py-4 pl-2 font-bold text-slate-800 dark:text-white">
-                                                            {project.company_name}
-                                                        </td>
-                                                        <td className="py-4">
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {services.slice(0, 2).map((s, i) => (
-                                                                    <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase rounded-md border border-slate-200 dark:border-slate-700">
-                                                                        {s}
-                                                                    </span>
-                                                                ))}
-                                                                {services.length > 2 && (
-                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 text-[10px] font-bold rounded-md">+{services.length - 2}</span>
+                                                    return services.map((service, index) => (
+                                                        <tr key={`${project.id}-${index}`} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                            <td className="py-4 pl-2 font-bold text-slate-800 dark:text-white">
+                                                                {/* Show project name only on first service or repeat? Let's repeat for clarity but maybe lighter if subsequent? No, repeat is safer for now. */}
+                                                                {project.company_name}
+                                                            </td>
+                                                            <td className="py-4">
+                                                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-md border border-slate-200 dark:border-slate-700">
+                                                                    {service}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-4 pr-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-brand-coral'}`}
+                                                                            style={{ width: `${progress}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-slate-500 w-8 text-right">{progress}%</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4">
+                                                                {nextDeadline ? (
+                                                                    <div className="flex items-center gap-1.5 text-xs">
+                                                                        <Clock size={12} className={new Date(nextDeadline) < new Date() ? 'text-red-500' : 'text-slate-400'} />
+                                                                        <span className={new Date(nextDeadline) < new Date() ? 'text-red-500 font-bold' : 'text-slate-600 dark:text-slate-300'}>
+                                                                            {new Date(nextDeadline).toLocaleDateString()}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs text-slate-400">-</span>
                                                                 )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 pr-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                                    <div
-                                                                        className={`h-full rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-brand-coral'}`}
-                                                                        style={{ width: `${progress}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                                <span className="text-xs font-bold text-slate-500 w-8 text-right">{progress}%</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4">
-                                                            {nextDeadline ? (
-                                                                <div className="flex items-center gap-1.5 text-xs">
-                                                                    <Clock size={12} className={new Date(nextDeadline) < new Date() ? 'text-red-500' : 'text-slate-400'} />
-                                                                    <span className={new Date(nextDeadline) < new Date() ? 'text-red-500 font-bold' : 'text-slate-600 dark:text-slate-300'}>
-                                                                        {new Date(nextDeadline).toLocaleDateString()}
-                                                                    </span>
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-xs text-slate-400">-</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-4 text-right pr-2">
-                                                            <button
-                                                                onClick={() => navigate('/projects')} // Ideally open specific project modal
-                                                                className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors"
-                                                            >
-                                                                <ArrowRight size={14} />
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                                            </td>
+                                                            <td className="py-4 text-right pr-2">
+                                                                <button
+                                                                    onClick={() => navigate('/projects')}
+                                                                    className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors"
+                                                                >
+                                                                    <ArrowRight size={14} />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ));
+                                                })}
                                         </tbody>
                                     </table>
                                 </div>
