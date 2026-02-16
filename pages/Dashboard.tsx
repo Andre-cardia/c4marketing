@@ -49,8 +49,8 @@ interface Notice {
 interface Task {
     id: string;
     title: string;
-    status: string;
-    priority: string;
+    status: 'backlog' | 'in_progress' | 'approval' | 'done' | 'paused';
+    priority: 'low' | 'medium' | 'high';
     due_date: string;
     project_id: number;
     description?: string;
@@ -122,7 +122,6 @@ const Dashboard: React.FC = () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         if (data) {
             setAcceptances(data);
-            calculateRevenue(data);
             return data;
         }
         return [];
