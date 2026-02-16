@@ -165,6 +165,44 @@ const Proposals: React.FC = () => {
         }
     };
 
+    const handleEmailChange = async (id: number, email: string) => {
+        setAcceptances(prev => prev.map(acc =>
+            acc.id === id ? { ...acc, email: email } : acc
+        ));
+
+        try {
+            const { error } = await supabase
+                .from('acceptances')
+                .update({ email: email })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating email:', error);
+            alert('Erro ao atualizar email.');
+            fetchAcceptances();
+        }
+    };
+
+    const handleCnpjChange = async (id: number, cnpj: string) => {
+        setAcceptances(prev => prev.map(acc =>
+            acc.id === id ? { ...acc, cnpj: cnpj } : acc
+        ));
+
+        try {
+            const { error } = await supabase
+                .from('acceptances')
+                .update({ cnpj: cnpj })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating CNPJ:', error);
+            alert('Erro ao atualizar CNPJ.');
+            fetchAcceptances();
+        }
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'Ativo': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
@@ -328,7 +366,13 @@ const Proposals: React.FC = () => {
                                                     <Users className="w-4 h-4 text-slate-300 dark:text-slate-500" />
                                                     <span className="font-bold text-slate-800 dark:text-white">{acc.name}</span>
                                                 </div>
-                                                {acc.email && <div className="text-xs text-slate-400 pl-6">{acc.email}</div>}
+                                                <input
+                                                    type="email"
+                                                    value={acc.email || ''}
+                                                    onChange={(e) => handleEmailChange(acc.id, e.target.value)}
+                                                    className="text-xs text-slate-400 pl-6 bg-transparent outline-none border border-transparent hover:border-slate-200 focus:border-brand-coral rounded px-1 transition-all w-full"
+                                                    placeholder="Adicionar email"
+                                                />
                                             </td>
                                             <td className="p-5">
                                                 <div className="flex flex-col gap-1">
@@ -336,11 +380,13 @@ const Proposals: React.FC = () => {
                                                         <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
                                                         <span className="font-semibold text-slate-700 dark:text-slate-200">{acc.company_name}</span>
                                                     </div>
-                                                    {acc.cnpj && (
-                                                        <div className="text-xs text-slate-400 pl-6 font-mono">
-                                                            {acc.cnpj}
-                                                        </div>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        value={acc.cnpj || ''}
+                                                        onChange={(e) => handleCnpjChange(acc.id, e.target.value)}
+                                                        className="text-xs text-slate-400 pl-6 font-mono bg-transparent outline-none border border-transparent hover:border-slate-200 focus:border-brand-coral rounded px-1 transition-all w-full"
+                                                        placeholder="00.000.000/0000-00"
+                                                    />
                                                 </div>
                                             </td>
                                             <td className="p-5">
