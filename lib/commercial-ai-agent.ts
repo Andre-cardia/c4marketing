@@ -18,6 +18,8 @@ export interface MonthlyMetrics {
     setupRevenue: number;
     totalRevenue: number;  // mrr + setupRevenue
     activeClients: number;
+    isForecast: boolean;   // true if this month is a projection
+    forecastMRR: number;   // projected MRR (equals mrr for past months, projected for future)
 }
 
 export interface CommercialContext {
@@ -27,6 +29,7 @@ export interface CommercialContext {
     comparisonYear?: number;
     currentMRR: number;
     currentARR: number;
+    predictedARR: number;   // projected ARR based on current MRR * 12
     currentActiveClients: number;
     averageChurnRate: number;
     averageConversionRate: number;
@@ -92,6 +95,11 @@ export async function fetchCommercialContext(
         ? ((currentMRR - previousMonth.mrr) / previousMonth.mrr) * 100
         : 0;
 
+    // Predicted ARR: sum of forecastMRR for each month in the year
+    const predictedARR = months.reduce((sum, m) => sum + m.forecastMRR, 0);
+    // Actual ARR: sum of real MRR for past months only
+    const actualARR = months.filter(m => !m.isForecast).reduce((sum, m) => sum + m.mrr, 0);
+
     const avgChurn = months.length > 0
         ? months.reduce((sum, m) => sum + (m.activeClients > 0 ? (m.churnedContracts / m.activeClients) * 100 : 0), 0) / months.length
         : 0;
@@ -106,7 +114,8 @@ export async function fetchCommercialContext(
         comparisonMonths,
         comparisonYear,
         currentMRR,
-        currentARR: currentMRR * 12,
+        currentARR: actualARR,
+        predictedARR,
         currentActiveClients: currentMonth?.activeClients || 0,
         averageChurnRate: Math.round(avgChurn * 10) / 10,
         averageConversionRate: Math.round(avgConversion * 10) / 10,
@@ -132,14 +141,22 @@ function computeMonthlyMetrics(
         const monthStart = new Date(year, m, 1);
         const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
 
-        // Don't calculate data for future months — they haven't happened yet
+        // Don't calculate data for future months — project MRR from current active base
         if (monthStart > now) {
+            // For forecast: project the last known MRR into future months
+            const lastRealMonth = result.length > 0 ? result[result.length - 1] : null;
+            const projectedMRR = lastRealMonth ? lastRealMonth.mrr : 0;
+            const projectedClients = lastRealMonth ? lastRealMonth.activeClients : 0;
+
             result.push({
                 month: monthKey,
                 monthLabel: monthLabels[m],
                 mrr: 0, arr: 0, newContracts: 0, churnedContracts: 0,
                 totalProposals: 0, acceptedProposals: 0, conversionRate: 0,
-                setupRevenue: 0, totalRevenue: 0, activeClients: 0,
+                setupRevenue: 0, totalRevenue: 0,
+                activeClients: 0,
+                isForecast: true,
+                forecastMRR: projectedMRR,
             });
             continue;
         }
@@ -209,6 +226,8 @@ function computeMonthlyMetrics(
             setupRevenue,
             totalRevenue: mrr + setupRevenue,
             activeClients: activeContracts.length,
+            isForecast: false,
+            forecastMRR: mrr,  // for past months, forecast = actual
         });
     }
 

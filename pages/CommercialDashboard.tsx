@@ -562,7 +562,7 @@ const CommercialDashboard: React.FC = () => {
                 ) : context ? (
                     <>
                         {/* KPI Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
                             <KPICard
                                 title="MRR"
                                 value={formatCompact(context.currentMRR)}
@@ -571,10 +571,16 @@ const CommercialDashboard: React.FC = () => {
                                 subtitle="Receita Mensal Recorrente"
                             />
                             <KPICard
-                                title="ARR"
+                                title="ARR Real"
                                 value={formatCompact(context.currentARR)}
                                 icon={<TrendingUp size={18} className="text-emerald-400" />}
-                                subtitle="Receita Anual Recorrente"
+                                subtitle="Acumulado até o mês atual"
+                            />
+                            <KPICard
+                                title="ARR Previsto"
+                                value={formatCompact(context.predictedARR)}
+                                icon={<TrendingUp size={18} className="text-amber-400" />}
+                                subtitle="Projeção anual"
                             />
                             <KPICard
                                 title="Conversão"
@@ -659,7 +665,8 @@ const CommercialDashboard: React.FC = () => {
                                     <thead>
                                         <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
                                             <th className="py-3 px-3">Mês</th>
-                                            <th className="py-3 px-3 text-right">MRR</th>
+                                            <th className="py-3 px-3 text-right">MRR Real</th>
+                                            <th className="py-3 px-3 text-right">MRR Previsto</th>
                                             <th className="py-3 px-3 text-right">Setup</th>
                                             <th className="py-3 px-3 text-right">Total</th>
                                             <th className="py-3 px-3 text-center">Propostas</th>
@@ -672,26 +679,72 @@ const CommercialDashboard: React.FC = () => {
                                     </thead>
                                     <tbody className="text-xs">
                                         {context.months.map((m, i) => (
-                                            <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
-                                                <td className="py-3 px-3 font-bold text-white">{m.monthLabel}</td>
-                                                <td className="py-3 px-3 text-right text-brand-coral font-medium">{formatCurrency(m.mrr)}</td>
-                                                <td className="py-3 px-3 text-right text-blue-400 font-medium">{formatCurrency(m.setupRevenue)}</td>
-                                                <td className="py-3 px-3 text-right text-white font-bold">{formatCurrency(m.totalRevenue)}</td>
-                                                <td className="py-3 px-3 text-center text-slate-400">{m.totalProposals}</td>
-                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.acceptedProposals}</td>
-                                                <td className="py-3 px-3 text-center">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.conversionRate >= 50 ? 'text-emerald-400 bg-emerald-400/10' :
-                                                        m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
-                                                            'text-slate-500 bg-slate-800'
-                                                        }`}>
-                                                        {m.conversionRate}%
-                                                    </span>
+                                            <tr key={i} className={`border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors ${m.isForecast ? 'opacity-60' : ''}`}>
+                                                <td className="py-3 px-3 font-bold text-white">
+                                                    {m.monthLabel}
+                                                    {m.isForecast && (
+                                                        <span className="ml-2 text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-bold">PREV</span>
+                                                    )}
                                                 </td>
-                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.newContracts}</td>
-                                                <td className="py-3 px-3 text-center text-red-400 font-medium">{m.churnedContracts}</td>
-                                                <td className="py-3 px-3 text-center text-white font-bold">{m.activeClients}</td>
+                                                <td className="py-3 px-3 text-right text-brand-coral font-medium">
+                                                    {m.isForecast ? '—' : formatCurrency(m.mrr)}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-amber-400 font-medium">
+                                                    {formatCurrency(m.forecastMRR)}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-blue-400 font-medium">
+                                                    {m.isForecast ? '—' : formatCurrency(m.setupRevenue)}
+                                                </td>
+                                                <td className="py-3 px-3 text-right text-white font-bold">
+                                                    {m.isForecast ? formatCurrency(m.forecastMRR) : formatCurrency(m.totalRevenue)}
+                                                </td>
+                                                <td className="py-3 px-3 text-center text-slate-400">{m.isForecast ? '—' : m.totalProposals}</td>
+                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.acceptedProposals}</td>
+                                                <td className="py-3 px-3 text-center">
+                                                    {m.isForecast ? '—' : (
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.conversionRate >= 50 ? 'text-emerald-400 bg-emerald-400/10' :
+                                                            m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
+                                                                'text-slate-500 bg-slate-800'
+                                                            }`}>
+                                                            {m.conversionRate}%
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.newContracts}</td>
+                                                <td className="py-3 px-3 text-center text-red-400 font-medium">{m.isForecast ? '—' : m.churnedContracts}</td>
+                                                <td className="py-3 px-3 text-center text-white font-bold">{m.isForecast ? '—' : m.activeClients}</td>
                                             </tr>
                                         ))}
+                                        {/* Totals row */}
+                                        <tr className="border-t-2 border-slate-700 bg-slate-800/30 font-bold">
+                                            <td className="py-3 px-3 text-white">TOTAL</td>
+                                            <td className="py-3 px-3 text-right text-brand-coral">
+                                                {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.mrr, 0))}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-amber-400">
+                                                {formatCurrency(context.months.reduce((s, m) => s + m.forecastMRR, 0))}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-blue-400">
+                                                {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.setupRevenue, 0))}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-white">
+                                                {formatCurrency(context.months.reduce((s, m) => s + (m.isForecast ? m.forecastMRR : m.totalRevenue), 0))}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-slate-400">
+                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.totalProposals, 0)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-emerald-400">
+                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.acceptedProposals, 0)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-slate-500">—</td>
+                                            <td className="py-3 px-3 text-center text-emerald-400">
+                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.newContracts, 0)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-red-400">
+                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.churnedContracts, 0)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-white">{context.currentActiveClients}</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
