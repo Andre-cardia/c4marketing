@@ -67,7 +67,13 @@ Deno.serve(async (req) => {
         }
 
         // 3. Construct prompt for LLM
-        const contextText = documents?.map(d => `${d.content} (Source: ${JSON.stringify(d.metadata)})`).join('\n---\n') || 'No context found.'
+        const contextText = documents?.map(d => {
+            const meta = d.metadata || {};
+            if (meta.type === 'chat_log') {
+                return `[Histórico de Conversa - ${meta.role} - ${meta.timestamp}]: ${d.content}`;
+            }
+            return `[Documento - Fonte: ${meta.source || 'Desconhecida'}]: ${d.content}`;
+        }).join('\n---\n') || 'Nenhum contexto encontrado.';
 
         const systemPrompt = `Você é o "Segundo Cérebro" corporativo. Você é responsavel por:analisar e arquitetar soluções de marketing digital para os clientes da C4 Marketing; analisar todas os dados
         e informações que tiver acesso e planejar as melhores estratégias comerciais, financeiras, de marketing, de RH, para a C4 Marketing. Também ajudará na solução de crises com clientes. Use o contexto abaixo para responder à pergunta do usuário.

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { askBrain, BrainDocument } from '../lib/brain';
+import { askBrain, addToBrain, BrainDocument } from '../lib/brain';
 import { Send, Bot, User, Loader2, FileText, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -34,13 +34,30 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setLoading(true);
 
+        // Fire-and-forget: Save user message to Brain
+        addToBrain(userMessage, {
+            type: 'chat_log',
+            role: 'user',
+            timestamp: new Date().toISOString()
+        }).catch(err => console.error('Failed to save user chat log:', err));
+
         try {
             const response = await askBrain(userMessage);
+
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: response.answer,
                 sources: response.documents
             }]);
+
+            // Fire-and-forget: Save assistant message to Brain
+            addToBrain(response.answer, {
+                type: 'chat_log',
+                role: 'assistant',
+                timestamp: new Date().toISOString(),
+                related_query: userMessage
+            }).catch(err => console.error('Failed to save assistant chat log:', err));
+
         } catch (error: any) {
             console.error('Brain Error:', error);
 
