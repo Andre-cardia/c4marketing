@@ -149,6 +149,108 @@ export default function BrainManager() {
         }
     };
 
+    const syncAllData = async () => {
+        if (!window.confirm('Isso irá ler todos os dados de produção (Usuários, Propostas, Contratos, Projetos) e enviar para o "Cérebro". Isso pode demorar. Deseja continuar?')) {
+            return;
+        }
+
+        setIsUploading(true);
+        let count = 0;
+
+        try {
+            // 1. Users
+            const { data: users } = await supabase.from('app_users').select('*');
+            if (users) {
+                for (const u of users) {
+                    const content = `[USUÁRIO] O usuário ${u.email} tem papel de ${u.role}. ID: ${u.id}.`;
+                    await addToBrain(content, {
+                        type: 'database_record',
+                        source_table: 'app_users',
+                        source_id: u.id,
+                        title: `Usuário: ${u.email}`
+                    });
+                    count++;
+                }
+            }
+
+            // 2. Proposals
+            const { data: proposals } = await supabase.from('proposals').select('*');
+            if (proposals) {
+                for (const p of proposals) {
+                    const services = Array.isArray(p.services)
+                        ? p.services.map((s: any) => typeof s === 'string' ? s : s.id).join(', ')
+                        : 'Nenhum';
+
+                    const content = `[PROPOSTA] Proposta para empresa ${p.company_name} (Responsável: ${p.responsible_name}). 
+                    Valor Mensal: R$ ${p.monthly_fee}, Setup: R$ ${p.setup_fee}. 
+                    Duração: ${p.contract_duration} meses. Serviços: ${services}. 
+                    Criada em: ${new Date(p.created_at).toLocaleDateString()}. ID: ${p.id}.`;
+
+                    await addToBrain(content, {
+                        type: 'database_record',
+                        source_table: 'proposals',
+                        source_id: p.id.toString(),
+                        title: `Proposta: ${p.company_name}`
+                    });
+                    count++;
+                }
+            }
+
+            // 3. Acceptances (Contracts)
+            const { data: acceptances } = await supabase.from('acceptances').select('*');
+            if (acceptances) {
+                for (const acc of acceptances) {
+                    const content = `[CONTRATO] Contrato Aceito para ${acc.company_name} (CNPJ: ${acc.cnpj || 'N/A'}).
+                    Cliente: ${acc.name} (${acc.email}). Status: ${acc.status}.
+                    Aceite em: ${new Date(acc.timestamp).toLocaleDateString()}.
+                    Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString() : 'Indefinida'}.
+                    ID: ${acc.id}.`;
+
+                    await addToBrain(content, {
+                        type: 'database_record',
+                        source_table: 'acceptances',
+                        source_id: acc.id.toString(),
+                        title: `Contrato: ${acc.company_name}`
+                    });
+                    count++;
+                }
+            }
+
+            // 4. Projects (Traffic, Website, Landing Page)
+            // Traffic
+            const { data: trafficParams } = await supabase.from('traffic_projects').select('*');
+            if (trafficParams) {
+                for (const tp of trafficParams) {
+                    const content = `[PROJETO TRÁFEGO] Cliente: ${tp.client_name}. Status: ${tp.status}.
+                    Objetivo: ${tp.objective}. Investimento Mensal: ${tp.monthly_investment}.
+                    Redes: ${Array.isArray(tp.ad_networks) ? tp.ad_networks.join(', ') : tp.ad_networks}.
+                    Público Alvo: ${tp.target_audience}. ID: ${tp.id}.`;
+
+                    await addToBrain(content, {
+                        type: 'database_record',
+                        source_table: 'traffic_projects',
+                        source_id: tp.id,
+                        title: `Projeto Tráfego: ${tp.client_name}`
+                    });
+                    count++;
+                }
+            }
+
+            // Simple notification
+            if (currentSessionId) {
+                await addChatMessage(currentSessionId, 'assistant', `Sincronização concluída! ${count} registros de produção foram analisados e salvos no meu banco de dados vetorial.`);
+                loadMessages(currentSessionId);
+            }
+            alert(`Sincronização finalizada com sucesso! ${count} registros processados.`);
+
+        } catch (error) {
+            console.error('Sync failed:', error);
+            alert('Erro durante a sincronização. Verifique o console.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -269,6 +371,15 @@ export default function BrainManager() {
                                 accept=".txt,.md,.pdf" // PDF support is strictly placeholder for now
                                 onChange={handleFileUpload}
                             />
+                            <button
+                                onClick={syncAllData}
+                                disabled={isUploading}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-brand-dark hover:bg-slate-800 text-brand-coral font-bold rounded-md text-sm transition-colors border border-brand-coral/30 hover:border-brand-coral shadow-lg shadow-brand-coral/10 mr-2"
+                                title="Sincronizar dados de produção com o Cérebro"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isUploading ? 'animate-spin' : ''}`} />
+                                <span className="hidden sm:inline">Sincronizar DB</span>
+                            </button>
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isUploading}
