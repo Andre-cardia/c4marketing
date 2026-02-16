@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
+import CreateProjectModal from '../components/projects/CreateProjectModal';
 
 interface Project {
     id: number;
@@ -33,6 +34,7 @@ const Projects: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
     const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('darkMode') === 'true';
@@ -196,15 +198,24 @@ const Projects: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Projetos Ativos</h2>
                         <p className="text-slate-500 dark:text-slate-400 text-sm">Gerencie os serviços contratados pelos seus clientes.</p>
                     </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar projeto..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
-                        />
+                    <div className="flex gap-4">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar projeto..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
+                            />
+                        </div>
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            className="bg-brand-coral hover:bg-red-500 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-coral/20"
+                        >
+                            <Plus size={20} />
+                            <span className="hidden sm:inline">Novo Projeto</span>
+                        </button>
                     </div>
                 </div>
 
@@ -314,6 +325,15 @@ const Projects: React.FC = () => {
                 isOpen={!!selectedProjectForKanban}
                 onClose={() => setSelectedProjectForKanban(null)}
                 project={selectedProjectForKanban}
+            />
+
+            <CreateProjectModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onProjectCreated={() => {
+                    fetchProjects();
+                    setShowCreateModal(false);
+                }}
             />
         </div>
     );
