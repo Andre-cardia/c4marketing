@@ -24,7 +24,7 @@ export default function AIAgent() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 transition-colors duration-200">
+        <div className="min-h-screen bg-slate-950 transition-colors duration-200 selection:bg-brand-coral/30">
             <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -32,7 +32,7 @@ export default function AIAgent() {
                 {/* Page Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
+                        <div className="p-3 bg-slate-900/50 backdrop-blur-md rounded-xl border border-white/10 shadow-lg">
                             <Bot className="w-8 h-8 text-brand-coral" />
                         </div>
                         <div>
@@ -44,7 +44,7 @@ export default function AIAgent() {
                     <button
                         onClick={runAnalysis}
                         disabled={loading}
-                        className="flex items-center gap-2 px-6 py-3 bg-brand-coral hover:bg-brand-coral/90 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-6 py-3 bg-brand-coral/90 hover:bg-brand-coral text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm border border-white/10"
                     >
                         {loading ? (
                             <>
@@ -62,7 +62,7 @@ export default function AIAgent() {
 
                 {/* Error State */}
                 {error && (
-                    <div className="mb-8 p-4 bg-red-950/30 border border-red-900/50 rounded-2xl flex items-start gap-3">
+                    <div className="mb-8 p-4 bg-red-950/30 backdrop-blur-md border border-red-500/20 rounded-2xl flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                         <div>
                             <h3 className="font-bold text-red-400 text-sm">Erro na Análise</h3>
@@ -73,9 +73,9 @@ export default function AIAgent() {
 
                 {/* Empty State */}
                 {!report && !loading && !error && (
-                    <div className="flex flex-col items-center justify-center py-24 bg-slate-900/50 rounded-3xl border border-slate-800 border-dashed text-center px-4">
-                        <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-xl">
-                            <Bot className="w-10 h-10 text-slate-600" />
+                    <div className="flex flex-col items-center justify-center py-24 bg-slate-900/30 backdrop-blur-sm rounded-3xl border border-white/5 border-dashed text-center px-4">
+                        <div className="w-20 h-20 bg-slate-800/50 backdrop-blur-md rounded-full flex items-center justify-center mb-6 border border-white/5 shadow-xl ring-1 ring-white/5">
+                            <Bot className="w-10 h-10 text-slate-500" />
                         </div>
                         <h3 className="text-xl font-bold text-white">Pronto para iniciar</h3>
                         <p className="text-slate-400 mt-2 max-w-md mx-auto text-sm">
@@ -87,13 +87,13 @@ export default function AIAgent() {
                 {/* Loading Skeleton */}
                 {loading && !report && (
                     <div className="space-y-6 animate-pulse">
-                        <div className="h-32 bg-slate-900/50 rounded-2xl border border-slate-800 p-8"></div>
+                        <div className="h-32 bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5 p-8"></div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="h-28 bg-slate-900/50 rounded-2xl border border-slate-800"></div>
-                            <div className="h-28 bg-slate-900/50 rounded-2xl border border-slate-800"></div>
-                            <div className="h-28 bg-slate-900/50 rounded-2xl border border-slate-800"></div>
+                            <div className="h-28 bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5"></div>
+                            <div className="h-28 bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5"></div>
+                            <div className="h-28 bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5"></div>
                         </div>
-                        <div className="h-96 bg-slate-900/50 rounded-2xl border border-slate-800"></div>
+                        <div className="h-96 bg-slate-900/30 backdrop-blur-md rounded-2xl border border-white/5"></div>
                     </div>
                 )}
 
@@ -102,7 +102,7 @@ export default function AIAgent() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                         {/* Executive Summary Card */}
-                        <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl">
+                        <div className="bg-slate-900/60 backdrop-blur-md rounded-2xl p-6 border border-white/10 shadow-2xl ring-1 ring-white/5">
                             <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                                 <Sparkles className="w-5 h-5 text-brand-coral" />
                                 Resumo Executivo
@@ -110,7 +110,7 @@ export default function AIAgent() {
                             <p className="text-slate-300 leading-relaxed text-sm">
                                 {report.executiveSummary}
                             </p>
-                            <div className="mt-4 pt-4 border-t border-slate-800 flex items-center gap-2 text-xs text-slate-500">
+                            <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-xs text-slate-500">
                                 <Clock className="w-3 h-3" />
                                 Atualizado em: {new Date(report.timestamp).toLocaleString()}
                             </div>
@@ -119,10 +119,10 @@ export default function AIAgent() {
                         {/* KPI Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Proposals KPI */}
-                            <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col justify-between">
+                            <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-white/5 shadow-lg ring-1 ring-white/5 flex flex-col justify-between hover:bg-slate-900/50 transition-colors">
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Vendas</span>
-                                    <div className="p-2 bg-slate-800 rounded-lg text-emerald-400">
+                                    <div className="p-2 bg-white/5 rounded-lg text-emerald-400">
                                         <TrendingUp className="w-4 h-4" />
                                     </div>
                                 </div>
@@ -130,16 +130,16 @@ export default function AIAgent() {
                                     <h3 className="text-2xl font-bold text-white">{report.proposals.totalValue}</h3>
                                     <p className="text-xs text-slate-500 mt-1">Valor Estimado (Mês)</p>
                                 </div>
-                                <div className="mt-4 p-2 bg-slate-950 rounded-lg border border-slate-800/50">
+                                <div className="mt-4 p-2 bg-slate-950/50 rounded-lg border border-white/5">
                                     <p className="text-xs text-emerald-400/80 italic">"{report.proposals.celebrationMessage}"</p>
                                 </div>
                             </div>
 
                             {/* Tasks KPI */}
-                            <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col justify-between">
+                            <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-white/5 shadow-lg ring-1 ring-white/5 flex flex-col justify-between hover:bg-slate-900/50 transition-colors">
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Operacional</span>
-                                    <div className="p-2 bg-slate-800 rounded-lg text-blue-400">
+                                    <div className="p-2 bg-white/5 rounded-lg text-blue-400">
                                         <Calendar className="w-4 h-4" />
                                     </div>
                                 </div>
@@ -153,16 +153,16 @@ export default function AIAgent() {
                                         <span className="text-xs text-slate-600">No backlog</span>
                                     </div>
                                 </div>
-                                <p className="mt-3 text-xs text-slate-500 border-t border-slate-800 pt-2 line-clamp-2">
+                                <p className="mt-3 text-xs text-slate-500 border-t border-white/5 pt-2 line-clamp-2">
                                     {report.tasks.analysis}
                                 </p>
                             </div>
 
                             {/* Users KPI */}
-                            <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col justify-between">
+                            <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-white/5 shadow-lg ring-1 ring-white/5 flex flex-col justify-between hover:bg-slate-900/50 transition-colors">
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Equipe</span>
-                                    <div className="p-2 bg-slate-800 rounded-lg text-purple-400">
+                                    <div className="p-2 bg-white/5 rounded-lg text-purple-400">
                                         <Users className="w-4 h-4" />
                                     </div>
                                 </div>
@@ -172,7 +172,7 @@ export default function AIAgent() {
                                 </div>
                                 <div className="mt-4 flex -space-x-2">
                                     {report.users.newUsers.slice(0, 4).map((u, i) => (
-                                        <div key={i} className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-300" title={u.name}>
+                                        <div key={i} className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-300 ring-2 ring-slate-900" title={u.name}>
                                             {u.name.substring(0, 1)}
                                         </div>
                                     ))}
@@ -190,27 +190,27 @@ export default function AIAgent() {
 
                                 <div className="space-y-3">
                                     {report.tasks.inProgress.map((task, i) => (
-                                        <div key={i} className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-start justify-between hover:border-slate-700 transition-colors">
+                                        <div key={i} className="bg-slate-900/40 backdrop-blur-sm p-4 rounded-xl border border-white/5 flex items-start justify-between hover:bg-slate-900/60 hover:border-white/10 transition-all group">
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${task.priority.toLowerCase().includes('alta') ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-blue-500'}`}></span>
-                                                    <h4 className="font-bold text-slate-200 text-sm">{task.name}</h4>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${task.priority.toLowerCase().includes('alta') ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.3)]'}`}></span>
+                                                    <h4 className="font-bold text-slate-200 text-sm group-hover:text-white transition-colors">{task.name}</h4>
                                                 </div>
                                                 <p className="text-xs text-slate-500 ml-3.5">{task.assignee}</p>
                                             </div>
-                                            <span className="text-[10px] font-medium text-slate-500 px-2 py-1 bg-slate-950 rounded border border-slate-800">
+                                            <span className="text-[10px] font-medium text-slate-500 px-2 py-1 bg-slate-950/50 rounded border border-white/5">
                                                 {task.priority || 'Normal'}
                                             </span>
                                         </div>
                                     ))}
 
                                     {report.tasks.backlog.slice(0, 3).map((task, i) => (
-                                        <div key={i} className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center justify-between opacity-70">
+                                        <div key={i} className="bg-slate-900/20 backdrop-blur-sm p-3 rounded-xl border border-white/5 flex items-center justify-between opacity-70 hover:opacity-100 transition-opacity">
                                             <div className="flex items-center gap-2">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
                                                 <h4 className="font-medium text-slate-400 text-xs">{task.name}</h4>
                                             </div>
-                                            <span className="text-[10px] text-slate-600 border border-slate-800 px-1.5 rounded">Backlog</span>
+                                            <span className="text-[10px] text-slate-600 border border-white/5 px-1.5 rounded">Backlog</span>
                                         </div>
                                     ))}
                                 </div>
@@ -222,10 +222,10 @@ export default function AIAgent() {
                                     Estratégia
                                 </h3>
 
-                                <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800 space-y-4">
+                                <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-white/5 space-y-4 shadow-lg ring-1 ring-white/5">
                                     {report.recommendations.map((rec, i) => (
                                         <div key={i} className="flex gap-3">
-                                            <div className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5 border border-slate-700">
+                                            <div className="w-5 h-5 rounded-full bg-white/5 text-slate-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5 border border-white/5">
                                                 {i + 1}
                                             </div>
                                             <p className="text-slate-300 text-sm leading-relaxed">
@@ -235,14 +235,14 @@ export default function AIAgent() {
                                     ))}
                                 </div>
 
-                                <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800">
+                                <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-5 border border-white/5 shadow-lg ring-1 ring-white/5">
                                     <h4 className="font-bold text-white mb-3 text-xs uppercase tracking-wider flex items-center justify-between">
                                         Últimas Vendas
                                         <span className="text-[10px] text-slate-500 font-normal">Este mês</span>
                                     </h4>
                                     <div className="space-y-2">
                                         {report.proposals.recentWon.length > 0 ? report.proposals.recentWon.map((prop, i) => (
-                                            <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
+                                            <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 -mx-2 rounded-lg transition-colors">
                                                 <div>
                                                     <p className="font-medium text-slate-300 text-xs">{prop.client}</p>
                                                     <p className="text-[10px] text-slate-500">{prop.service}</p>
