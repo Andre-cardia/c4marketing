@@ -42,10 +42,30 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                 sources: response.documents
             }]);
         } catch (error: any) {
-            let errorMessage = error.message || JSON.stringify(error);
+            console.error('Brain Error:', error);
+
+            let errorMessage = error.message || 'Erro desconhecido';
+
+            // Tenta extrair detalhes se for um erro da Edge Function (que retorna JSON no body)
+            if (error && typeof error === 'object' && 'context' in error) {
+                try {
+                    const body = await error.context.json();
+                    if (body.error) {
+                        errorMessage = body.error;
+                    } else {
+                        errorMessage = JSON.stringify(body);
+                    }
+                } catch (e) {
+                    // Falha ao ler JSON, mantém mensagem original
+                }
+            }
 
             if (errorMessage.includes('Failed to send a request')) {
-                errorMessage = 'Falha de conexão com o "Cérebro". As funções Edge foram publicadas (deploy)? Verifique o passo 2 do guia walkthrough.md.';
+                errorMessage = 'Falha de conexão. Verifique se as funções foram publicadas (deploy).';
+            }
+
+            if (errorMessage.includes('non-2xx status code')) {
+                errorMessage = `Erro interno do Cérebro (Server Error). Detalhes: ${errorMessage}`;
             }
 
             setMessages(prev => [...prev, {
