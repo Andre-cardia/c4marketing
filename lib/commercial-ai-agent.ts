@@ -125,10 +125,24 @@ function computeMonthlyMetrics(
     const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const result: MonthlyMetrics[] = [];
 
+    const now = new Date();
+
     for (let m = 0; m < 12; m++) {
         const monthKey = `${year}-${String(m + 1).padStart(2, '0')}`;
         const monthStart = new Date(year, m, 1);
         const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
+
+        // Don't calculate data for future months — they haven't happened yet
+        if (monthStart > now) {
+            result.push({
+                month: monthKey,
+                monthLabel: monthLabels[m],
+                mrr: 0, arr: 0, newContracts: 0, churnedContracts: 0,
+                totalProposals: 0, acceptedProposals: 0, conversionRate: 0,
+                setupRevenue: 0, totalRevenue: 0, activeClients: 0,
+            });
+            continue;
+        }
 
         // Proposals created in this month
         const monthProposals = proposals.filter(p => {
@@ -142,7 +156,7 @@ function computeMonthlyMetrics(
             return d >= monthStart && d <= monthEnd;
         });
 
-        // Calculate MRR: sum of monthly_fee for ALL contracts active up to this month
+        // Calculate MRR: sum of monthly_fee for contracts whose start date is on or before monthEnd
         const activeContracts = acceptances.filter(a => {
             const acceptDate = new Date(a.timestamp);
             if (acceptDate > monthEnd) return false;
