@@ -44,8 +44,8 @@ const App: React.FC = () => {
               <Route path="/p/:slug" element={<ProposalView />} />
               <Route path="/p/:slug/contract" element={<ContractView />} />
               <Route path="/contracts/:id" element={<ContractView />} />
-              <Route path="/projects/:id/consulting" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-              <Route path="/meetings" element={<ProtectedRoute><Meetings /></ProtectedRoute>} />
+              <Route path="/projects/:id/consulting" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><Projects /></ProtectedRoute>} />
+              <Route path="/meetings" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional']}><Meetings /></ProtectedRoute>} />
               <Route
                 path="/ai-agent"
                 element={
@@ -85,7 +85,7 @@ const App: React.FC = () => {
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional', 'comercial']}>
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -109,7 +109,7 @@ const App: React.FC = () => {
               <Route
                 path="/proposals"
                 element={
-                  <ProtectedRoute allowedRoles={['gestor']}>
+                  <ProtectedRoute allowedRoles={['gestor', 'comercial']}>
                     <Proposals />
                   </ProtectedRoute>
                 }
@@ -117,7 +117,7 @@ const App: React.FC = () => {
               <Route
                 path="/commercial-dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={['gestor']}>
+                  <ProtectedRoute allowedRoles={['gestor', 'comercial']}>
                     <CommercialDashboard />
                   </ProtectedRoute>
                 }
@@ -125,7 +125,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <Projects />
                   </ProtectedRoute>
                 }
@@ -133,7 +133,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/traffic"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <TrafficManagement />
                   </ProtectedRoute>
                 }
@@ -141,7 +141,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/traffic/strategy"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <StrategyMeeting />
                   </ProtectedRoute>
                 }
@@ -149,7 +149,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/traffic/campaign/:campaignId/:stageId"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <CampaignStage />
                   </ProtectedRoute>
                 }
@@ -157,7 +157,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/hosting"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <Hosting />
                   </ProtectedRoute>
                 }
@@ -165,7 +165,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/lp"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <LandingPage />
                   </ProtectedRoute>
                 }
@@ -173,7 +173,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/website"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <Website />
                   </ProtectedRoute>
                 }
@@ -181,7 +181,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/ecommerce"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <Ecommerce />
                   </ProtectedRoute>
                 }
@@ -189,7 +189,7 @@ const App: React.FC = () => {
               <Route
                 path="/projects/:id/consulting"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}>
                     <Consulting />
                   </ProtectedRoute>
                 }

@@ -49,7 +49,7 @@ const Users: React.FC = () => {
         email: '',
         phone: '',
         password: '',
-        role: 'leitor' as 'leitor' | 'comercial' | 'gestor' | 'operacional'
+        role: 'leitor' as 'leitor' | 'comercial' | 'gestor' | 'operacional' | 'clientes'
     });
     const [creating, setCreating] = useState(false);
 
@@ -222,6 +222,7 @@ const Users: React.FC = () => {
             case 'gestor': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800';
             case 'comercial': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800';
             case 'operacional': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800';
+            case 'clientes': return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 border-pink-200 dark:border-pink-800';
             default: return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'; // leitor
         }
     };
@@ -305,6 +306,7 @@ const Users: React.FC = () => {
                                                         <option value="comercial">Comercial</option>
                                                         <option value="gestor">Gestor</option>
                                                         <option value="operacional">Operacional</option>
+                                                        <option value="clientes">Clientes</option>
                                                     </select>
                                                 ) : (
                                                     <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getRoleBadge(user.role)} uppercase tracking-wide`}>
@@ -403,7 +405,7 @@ const Users: React.FC = () => {
                                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Nível de Acesso</label>
                                 <select
                                     value={newUser.role}
-                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'leitor' | 'comercial' | 'gestor' | 'operacional' })}
+                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'leitor' | 'comercial' | 'gestor' | 'operacional' | 'clientes' })}
                                     disabled={userRole !== 'gestor'}
                                     className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-brand-coral focus:border-transparent dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                     required
@@ -412,12 +414,14 @@ const Users: React.FC = () => {
                                     <option value="comercial">Comercial</option>
                                     <option value="gestor">Gestor</option>
                                     <option value="operacional">Operacional</option>
+                                    <option value="clientes">Clientes</option>
                                 </select>
                                 <p className="text-xs text-slate-400 mt-2 text-center">
                                     {newUser.role === 'leitor' && 'Apenas visualiza dados.'}
                                     {newUser.role === 'comercial' && 'Visualiza e cria propostas.'}
                                     {newUser.role === 'gestor' && 'Controle total do sistema.'}
                                     {newUser.role === 'operacional' && 'Acesso a Dashboard e Projetos.'}
+                                    {newUser.role === 'clientes' && 'Sem acesso ao sistema administrativo.'}
                                 </p>
                             </div>
 
