@@ -162,13 +162,22 @@ export default function BrainManager() {
             const { data: users } = await supabase.from('app_users').select('*');
             if (users) {
                 for (const u of users) {
-                    const content = `[USUÁRIO] O usuário ${u.email} possui a função de acesso (role): ${u.role}. ID do Sistema: ${u.id}.`;
+                    const content = `RETORNO DO BANCO DE DADOS:
+=== TÍTULO: Usuário: ${u.email} ===
+=== FONTE: Tabela app_users ===
+=== DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
+
+[DADOS DO USUÁRIO]
+Email: ${u.email}
+Função (Role): ${u.role}
+ID do Sistema: ${u.id}
+`;
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'app_users',
                         source_id: u.id,
                         title: `Usuário: ${u.email}`,
-                        source: `Usuário: ${u.email}`
+                        source: `Tabela app_users`
                     });
                     count++;
                 }
@@ -182,20 +191,29 @@ export default function BrainManager() {
                         ? p.services.map((s: any) => typeof s === 'string' ? s : s.id).join(', ')
                         : 'Nenhum';
 
-                    const content = `[PROPOSTA DE SERVIÇO] Proposta comercial para a empresa ${p.company_name}.
-                    Responsável pela proposta: ${p.responsible_name}.
-                    Detalhes Financeiros: Valor Mensal (MRR): R$ ${p.monthly_fee}, Taxa de Setup: R$ ${p.setup_fee}.
-                    Vigência/Duração do Contrato Proposto: ${p.contract_duration} meses.
-                    Serviços Incluídos: ${services}.
-                    Data de Criação da Proposta: ${new Date(p.created_at).toLocaleDateString('pt-BR')}.
-                    ID da Proposta: ${p.id}.`;
+                    const content = `RETORNO DO BANCO DE DADOS:
+=== TÍTULO: Proposta: ${p.company_name} ===
+=== FONTE: Tabela proposals ===
+=== DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
+
+[DETALHES DA PROPOSTA]
+Empresa: ${p.company_name}
+Responsável: ${p.responsible_name}
+Valor Mensal (MRR): R$ ${p.monthly_fee}
+Setup: R$ ${p.setup_fee}
+Vigência: ${p.contract_duration} meses
+Serviços: ${services}
+Data de Criação: ${new Date(p.created_at).toLocaleDateString('pt-BR')}
+ID: ${p.id}
+Link: /p/${p.id}
+`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'proposals',
                         source_id: p.id.toString(),
                         title: `Proposta: ${p.company_name}`,
-                        source: `Proposta: ${p.company_name}`
+                        source: `Proposta Comercial`
                     });
                     count++;
                 }
@@ -205,19 +223,27 @@ export default function BrainManager() {
             const { data: acceptances } = await supabase.from('acceptances').select('*');
             if (acceptances) {
                 for (const acc of acceptances) {
-                    const content = `[CONTRATO ATIVO] Contrato vigente com a empresa ${acc.company_name} (CNPJ: ${acc.cnpj || 'Não Informado'}).
-                    Cliente Responsável: ${acc.name} (Email: ${acc.email}).
-                    Status do Contrato: ${acc.status}.
-                    Data de Início do Contrato (Data de Aceite): ${new Date(acc.timestamp).toLocaleDateString('pt-BR')}.
-                    Data de Término/Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString('pt-BR') : 'Indeterminado'}.
-                    ID do Contrato: ${acc.id}.`;
+                    const content = `RETORNO DO BANCO DE DADOS:
+=== TÍTULO: Contrato: ${acc.company_name} ===
+=== FONTE: Tabela acceptances (Contratos Ativos) ===
+=== DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
+
+[DETALHES DO CONTRATO]
+Empresa: ${acc.company_name}
+CNPJ: ${acc.cnpj || 'Não cadastrado'}
+Cliente: ${acc.name} (${acc.email})
+Status: ${acc.status}
+Data de Início (Aceite): ${new Date(acc.timestamp).toLocaleDateString('pt-BR')}
+Validade/Término: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString('pt-BR') : 'Indeterminado'}
+ID: ${acc.id}
+`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'acceptances',
                         source_id: acc.id.toString(),
                         title: `Contrato: ${acc.company_name}`,
-                        source: `Contrato: ${acc.company_name}`
+                        source: `Contrato Ativo`
                     });
                     count++;
                 }
@@ -239,18 +265,25 @@ export default function BrainManager() {
                     const acceptance = acceptances?.find(a => a.id === tp.acceptance_id);
                     const clientName = acceptance?.company_name || 'Empresa Desconhecida';
 
-                    const content = `[PROJETO DE TRÁFEGO PAGO] Projeto de Gestão de Tráfego para ${clientName}.
-                    Status do Projeto: ${tp.account_setup_status === 'completed' ? 'Configurado' : 'Em Configuração'}.
-                    Data de Início do Projeto: ${new Date(tp.created_at).toLocaleDateString('pt-BR')}.
-                    Objetivo da Campanha: ${tp.strategy_meeting_notes || 'Não especificado'}.
-                    ID do Projeto: ${tp.id}.`;
+                    const content = `RETORNO DO BANCO DE DADOS:
+=== TÍTULO: Projeto Tráfego: ${clientName} ===
+=== FONTE: Tabela traffic_projects ===
+=== DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
+
+[GESTÃO DE TRÁFEGO]
+Cliente: ${clientName}
+Status do Setup: ${tp.account_setup_status === 'completed' ? 'Completo' : 'Pendente'}
+Data de Início do Projeto: ${new Date(tp.created_at).toLocaleDateString('pt-BR')}
+Objetivo: ${tp.strategy_meeting_notes || 'Não definido'}
+ID: ${tp.id}
+`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'traffic_projects',
                         source_id: tp.id,
                         title: `Projeto Tráfego: ${clientName}`,
-                        source: `Projeto Tráfego: ${clientName}`
+                        source: `Gestão de Tráfego`
                     });
                     count++;
                 }
