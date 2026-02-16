@@ -343,9 +343,9 @@ const Dashboard: React.FC = () => {
 
                     {/* Active Projects */}
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10"></div>
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-slate-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-slate-500/10"></div>
                         <div className="relative flex items-center gap-4">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-blue-500 rounded-xl">
+                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl">
                                 <Briefcase size={24} />
                             </div>
                             <div>
@@ -359,15 +359,15 @@ const Dashboard: React.FC = () => {
 
                     {/* Deliveries This Week */}
                     <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-purple-500/10"></div>
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-slate-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-slate-500/10"></div>
                         <div className="relative flex items-center gap-4">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-purple-500 rounded-xl">
+                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl">
                                 <Target size={24} />
                             </div>
                             <div>
                                 <span className="text-sm font-bold text-slate-500 dark:text-slate-400 block">Entregas (7 dias)</span>
                                 <div className="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">
-                                    {deliveriesThisWeek} <span className="text-xs font-bold text-purple-500 align-middle ml-1">prazo curto!</span>
+                                    {deliveriesThisWeek} <span className="text-xs font-bold text-amber-600 align-middle ml-1">prazo curto!</span>
                                 </div>
                             </div>
                         </div>
@@ -389,9 +389,9 @@ const Dashboard: React.FC = () => {
                                 </h3>
                                 {/* Legend */}
                                 <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-300"></div><span className="text-slate-500">Backlog</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"></div><span className="text-slate-500">Exec.</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500"></div><span className="text-slate-500">Aprov.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-400"></div><span className="text-slate-500">Backlog</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-600"></div><span className="text-slate-500">Exec.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div><span className="text-slate-500">Aprov.</span></div>
                                     <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-slate-500">Final.</span></div>
                                 </div>
                             </div>
@@ -430,7 +430,7 @@ const Dashboard: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     <span className="text-slate-300">B: {d.backlog}</span>
                                                     <span className="text-blue-300">E: {d.in_progress}</span>
-                                                    <span className="text-purple-300">A: {d.approval}</span>
+                                                    <span className="text-amber-300">A: {d.approval}</span>
                                                     <span className="text-emerald-300">F: {d.done}</span>
                                                 </div>
                                             </div>
@@ -442,9 +442,9 @@ const Dashboard: React.FC = () => {
                                                 {/* Stacked Segments (flex-col-reverse fills from bottom) */}
                                                 {d.total > 0 ? (
                                                     <>
-                                                        <div style={{ height: `${(d.backlog / maxTotal) * 100}%` }} className="bg-slate-300 w-full transition-all duration-500 hover:bg-slate-400"></div>
-                                                        <div style={{ height: `${(d.in_progress / maxTotal) * 100}%` }} className="bg-blue-500 w-full transition-all duration-500 hover:bg-blue-600"></div>
-                                                        <div style={{ height: `${(d.approval / maxTotal) * 100}%` }} className="bg-purple-500 w-full transition-all duration-500 hover:bg-purple-600"></div>
+                                                        <div style={{ height: `${(d.backlog / maxTotal) * 100}%` }} className="bg-slate-400 w-full transition-all duration-500 hover:bg-slate-500"></div>
+                                                        <div style={{ height: `${(d.in_progress / maxTotal) * 100}%` }} className="bg-blue-600 w-full transition-all duration-500 hover:bg-blue-700"></div>
+                                                        <div style={{ height: `${(d.approval / maxTotal) * 100}%` }} className="bg-amber-500 w-full transition-all duration-500 hover:bg-amber-600"></div>
                                                         <div style={{ height: `${(d.done / maxTotal) * 100}%` }} className="bg-emerald-500 w-full transition-all duration-500 hover:bg-emerald-600"></div>
                                                     </>
                                                 ) : (
