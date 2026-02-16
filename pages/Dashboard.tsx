@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Header from '../components/Header';
 import NoticeCard from '../components/NoticeCard';
 import TaskModal from '../components/projects/TaskModal';
+import NoticeModal from '../components/NoticeModal';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -71,7 +72,7 @@ interface Booking {
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { userRole, loading: roleLoading } = useUserRole();
+    const { userRole, fullName, email, avatarUrl, loading: roleLoading } = useUserRole();
 
     const [totalUsers, setTotalUsers] = useState<number>(0);
     const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
@@ -92,6 +93,12 @@ const Dashboard: React.FC = () => {
     const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | undefined>(undefined);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+    // Notice Modal
+    const [showNoticeModal, setShowNoticeModal] = useState(false);
+
+    // User Avatar Map
+    const [userAvatars, setUserAvatars] = useState<{ [email: string]: string }>({});
 
     useEffect(() => {
         fetchData();
@@ -178,8 +185,19 @@ const Dashboard: React.FC = () => {
     };
 
     const fetchUsersCount = async () => {
-        const { count } = await supabase.from('app_users').select('*', { count: 'exact', head: true });
+        const { count, data } = await supabase.from('app_users').select('*', { count: 'exact' });
         if (count !== null) setTotalUsers(count);
+
+        // Build Avatar Map
+        if (data) {
+            const map: { [email: string]: string } = {};
+            data.forEach((u: any) => {
+                if (u.email && u.avatar_url) {
+                    map[u.email] = u.avatar_url;
+                }
+            });
+            setUserAvatars(map);
+        }
     };
 
     const fetchNotices = async () => {
@@ -256,6 +274,23 @@ const Dashboard: React.FC = () => {
         const { error } = await supabase.from('notices').delete().eq('id', id);
         if (!error) {
             setNotices(notices.filter(n => n.id !== id));
+        }
+    };
+
+    const handleCreateNotice = async (message: string, priority: 'normal' | 'importante' | 'urgente') => {
+        if (!email || !fullName) return;
+
+        const { data, error } = await supabase.from('notices').insert([{
+            message,
+            priority,
+            author_name: fullName,
+            author_email: email,
+            created_at: new Date().toISOString()
+        }]).select();
+
+        if (data) {
+            setNotices([data[0], ...notices]);
+            setShowNoticeModal(false);
         }
     };
 
@@ -754,6 +789,14 @@ const Dashboard: React.FC = () => {
                     />
                 )}
 
+                {/* Create Notice Modal */}
+                <NoticeModal
+                    isOpen={showNoticeModal}
+                    onClose={() => setShowNoticeModal(false)}
+                    onSave={handleCreateNotice}
+                    authorName={fullName}
+                    authorAvatar={avatarUrl}
+                />
             </main>
         </div>
     );
