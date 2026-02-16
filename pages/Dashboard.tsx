@@ -339,83 +339,36 @@ const Dashboard: React.FC = () => {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
                 {/* Top Stats Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
 
                     {/* Active Projects */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-blue-500 rounded-xl">
-                                    <Briefcase size={24} />
+                        <div className="relative flex items-center gap-4">
+                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-blue-500 rounded-xl">
+                                <Briefcase size={24} />
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400 block">Projetos Ativos</span>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">
+                                    {clientStatusCounts.active} <span className="text-xs font-normal text-slate-400 align-middle ml-1">em andamento</span>
                                 </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Projetos Ativos</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {clientStatusCounts.active}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-2">
-                                + {clientStatusCounts.onboarding} em onboarding
                             </div>
                         </div>
                     </div>
 
                     {/* Deliveries This Week */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
                         <div className="absolute right-0 top-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-purple-500/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-purple-500 rounded-xl">
-                                    <Target size={24} />
+                        <div className="relative flex items-center gap-4">
+                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-purple-500 rounded-xl">
+                                <Target size={24} />
+                            </div>
+                            <div>
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400 block">Entregas (7 dias)</span>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">
+                                    {deliveriesThisWeek} <span className="text-xs font-bold text-purple-500 align-middle ml-1">prazo curto!</span>
                                 </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Entregas (7 dias)</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {deliveriesThisWeek}
-                            </div>
-                            <div className="text-xs text-purple-500 font-bold mt-2">
-                                Foco total!
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* My Priorities */}
-                    <div
-                        className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group cursor-pointer hover:border-brand-coral/50 transition-all"
-                        onClick={handleOpenCriticalList}
-                    >
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-red-500/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-red-500 rounded-xl">
-                                    <AlertTriangle size={24} />
-                                </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Prioridades Altas</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {myPriorityTasks.length}
-                            </div>
-                            <div className="text-xs text-red-500 font-bold mt-2 flex items-center gap-1">
-                                Ver lista <ArrowRight size={12} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Active Notices */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-brand-coral/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-brand-coral/10"></div>
-                        <div className="relative">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-3 bg-slate-100 dark:bg-slate-800 text-brand-coral rounded-xl">
-                                    <Bell size={24} />
-                                </div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Avisos Ativos</span>
-                            </div>
-                            <div className="text-3xl font-black text-slate-800 dark:text-white">
-                                {notices.length}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-2">
-                                Fique atento
                             </div>
                         </div>
                     </div>
@@ -568,48 +521,7 @@ const Dashboard: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Recent Critical Tasks */}
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <ListTodo className="w-5 h-5 text-red-500" />
-                                    Prioridades
-                                </h3>
-                                <button onClick={handleOpenCriticalList} className="text-xs text-brand-coral font-bold hover:underline">Ver Todas</button>
-                            </div>
 
-                            {criticalTasks.length === 0 ? (
-                                <p className="text-slate-400 text-center py-8">Nenhuma tarefa crítica pendente. Tudo em dia!</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {criticalTasks.slice(0, 5).map(task => (
-                                        <div
-                                            key={task.id}
-                                            className="flex items-center justify-between p-4 bg-red-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl cursor-pointer hover:border-red-200 dark:hover:border-red-900/50 transition-colors group"
-                                            onClick={() => handleOpenTask(task)}
-                                        >
-                                            <div>
-                                                <h4 className="font-bold text-slate-800 dark:text-slate-200">{task.title}</h4>
-                                                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                                    <span className="font-semibold text-slate-600 dark:text-slate-400">{task.project_name}</span>
-                                                    <span>•</span>
-                                                    <Clock size={12} className={new Date(task.due_date) < new Date() ? 'text-red-500' : ''} />
-                                                    <span className={new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}>
-                                                        {new Date(task.due_date).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <span className="px-3 py-1 bg-white dark:bg-slate-900 text-red-500 text-xs font-bold rounded-full shadow-sm border border-slate-100 dark:border-slate-700">
-                                                    Urgente
-                                                </span>
-                                                <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
 
                         {/* Notices (Highlights) */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
@@ -653,8 +565,46 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Right Column: Agenda */}
+                    {/* Right Column: Agenda & Priorities */}
                     <div className="space-y-8">
+                        {/* Recent Critical Tasks (Moved Here) */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <ListTodo className="w-5 h-5 text-red-500" />
+                                    Prioridades
+                                </h3>
+                                <button onClick={handleOpenCriticalList} className="text-xs text-brand-coral font-bold hover:underline">Ver Todas</button>
+                            </div>
+
+                            {criticalTasks.length === 0 ? (
+                                <p className="text-slate-400 text-center py-6 text-sm">Nenhuma tarefa crítica pendente.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {criticalTasks.slice(0, 5).map(task => (
+                                        <div
+                                            key={task.id}
+                                            className="flex flex-col gap-2 p-3 bg-red-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl cursor-pointer hover:border-red-200 dark:hover:border-red-900/50 transition-colors group"
+                                            onClick={() => handleOpenTask(task)}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs line-clamp-2 leading-tight">{task.title}</h4>
+                                                <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                                <span className="font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[80px]">{task.project_name}</span>
+                                                <span>•</span>
+                                                <Clock size={10} className={new Date(task.due_date) < new Date() ? 'text-red-500' : ''} />
+                                                <span className={new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}>
+                                                    {new Date(task.due_date).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Upcoming Meetings (Next 7 Days) */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
