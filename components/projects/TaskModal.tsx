@@ -10,7 +10,7 @@ interface Task {
     description?: string;
     status: 'backlog' | 'in_progress' | 'approval' | 'done' | 'paused';
     priority: 'low' | 'medium' | 'high';
-    assignee: string;
+    assignee?: string;
     due_date: string;
     attachment_url?: string;
 }

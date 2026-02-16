@@ -424,8 +424,62 @@ const Dashboard: React.FC = () => {
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
 
-                    {/* Left Column: Projects & Services */}
+                    {/* Left Column: Global Status, Projects, Notices */}
                     <div className="lg:col-span-2 space-y-8">
+
+                        {/* Global Status Bar Chart */}
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-6">
+                                <BarChart2 className="w-5 h-5 text-brand-coral" />
+                                Status Global de Tarefas
+                            </h3>
+
+                            <div className="space-y-6">
+                                {/* Bar Chart Container */}
+                                <div className="space-y-4">
+                                    {/* Backlog */}
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                            <span>Backlog</span>
+                                            <span>{taskStatusCounts.backlog} tarefas</span>
+                                        </div>
+                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div style={{ width: `${(taskStatusCounts.backlog / tasks.length) * 100}%` }} className="h-full bg-slate-400 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    {/* In Progress */}
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                            <span>Em Execução</span>
+                                            <span>{taskStatusCounts.in_progress} tarefas</span>
+                                        </div>
+                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div style={{ width: `${(taskStatusCounts.in_progress / tasks.length) * 100}%` }} className="h-full bg-blue-500 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    {/* Approval */}
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                            <span>Aprovação</span>
+                                            <span>{taskStatusCounts.approval} tarefas</span>
+                                        </div>
+                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div style={{ width: `${(taskStatusCounts.approval / tasks.length) * 100}%` }} className="h-full bg-purple-500 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    {/* Done */}
+                                    <div>
+                                        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                            <span>Finalizado</span>
+                                            <span>{taskStatusCounts.done} tarefas</span>
+                                        </div>
+                                        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div style={{ width: `${(taskStatusCounts.done / tasks.length) * 100}%` }} className="h-full bg-emerald-500 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Service Progress Tracking */}
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -514,7 +568,7 @@ const Dashboard: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Recent Critical Tasks (Redesigned) */}
+                        {/* Recent Critical Tasks */}
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
@@ -556,11 +610,51 @@ const Dashboard: React.FC = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Notices (Highlights) */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Bell className="w-5 h-5 text-brand-coral" />
+                                    Avisos da Equipe
+                                </h3>
+                                {userRole === 'gestor' && (
+                                    <button
+                                        onClick={() => setShowNoticeModal(true)}
+                                        className="p-2 bg-brand-coral text-white rounded-full hover:bg-brand-coral/90 transition-colors shadow-md shadow-brand-coral/20"
+                                        title="Novo Aviso"
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                {notices.length === 0 ? (
+                                    <div className="text-center py-10 opacity-50">
+                                        <Bell size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+                                        <p className="text-slate-400 text-sm">Nenhum aviso importante no momento.</p>
+                                    </div>
+                                ) : (
+                                    notices.map(notice => (
+                                        <NoticeCard
+                                            key={notice.id}
+                                            id={notice.id}
+                                            message={notice.message}
+                                            authorName={notice.author_name}
+                                            authorAvatar={userAvatars[notice.author_email]}
+                                            timestamp={notice.created_at}
+                                            priority={notice.priority}
+                                            canDelete={userRole === 'gestor'}
+                                            onDelete={handleDeleteNotice}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Right Column: Operational Stats & Notices */}
+                    {/* Right Column: Agenda */}
                     <div className="space-y-8">
-
                         {/* Upcoming Meetings (Next 7 Days) */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
@@ -607,75 +701,6 @@ const Dashboard: React.FC = () => {
                                     ))}
                                 </div>
                             )}
-                        </div>
-
-                        {/* Global Task Status */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-blue-500" />
-                                Status Global
-                            </h3>
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">Backlog</span>
-                                    </div>
-                                    <span className="font-bold text-slate-800 dark:text-white">{taskStatusCounts.backlog}</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">Em Execução</span>
-                                    </div>
-                                    <span className="font-bold text-slate-800 dark:text-white">{taskStatusCounts.in_progress}</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">Aprovação</span>
-                                    </div>
-                                    <span className="font-bold text-slate-800 dark:text-white">{taskStatusCounts.approval}</span>
-                                </div>
-                                <div className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">Finalizado</span>
-                                    </div>
-                                    <span className="font-bold text-slate-800 dark:text-white">{taskStatusCounts.done}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Notices */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Bell className="w-5 h-5 text-brand-coral" />
-                                    Avisos
-                                </h3>
-                                <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
-                                    <Plus size={18} />
-                                </button>
-                            </div>
-                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                {notices.length === 0 ? (
-                                    <p className="text-center text-slate-400 text-sm py-4">Nenhum aviso.</p>
-                                ) : (
-                                    notices.map(notice => (
-                                        <NoticeCard
-                                            key={notice.id}
-                                            id={notice.id}
-                                            message={notice.message}
-                                            authorName={notice.author_name}
-                                            timestamp={notice.created_at}
-                                            priority={notice.priority}
-                                            canDelete={userRole === 'gestor'}
-                                            onDelete={handleDeleteNotice}
-                                        />
-                                    ))
-                                )}
-                            </div>
                         </div>
                     </div>
                 </div>
