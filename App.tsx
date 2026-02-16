@@ -45,7 +45,7 @@ const App: React.FC = () => {
             <Route
               path="/ai-agent"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'gestor']}>
+                <ProtectedRoute allowedRoles={['gestor']}>
                   <AIAgent />
                 </ProtectedRoute>
               }
@@ -81,7 +81,7 @@ const App: React.FC = () => {
             <Route
               path="/users"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['gestor']}>
                   <Users />
                 </ProtectedRoute>
               }
@@ -89,7 +89,7 @@ const App: React.FC = () => {
             <Route
               path="/proposals/new"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['gestor']}>
                   <CreateProposal />
                 </ProtectedRoute>
               }
@@ -97,7 +97,7 @@ const App: React.FC = () => {
             <Route
               path="/proposals"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['gestor']}>
                   <Proposals />
                 </ProtectedRoute>
               }
@@ -105,7 +105,7 @@ const App: React.FC = () => {
             <Route
               path="/commercial-dashboard"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial']}>
+                <ProtectedRoute allowedRoles={['gestor']}>
                   <CommercialDashboard />
                 </ProtectedRoute>
               }

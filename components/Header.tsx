@@ -40,8 +40,8 @@ const Header: React.FC = () => {
             Dashboard
           </button>
 
-          {/* AI Manager - only for admin and gestor */}
-          {!loading && (userRole === 'admin' || userRole === 'gestor') && (
+          {/* AI Manager - only for gestor */}
+          {!loading && userRole === 'gestor' && (
             <button
               onClick={() => navigate('/ai-agent')}
               className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
@@ -51,8 +51,8 @@ const Header: React.FC = () => {
             </button>
           )}
 
-          {/* Comercial Dropdown - only for gestor and comercial */}
-          {!loading && (userRole === 'gestor' || userRole === 'comercial') && (
+          {/* Comercial Dropdown - only for gestor */}
+          {!loading && userRole === 'gestor' && (
             <div className="relative group">
               <button
                 className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') || location.pathname.startsWith('/commercial-dashboard') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
