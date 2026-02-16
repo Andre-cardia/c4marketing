@@ -119,7 +119,7 @@ export default function AIAgent() {
                                 <Sparkles className="w-4 h-4" />
                                 Resumo Executivo
                             </h2>
-                            <p className="text-slate-200 text-lg leading-relaxed font-light relative z-10">
+                            <p className="text-slate-200 text-sm leading-relaxed font-light relative z-10">
                                 {report.executiveSummary}
                             </p>
                             <div className="mt-6 pt-6 border-t border-white/5 flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-widest font-medium relative z-10">
