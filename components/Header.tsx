@@ -51,14 +51,31 @@ const Header: React.FC = () => {
             </button>
           )}
 
-          {/* Propostas - only for gestor and comercial */}
+          {/* Comercial Dropdown - only for gestor and comercial */}
           {!loading && (userRole === 'gestor' || userRole === 'comercial') && (
-            <button
-              onClick={() => navigate('/proposals')}
-              className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-            >
-              Propostas
-            </button>
+            <div className="relative group">
+              <button
+                className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') || location.pathname.startsWith('/commercial-dashboard') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
+              >
+                Comercial
+              </button>
+              <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 min-w-[180px]">
+                  <button
+                    onClick={() => navigate('/proposals')}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-coral transition-colors"
+                  >
+                    Propostas
+                  </button>
+                  <button
+                    onClick={() => navigate('/commercial-dashboard')}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-coral transition-colors"
+                  >
+                    Dashboard Comercial
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           <button
