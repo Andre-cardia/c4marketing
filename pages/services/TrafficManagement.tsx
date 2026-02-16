@@ -25,6 +25,17 @@ const PLANNING_CHECKLIST_ITEMS = [
     "Orçamento"
 ];
 
+const CREATIVES_CHECKLIST_ITEMS = [
+    "Criativos Estáticos",
+    "Criativos Animados (Video/Motion)",
+    "Logo"
+];
+
+const EXECUTION_CHECKLIST_ITEMS = [
+    "Configuração das Campanhas",
+    "Aprovação pela Plataforma de Anúncios"
+];
+
 interface TrafficProject {
     id: string;
     acceptance_id: string;
@@ -687,6 +698,16 @@ const TrafficManagement: React.FC = () => {
                                                         const totalCount = PLANNING_CHECKLIST_ITEMS.length;
                                                         const progress = Math.round((completedCount / totalCount) * 100);
 
+                                                        // Progress Bar Calculation for Creatives
+                                                        const creativesCompletedCount = CREATIVES_CHECKLIST_ITEMS.filter(i => step.checklist_data?.[i]).length;
+                                                        const creativesTotalCount = CREATIVES_CHECKLIST_ITEMS.length;
+                                                        const creativesProgress = Math.round((creativesCompletedCount / creativesTotalCount) * 100);
+
+                                                        // Progress Bar Calculation for Execution
+                                                        const executionCompletedCount = EXECUTION_CHECKLIST_ITEMS.filter(i => step.checklist_data?.[i]).length;
+                                                        const executionTotalCount = EXECUTION_CHECKLIST_ITEMS.length;
+                                                        const executionProgress = Math.round((executionCompletedCount / executionTotalCount) * 100);
+
                                                         return (
                                                             <div
                                                                 key={step.id}
@@ -751,6 +772,30 @@ const TrafficManagement: React.FC = () => {
                                                                                     <div
                                                                                         className="h-full bg-brand-coral transition-all duration-500"
                                                                                         style={{ width: `${progress}%` }}
+                                                                                    ></div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {step.step_key === 'creatives' && (isActive || isCompleted) && !isExpanded && (
+                                                                            <div className="flex flex-col items-end gap-1 mr-4">
+                                                                                <span className="text-[10px] font-bold text-slate-400">{creativesProgress}%</span>
+                                                                                <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                                                    <div
+                                                                                        className="h-full bg-brand-coral transition-all duration-500"
+                                                                                        style={{ width: `${creativesProgress}%` }}
+                                                                                    ></div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {step.step_key === 'execution' && (isActive || isCompleted) && !isExpanded && (
+                                                                            <div className="flex flex-col items-end gap-1 mr-4">
+                                                                                <span className="text-[10px] font-bold text-slate-400">{executionProgress}%</span>
+                                                                                <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                                                    <div
+                                                                                        className="h-full bg-brand-coral transition-all duration-500"
+                                                                                        style={{ width: `${executionProgress}%` }}
                                                                                     ></div>
                                                                                 </div>
                                                                             </div>
@@ -830,6 +875,122 @@ const TrafficManagement: React.FC = () => {
 
                                                                                     <div className="grid grid-cols-1 gap-3">
                                                                                         {PLANNING_CHECKLIST_ITEMS.map((item) => {
+                                                                                            const isChecked = step.checklist_data?.[item] || false;
+                                                                                            return (
+                                                                                                <label key={item} className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all border
+                                                                                                    ${isChecked
+                                                                                                        ? 'bg-brand-coral/10 border-brand-coral/30'
+                                                                                                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'}`}>
+                                                                                                    <div className="relative flex items-center justify-center">
+                                                                                                        <input
+                                                                                                            type="checkbox"
+                                                                                                            checked={isChecked}
+                                                                                                            disabled={!isActive}
+                                                                                                            onChange={() => handleToggleChecklist(step.id, item, step.checklist_data)}
+                                                                                                            className="appearance-none w-5 h-5 rounded border-2 border-slate-500 checked:bg-brand-coral checked:border-brand-coral transition-all cursor-pointer"
+                                                                                                        />
+                                                                                                        {isChecked && <CheckCircle size={12} className="absolute text-white pointer-events-none" />}
+                                                                                                    </div>
+                                                                                                    <span className={`text-sm ${isChecked ? 'text-white font-semibold' : 'text-slate-400'}`}>
+                                                                                                        {item}
+                                                                                                    </span>
+                                                                                                </label>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Right Column: Observations */}
+                                                                                <div className="flex flex-col h-full">
+                                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-wider">Observações</label>
+                                                                                    <textarea
+                                                                                        rows={12}
+                                                                                        value={step.observations || ''}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
+                                                                                        disabled={!isActive && !isCompleted}
+                                                                                        placeholder="Adicione notas estratégicas..."
+                                                                                        className="flex-1 w-full text-sm p-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral outline-none resize-none placeholder:text-slate-600"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : step.step_key === 'creatives' ? (
+                                                                            /* Creatives Layout - Same pattern as Planning */
+                                                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                                                {/* Left Column: Checklist */}
+                                                                                <div className="flex flex-col h-full">
+                                                                                    <div className="flex items-center justify-between mb-4">
+                                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Checklist de Atividades</label>
+                                                                                        <span className="text-[10px] font-bold text-brand-coral">{creativesProgress}% Concluído</span>
+                                                                                    </div>
+
+                                                                                    {/* Progress Bar */}
+                                                                                    <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
+                                                                                        <div
+                                                                                            className="h-full bg-gradient-to-r from-brand-coral to-red-500 shadow-[0_0_10px_rgba(255,107,107,0.5)] transition-all duration-500 ease-out"
+                                                                                            style={{ width: `${creativesProgress}%` }}
+                                                                                        ></div>
+                                                                                    </div>
+
+                                                                                    <div className="grid grid-cols-1 gap-3">
+                                                                                        {CREATIVES_CHECKLIST_ITEMS.map((item) => {
+                                                                                            const isChecked = step.checklist_data?.[item] || false;
+                                                                                            return (
+                                                                                                <label key={item} className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all border
+                                                                                                    ${isChecked
+                                                                                                        ? 'bg-brand-coral/10 border-brand-coral/30'
+                                                                                                        : 'bg-slate-800 border-slate-700 hover:border-slate-600'}`}>
+                                                                                                    <div className="relative flex items-center justify-center">
+                                                                                                        <input
+                                                                                                            type="checkbox"
+                                                                                                            checked={isChecked}
+                                                                                                            disabled={!isActive}
+                                                                                                            onChange={() => handleToggleChecklist(step.id, item, step.checklist_data)}
+                                                                                                            className="appearance-none w-5 h-5 rounded border-2 border-slate-500 checked:bg-brand-coral checked:border-brand-coral transition-all cursor-pointer"
+                                                                                                        />
+                                                                                                        {isChecked && <CheckCircle size={12} className="absolute text-white pointer-events-none" />}
+                                                                                                    </div>
+                                                                                                    <span className={`text-sm ${isChecked ? 'text-white font-semibold' : 'text-slate-400'}`}>
+                                                                                                        {item}
+                                                                                                    </span>
+                                                                                                </label>
+                                                                                            );
+                                                                                        })}
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                {/* Right Column: Observations */}
+                                                                                <div className="flex flex-col h-full">
+                                                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-4 tracking-wider">Observações</label>
+                                                                                    <textarea
+                                                                                        rows={12}
+                                                                                        value={step.observations || ''}
+                                                                                        onChange={(e) => handleUpdateTimelineStep(step.id, { observations: e.target.value })}
+                                                                                        disabled={!isActive && !isCompleted}
+                                                                                        placeholder="Adicione notas estratégicas..."
+                                                                                        className="flex-1 w-full text-sm p-4 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 focus:ring-1 focus:ring-brand-coral outline-none resize-none placeholder:text-slate-600"
+                                                                                    />
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : step.step_key === 'execution' ? (
+                                                                            /* Execution Layout - Same pattern as Planning */
+                                                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                                                                {/* Left Column: Checklist */}
+                                                                                <div className="flex flex-col h-full">
+                                                                                    <div className="flex items-center justify-between mb-4">
+                                                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Checklist de Atividades</label>
+                                                                                        <span className="text-[10px] font-bold text-brand-coral">{executionProgress}% Concluído</span>
+                                                                                    </div>
+
+                                                                                    {/* Progress Bar */}
+                                                                                    <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
+                                                                                        <div
+                                                                                            className="h-full bg-gradient-to-r from-brand-coral to-red-500 shadow-[0_0_10px_rgba(255,107,107,0.5)] transition-all duration-500 ease-out"
+                                                                                            style={{ width: `${executionProgress}%` }}
+                                                                                        ></div>
+                                                                                    </div>
+
+                                                                                    <div className="grid grid-cols-1 gap-3">
+                                                                                        {EXECUTION_CHECKLIST_ITEMS.map((item) => {
                                                                                             const isChecked = step.checklist_data?.[item] || false;
                                                                                             return (
                                                                                                 <label key={item} className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all border
