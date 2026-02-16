@@ -41,25 +41,47 @@ const Header: React.FC = () => {
           </button>
 
           {/* AI Manager - only for gestor */}
+          {/* AI Tools Dropdown - only for gestor */}
           {!loading && userRole === 'gestor' && (
-            <button
-              onClick={() => navigate('/ai-agent')}
-              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-            >
-              <span className="p-0.5 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[10px] w-4 h-4 flex items-center justify-center font-bold">AI</span>
-              AI Manager
-            </button>
-          )}
+            <div className="relative group">
+              <button
+                className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' || location.pathname === '/brain'
+                    ? 'text-brand-coral'
+                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+              >
+                <div className="p-0.5 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white w-5 h-5 flex items-center justify-center font-bold text-[10px]">AI</div>
+                AI Tools
+              </button>
 
-          {/* Brain Manager - only for gestor */}
-          {!loading && userRole === 'gestor' && (
-            <button
-              onClick={() => navigate('/brain')}
-              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/brain' ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-            >
-              <span className="p-0.5 rounded bg-slate-800 text-white text-[10px] w-4 h-4 flex items-center justify-center font-bold">🧠</span>
-              Cérebro
-            </button>
+              <div className="absolute left-0 top-full pt-2 hidden group-hover:block z-50">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 min-w-[240px]">
+                  <button
+                    onClick={() => navigate('/ai-agent')}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 ${location.pathname === '/ai-agent' ? 'text-brand-coral bg-slate-50 dark:bg-slate-800' : 'text-slate-700 dark:text-slate-300'
+                      }`}
+                  >
+                    <div className="p-1 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white w-6 h-6 flex items-center justify-center font-bold text-[10px] shadow-sm">AI</div>
+                    <div>
+                      <span className="block font-medium">AI Manager</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Gestão Estratégica</span>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/brain')}
+                    className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 ${location.pathname === '/brain' ? 'text-brand-coral bg-slate-50 dark:bg-slate-800' : 'text-slate-700 dark:text-slate-300'
+                      }`}
+                  >
+                    <div className="p-1 rounded bg-slate-800 text-white w-6 h-6 flex items-center justify-center font-bold text-[10px] shadow-sm">🧠</div>
+                    <div>
+                      <span className="block font-medium">Fale com o Cérebro</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Segundo Cérebro</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Comercial Dropdown - only for gestor */}
