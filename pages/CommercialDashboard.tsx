@@ -276,8 +276,8 @@ const KPICard: React.FC<{
             </div>
             {change !== undefined && (
                 <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${change >= 0
-                        ? 'text-emerald-400 bg-emerald-400/10'
-                        : 'text-red-400 bg-red-400/10'
+                    ? 'text-emerald-400 bg-emerald-400/10'
+                    : 'text-red-400 bg-red-400/10'
                     }`}>
                     {change >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                     {Math.abs(change)}%
@@ -405,8 +405,8 @@ const CommercialChatbot: React.FC<{
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                ? 'bg-brand-coral text-white rounded-br-md'
-                                : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-md'
+                            ? 'bg-brand-coral text-white rounded-br-md'
+                            : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-md'
                             }`}>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
                         </div>
@@ -652,7 +652,7 @@ const CommercialDashboard: React.FC = () => {
                         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-hidden">
                             <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
                                 <MessageSquare size={16} className="text-slate-400" />
-                                Detalhamento Mensal
+                                Detalhamento Mensal — {selectedYear}
                             </h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
@@ -681,8 +681,8 @@ const CommercialDashboard: React.FC = () => {
                                                 <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.acceptedProposals}</td>
                                                 <td className="py-3 px-3 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.conversionRate >= 50 ? 'text-emerald-400 bg-emerald-400/10' :
-                                                            m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
-                                                                'text-slate-500 bg-slate-800'
+                                                        m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
+                                                            'text-slate-500 bg-slate-800'
                                                         }`}>
                                                         {m.conversionRate}%
                                                     </span>

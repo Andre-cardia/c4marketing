@@ -54,7 +54,7 @@ export async function fetchCommercialContext(
         .order('created_at', { ascending: true });
 
     // Fetch ALL acceptances with their proposal data
-    const { data: allAcceptances } = await supabase
+    const { data: allAcceptances, error: accError } = await supabase
         .from('acceptances')
         .select(`
             id, timestamp, company_name, status,
@@ -68,6 +68,8 @@ export async function fetchCommercialContext(
             )
         `)
         .order('timestamp', { ascending: true });
+
+    if (accError) console.error('Erro ao buscar acceptances:', accError);
 
     const proposals = allProposals || [];
     const acceptances = allAcceptances || [];
@@ -141,22 +143,17 @@ function computeMonthlyMetrics(
         });
 
         // Calculate MRR: sum of monthly_fee for ALL contracts active up to this month
-        // A contract is "active" if it was accepted on or before monthEnd and its status is one of the active statuses
         const activeContracts = acceptances.filter(a => {
             const acceptDate = new Date(a.timestamp);
             if (acceptDate > monthEnd) return false;
-
-            // Consider active statuses
-            const status = a.status || 'Ativo';
-            return ['Ativo', 'Onboarding'].includes(status);
+            return isActiveContract(a);
         });
 
         let mrr = 0;
         let setupRevenue = 0;
 
         activeContracts.forEach((acc: any) => {
-            const monthlyFee = getMonthlyFee(acc);
-            mrr += monthlyFee;
+            mrr += getMonthlyFee(acc);
         });
 
         // Setup revenue: sum of setup_fee for contracts started this month
@@ -164,23 +161,22 @@ function computeMonthlyMetrics(
             setupRevenue += getSetupFee(acc);
         });
 
-        // Churn: contracts that left "Ativo" status during this month
-        // (approximation: contracts with non-active status whose last known date is in this month)
-        const churnedContracts = acceptances.filter(a => {
+        // Churn count: contracts churned up to this month
+        const totalChurnedUpToMonth = acceptances.filter(a => {
             const acceptDate = new Date(a.timestamp);
             if (acceptDate > monthEnd) return false;
-            const status = a.status || 'Ativo';
-            return ['Cancelado', 'Suspenso', 'Finalizado'].includes(status);
+            return isChurnedContract(a);
         }).length;
 
-        // Only count churned that happened up to this month, relative to total contracts
-        const totalContractsUpToMonth = acceptances.filter(a => new Date(a.timestamp) <= monthEnd).length;
-        const churnThisMonth = m === 0 ? churnedContracts : Math.max(0, churnedContracts - acceptances.filter(a => {
+        // Churn from previous month (for delta calculation)
+        const totalChurnedUpToPrevMonth = m > 0 ? acceptances.filter(a => {
             const acceptDate = new Date(a.timestamp);
-            if (acceptDate > new Date(year, m, 0, 23, 59, 59)) return false;
-            const status = a.status || 'Ativo';
-            return ['Cancelado', 'Suspenso', 'Finalizado'].includes(status);
-        }).length);
+            const prevMonthEnd = new Date(year, m, 0, 23, 59, 59);
+            if (acceptDate > prevMonthEnd) return false;
+            return isChurnedContract(a);
+        }).length : 0;
+
+        const churnThisMonth = totalChurnedUpToMonth - totalChurnedUpToPrevMonth;
 
         const conversionRate = monthProposals.length > 0
             ? (monthAcceptances.length / monthProposals.length) * 100
@@ -192,7 +188,7 @@ function computeMonthlyMetrics(
             mrr,
             arr: mrr * 12,
             newContracts: monthAcceptances.length,
-            churnedContracts: churnThisMonth,
+            churnedContracts: Math.max(0, churnThisMonth),
             totalProposals: monthProposals.length,
             acceptedProposals: monthAcceptances.length,
             conversionRate: Math.round(conversionRate * 10) / 10,
@@ -206,15 +202,55 @@ function computeMonthlyMetrics(
 }
 
 function getMonthlyFee(acc: any): number {
-    if (acc.proposal?.monthly_fee) return acc.proposal.monthly_fee;
-    if (acc.contract_snapshot?.proposal?.monthly_fee) return acc.contract_snapshot.proposal.monthly_fee;
+    // Try linked proposal first
+    if (acc.proposal && acc.proposal.monthly_fee != null) {
+        return Number(acc.proposal.monthly_fee) || 0;
+    }
+    // Fallback to contract_snapshot
+    if (acc.contract_snapshot?.proposal?.monthly_fee != null) {
+        return Number(acc.contract_snapshot.proposal.monthly_fee) || 0;
+    }
+    // Also check top-level contract_snapshot fields (some snapshots store differently)
+    if (acc.contract_snapshot?.monthly_fee != null) {
+        return Number(acc.contract_snapshot.monthly_fee) || 0;
+    }
     return 0;
 }
 
 function getSetupFee(acc: any): number {
-    if (acc.proposal?.setup_fee) return acc.proposal.setup_fee;
-    if (acc.contract_snapshot?.proposal?.setup_fee) return acc.contract_snapshot.proposal.setup_fee;
+    // Try linked proposal first
+    if (acc.proposal && acc.proposal.setup_fee != null) {
+        return Number(acc.proposal.setup_fee) || 0;
+    }
+    // Fallback to contract_snapshot
+    if (acc.contract_snapshot?.proposal?.setup_fee != null) {
+        return Number(acc.contract_snapshot.proposal.setup_fee) || 0;
+    }
+    // Also check top-level
+    if (acc.contract_snapshot?.setup_fee != null) {
+        return Number(acc.contract_snapshot.setup_fee) || 0;
+    }
     return 0;
+}
+
+/**
+ * Checks if an acceptance is considered active.
+ * Contracts without explicit status or with active-like statuses are considered active.
+ */
+function isActiveContract(acc: any): boolean {
+    const status = (acc.status || '').trim();
+    // If no status set, it's active by default
+    if (!status) return true;
+    // Explicit active statuses
+    const activeStatuses = ['Ativo', 'Onboarding', 'Em andamento', 'ativo', 'onboarding'];
+    return activeStatuses.some(s => s.toLowerCase() === status.toLowerCase());
+}
+
+function isChurnedContract(acc: any): boolean {
+    const status = (acc.status || '').trim();
+    if (!status) return false;
+    const churnStatuses = ['Cancelado', 'Suspenso', 'Finalizado', 'cancelado', 'suspenso', 'finalizado'];
+    return churnStatuses.some(s => s.toLowerCase() === status.toLowerCase());
 }
 
 // ─── AI Chat ─────────────────────────────────────────────────────────────────
