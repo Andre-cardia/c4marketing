@@ -162,7 +162,7 @@ export default function BrainManager() {
             const { data: users } = await supabase.from('app_users').select('*');
             if (users) {
                 for (const u of users) {
-                    const content = `[USUÁRIO] O usuário ${u.email} tem papel de ${u.role}. ID: ${u.id}.`;
+                    const content = `[USUÁRIO] O usuário ${u.email} possui a função de acesso (role): ${u.role}. ID do Sistema: ${u.id}.`;
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'app_users',
@@ -181,10 +181,13 @@ export default function BrainManager() {
                         ? p.services.map((s: any) => typeof s === 'string' ? s : s.id).join(', ')
                         : 'Nenhum';
 
-                    const content = `[PROPOSTA] Proposta para empresa ${p.company_name} (Responsável: ${p.responsible_name}). 
-                    Valor Mensal: R$ ${p.monthly_fee}, Setup: R$ ${p.setup_fee}. 
-                    Duração: ${p.contract_duration} meses. Serviços: ${services}. 
-                    Criada em: ${new Date(p.created_at).toLocaleDateString()}. ID: ${p.id}.`;
+                    const content = `[PROPOSTA DE SERVIÇO] Proposta comercial para a empresa ${p.company_name}.
+                    Responsável pela proposta: ${p.responsible_name}.
+                    Detalhes Financeiros: Valor Mensal (MRR): R$ ${p.monthly_fee}, Taxa de Setup: R$ ${p.setup_fee}.
+                    Vigência/Duração do Contrato Proposto: ${p.contract_duration} meses.
+                    Serviços Incluídos: ${services}.
+                    Data de Criação da Proposta: ${new Date(p.created_at).toLocaleDateString()}.
+                    ID da Proposta: ${p.id}.`;
 
                     await addToBrain(content, {
                         type: 'database_record',
@@ -200,11 +203,12 @@ export default function BrainManager() {
             const { data: acceptances } = await supabase.from('acceptances').select('*');
             if (acceptances) {
                 for (const acc of acceptances) {
-                    const content = `[CONTRATO] Contrato Aceito para ${acc.company_name} (CNPJ: ${acc.cnpj || 'N/A'}).
-                    Cliente: ${acc.name} (${acc.email}). Status: ${acc.status}.
-                    Aceite em: ${new Date(acc.timestamp).toLocaleDateString()}.
-                    Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString() : 'Indefinida'}.
-                    ID: ${acc.id}.`;
+                    const content = `[CONTRATO ATIVO] Contrato vigente com a empresa ${acc.company_name} (CNPJ: ${acc.cnpj || 'Não Informado'}).
+                    Cliente Responsável: ${acc.name} (Email: ${acc.email}).
+                    Status do Contrato: ${acc.status}.
+                    Data de Início do Contrato (Data de Aceite): ${new Date(acc.timestamp).toLocaleDateString()}.
+                    Data de Término/Validade do Contrato: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString() : 'Indeterminado'}.
+                    ID do Contrato: ${acc.id}.`;
 
                     await addToBrain(content, {
                         type: 'database_record',
@@ -221,16 +225,28 @@ export default function BrainManager() {
             const { data: trafficParams } = await supabase.from('traffic_projects').select('*');
             if (trafficParams) {
                 for (const tp of trafficParams) {
-                    const content = `[PROJETO TRÁFEGO] Cliente: ${tp.client_name}. Status: ${tp.status}.
-                    Objetivo: ${tp.objective}. Investimento Mensal: ${tp.monthly_investment}.
-                    Redes: ${Array.isArray(tp.ad_networks) ? tp.ad_networks.join(', ') : tp.ad_networks}.
-                    Público Alvo: ${tp.target_audience}. ID: ${tp.id}.`;
+                    // Try to fetch client name from associated acceptance if not directly available (though schema suggests it might not be joined here easily without join query)
+                    // For now, assume client_name exists or we use ID.
+                    // Wait, traffic_projects schema I saw earlier DOES NOT have client_name!
+                    // It links to acceptance_id.
+                    // I need to fetch acceptances to get the name.
+
+                    // Let's do a join or map.
+                    // Since I already fetched acceptances above, I can map ID to Name.
+                    const acceptance = acceptances?.find(a => a.id === tp.acceptance_id);
+                    const clientName = acceptance?.company_name || 'Empresa Desconhecida';
+
+                    const content = `[PROJETO DE TRÁFEGO PAGO] Projeto de Gestão de Tráfego para ${clientName}.
+                    Status do Projeto: ${tp.account_setup_status === 'completed' ? 'Configurado' : 'Em Configuração'}.
+                    Data de Início do Projeto: ${new Date(tp.created_at).toLocaleDateString()}.
+                    Objetivo da Campanha: ${tp.strategy_meeting_notes || 'Não especificado'}.
+                    ID do Projeto: ${tp.id}.`;
 
                     await addToBrain(content, {
                         type: 'database_record',
                         source_table: 'traffic_projects',
                         source_id: tp.id,
-                        title: `Projeto Tráfego: ${tp.client_name}`
+                        title: `Projeto Tráfego: ${clientName}`
                     });
                     count++;
                 }
