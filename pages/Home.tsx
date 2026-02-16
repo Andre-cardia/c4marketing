@@ -110,7 +110,7 @@ const Home: React.FC = () => {
           {/* Logo */}
           <div className="mb-12">
             <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" alt="C4 Marketing" className="h-10 brightness-0 invert opacity-90" />
+              <img src="/logo.png" alt="C4 Marketing" className="h-14 brightness-0 invert opacity-90" />
             </div>
             <div className="h-0.5 w-12 bg-gradient-to-r from-brand-coral to-transparent mt-4"></div>
           </div>
@@ -318,11 +318,14 @@ const Home: React.FC = () => {
             </div>
 
             {/* Security Badge */}
-            <div className="mt-6 pt-5 border-t border-white/[0.05] text-center">
-              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-700 font-medium uppercase tracking-wider">
-                <Shield size={10} />
+            <div className="mt-6 pt-5 border-t border-white/[0.05] text-center space-y-2">
+              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                <Shield size={10} className="text-emerald-500" />
                 Conexão segura • Dados criptografados
               </div>
+              <p className="text-[10px] text-slate-600 font-medium">
+                Atenção: Acesse pelo Desktop
+              </p>
             </div>
           </div>
         </div>
