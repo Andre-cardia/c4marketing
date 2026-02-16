@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import NoticeModal from '../components/NoticeModal';
 import { Users as UsersIcon, Plus, Mail, Phone, Shield, Trash2, Edit, Bell, X } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 
@@ -17,7 +18,7 @@ interface AppUser {
 
 const Users: React.FC = () => {
     const navigate = useNavigate();
-    const { userRole, loading: roleLoading } = useUserRole();
+    const { userRole, loading: roleLoading, fullName, avatarUrl, email } = useUserRole();
 
     // Shared State for Theme
     const [darkMode, setDarkMode] = useState(() => {
@@ -54,11 +55,6 @@ const Users: React.FC = () => {
 
     // Notice State
     const [showNoticeModal, setShowNoticeModal] = useState(false);
-    const [newNotice, setNewNotice] = useState({
-        message: '',
-        priority: 'normal' as 'normal' | 'importante' | 'urgente'
-    });
-    const [creatingNotice, setCreatingNotice] = useState(false);
 
     // Access control - redirect if not gestor
     useEffect(() => {
@@ -190,46 +186,34 @@ const Users: React.FC = () => {
         }
     };
 
-    const handleCreateNotice = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCreatingNotice(true);
-
+    const handleCreateNotice = async (message: string, priority: 'normal' | 'importante' | 'urgente') => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user?.email) {
-                alert('Você precisa estar autenticado.');
+            // Reuse logic from Dashboard or simplified insert
+            // We need to ensure we have user info. 
+            // Since we use useUserRole, we might have it already, but let's be safe.
+
+            if (!email) {
+                alert('Erro: Usuário não identificado.');
                 return;
             }
 
-            // Get author name from app_users
-            const { data: userData } = await supabase
-                .from('app_users')
-                .select('name')
-                .eq('email', session.user.email)
-                .single();
-
-            if (!userData) {
-                alert('Usuário não encontrado.');
-                return;
-            }
+            // If we rely on useUserRole, we have fullName.
+            const authorName = fullName || 'Gestor';
 
             const { error } = await supabase.from('notices').insert([{
-                message: newNotice.message,
-                author_email: session.user.email,
-                author_name: userData.name,
-                priority: newNotice.priority
+                message: message,
+                author_email: email,
+                author_name: authorName,
+                priority: priority,
+                created_at: new Date().toISOString()
             }]);
 
             if (error) throw error;
 
-            setShowNoticeModal(false);
-            setNewNotice({ message: '', priority: 'normal' });
             alert('Aviso criado com sucesso!');
         } catch (error) {
             console.error('Error creating notice:', error);
             alert('Erro ao criar aviso.');
-        } finally {
-            setCreatingNotice(false);
         }
     };
 
@@ -459,102 +443,13 @@ const Users: React.FC = () => {
             )}
 
             {/* Notice Creation Modal */}
-            {showNoticeModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-8">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                        <Bell className="w-6 h-6 text-amber-500" />
-                                        Criar Aviso
-                                    </h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                                        Publique um aviso no Mural do Dashboard
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setShowNoticeModal(false)}
-                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                                >
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleCreateNotice} className="space-y-6">
-                                <div>
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
-                                        Mensagem
-                                    </label>
-                                    <textarea
-                                        value={newNotice.message}
-                                        onChange={(e) => setNewNotice({ ...newNotice, message: e.target.value })}
-                                        className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-slate-700 dark:text-white resize-none"
-                                        rows={5}
-                                        placeholder="Digite a mensagem do aviso..."
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-                                        Nível de Prioridade
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewNotice({ ...newNotice, priority: 'normal' })}
-                                            className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'normal'
-                                                ? 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600 ring-2 ring-slate-400'
-                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                                                }`}
-                                        >
-                                            Normal
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewNotice({ ...newNotice, priority: 'importante' })}
-                                            className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'importante'
-                                                ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600 ring-2 ring-amber-500'
-                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-amber-300'
-                                                }`}
-                                        >
-                                            Importante
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setNewNotice({ ...newNotice, priority: 'urgente' })}
-                                            className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${newNotice.priority === 'urgente'
-                                                ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600 ring-2 ring-red-500'
-                                                : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:border-red-300'
-                                                }`}
-                                        >
-                                            Urgente
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowNoticeModal(false)}
-                                        className="flex-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 py-3 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={creatingNotice}
-                                        className="flex-1 bg-amber-500 text-white py-3 rounded-xl font-bold hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {creatingNotice ? 'Publicando...' : 'Publicar Aviso'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <NoticeModal
+                isOpen={showNoticeModal}
+                onClose={() => setShowNoticeModal(false)}
+                onSave={handleCreateNotice}
+                authorName={fullName || 'Usuário'}
+                authorAvatar={avatarUrl}
+            />
         </div>
     );
 };
