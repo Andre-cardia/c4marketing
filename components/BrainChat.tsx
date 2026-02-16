@@ -42,9 +42,15 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                 sources: response.documents
             }]);
         } catch (error: any) {
+            let errorMessage = error.message || JSON.stringify(error);
+
+            if (errorMessage.includes('Failed to send a request')) {
+                errorMessage = 'Falha de conexão com o "Cérebro". As funções Edge foram publicadas (deploy)? Verifique o passo 2 do guia walkthrough.md.';
+            }
+
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `Desculpe, tive um problema ao acessar o cérebro. Detalhes do erro: ${error.message || JSON.stringify(error)}`
+                content: `❌ Erro: ${errorMessage}`
             }]);
         } finally {
             setLoading(false);
