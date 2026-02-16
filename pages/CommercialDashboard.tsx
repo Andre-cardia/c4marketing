@@ -571,21 +571,27 @@ const CommercialDashboard: React.FC = () => {
                                 subtitle="Receita Mensal Recorrente"
                             />
                             <KPICard
-                                title="ARR Real"
-                                value={formatCompact(context.currentARR)}
-                                icon={<TrendingUp size={18} className="text-emerald-400" />}
-                                subtitle="Acumulado até o mês atual"
+                                title="Rec. Acumulada"
+                                value={formatCompact(context.accumulatedRevenue)}
+                                icon={<DollarSign size={18} className="text-emerald-400" />}
+                                subtitle="Faturamento YTD (Realizado)"
                             />
                             <KPICard
-                                title="ARR Previsto"
-                                value={formatCompact(context.predictedARR)}
+                                title="ARR (Run Rate)"
+                                value={formatCompact(context.actualARR)}
                                 icon={<TrendingUp size={18} className="text-amber-400" />}
-                                subtitle="Projeção anual"
+                                subtitle="Escala Anual (MRR x 12)"
+                            />
+                            <KPICard
+                                title="Previsão Total"
+                                value={formatCompact(context.predictedARR)}
+                                icon={<BarChart3 size={18} className="text-blue-400" />}
+                                subtitle="Projeção p/ fim do ano"
                             />
                             <KPICard
                                 title="Conversão"
                                 value={`${context.averageConversionRate}%`}
-                                icon={<Percent size={18} className="text-blue-400" />}
+                                icon={<Percent size={18} className="text-cyan-400" />}
                                 subtitle="Média do exercício"
                             />
                             <KPICard
@@ -597,14 +603,7 @@ const CommercialDashboard: React.FC = () => {
                             <KPICard
                                 title="Clientes Ativos"
                                 value={String(context.currentActiveClients)}
-                                icon={<Users size={18} className="text-cyan-400" />}
-                            />
-                            <KPICard
-                                title="Crescimento"
-                                value={`${context.mrrGrowth > 0 ? '+' : ''}${context.mrrGrowth}%`}
-                                change={context.mrrGrowth}
-                                icon={<Activity size={18} className="text-amber-400" />}
-                                subtitle="MRR vs mês anterior"
+                                icon={<Users size={18} className="text-emerald-400" />}
                             />
                         </div>
 
@@ -665,10 +664,10 @@ const CommercialDashboard: React.FC = () => {
                                     <thead>
                                         <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
                                             <th className="py-3 px-3">Mês</th>
-                                            <th className="py-3 px-3 text-right">MRR Real</th>
-                                            <th className="py-3 px-3 text-right">MRR Previsto</th>
+                                            <th className="py-3 px-3 text-right">Fat. Recorrente</th>
+                                            <th className="py-3 px-3 text-right">MRR (Contratos)</th>
                                             <th className="py-3 px-3 text-right">Setup</th>
-                                            <th className="py-3 px-3 text-right">Total</th>
+                                            <th className="py-3 px-3 text-right">Receita Total</th>
                                             <th className="py-3 px-3 text-center">Propostas</th>
                                             <th className="py-3 px-3 text-center">Aceitas</th>
                                             <th className="py-3 px-3 text-center">Conversão</th>

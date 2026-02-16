@@ -28,8 +28,9 @@ export interface CommercialContext {
     comparisonMonths?: MonthlyMetrics[];
     comparisonYear?: number;
     currentMRR: number;
-    currentARR: number;
-    predictedARR: number;   // projected ARR based on current MRR * 12
+    accumulatedRevenue: number; // Sum of MRR + Setup of past months
+    actualARR: number;          // currentMRR * 12
+    predictedARR: number;       // projected total revenue for the year
     currentActiveClients: number;
     averageChurnRate: number;
     averageConversionRate: number;
@@ -97,8 +98,10 @@ export async function fetchCommercialContext(
 
     // Predicted ARR: sum of forecastMRR for each month in the year
     const predictedARR = months.reduce((sum, m) => sum + m.forecastMRR, 0);
-    // Actual ARR: sum of real MRR for past months only
-    const actualARR = months.filter(m => !m.isForecast).reduce((sum, m) => sum + m.mrr, 0);
+    // Accumulated Revenue (YTD): sum of real revenue (MRR + Setup) for past months only
+    const accRevenue = months.filter(m => !m.isForecast).reduce((sum, m) => sum + m.totalRevenue, 0);
+    // Actual ARR (annualized run rate): current MRR * 12
+    const actualARR = currentMRR * 12;
 
     const avgChurn = months.length > 0
         ? months.reduce((sum, m) => sum + (m.activeClients > 0 ? (m.churnedContracts / m.activeClients) * 100 : 0), 0) / months.length
@@ -114,7 +117,8 @@ export async function fetchCommercialContext(
         comparisonMonths,
         comparisonYear,
         currentMRR,
-        currentARR: actualARR,
+        accumulatedRevenue: accRevenue,
+        actualARR,
         predictedARR,
         currentActiveClients: currentMonth?.activeClients || 0,
         averageChurnRate: Math.round(avgChurn * 10) / 10,
@@ -310,7 +314,9 @@ export async function chatWithDirector(
     const contextSummary = `
 DADOS COMERCIAIS DO ANO ${context.year}:
 - MRR Atual: ${formatCurrency(context.currentMRR)}
-- ARR Atual: ${formatCurrency(context.currentARR)}
+- ARR Atual (Run Rate): ${formatCurrency(context.actualARR)}
+- Receita Acumulada no Ano (YTD): ${formatCurrency(context.accumulatedRevenue)}
+- Previsão de Receita Total no Ano: ${formatCurrency(context.predictedARR)}
 - Clientes Ativos: ${context.currentActiveClients}
 - Crescimento MRR (mês anterior): ${context.mrrGrowth}%
 - Taxa Média de Conversão: ${context.averageConversionRate}%
