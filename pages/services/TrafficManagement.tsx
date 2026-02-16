@@ -1153,7 +1153,7 @@ const TrafficManagement: React.FC = () => {
                                                                                     </button>
                                                                                 )}
 
-                                                                                {isActive && (
+                                                                                {isActive && step.step_key !== 'finalization' && (
                                                                                     <button
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
@@ -1163,6 +1163,21 @@ const TrafficManagement: React.FC = () => {
                                                                                     >
                                                                                         <CheckCircle size={16} />
                                                                                         Concluir Etapa
+                                                                                    </button>
+                                                                                )}
+
+                                                                                {isActive && step.step_key === 'finalization' && (
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (confirm('Tem certeza que deseja concluir este projeto? A campanha será marcada como finalizada.')) {
+                                                                                                handleCompleteStep(step, campaign.id);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-brand-coral to-red-500 text-white rounded-xl font-bold text-sm hover:from-red-500 hover:to-brand-coral transition-all shadow-lg shadow-brand-coral/30 transform hover:-translate-y-0.5"
+                                                                                    >
+                                                                                        <Flag size={16} />
+                                                                                        Concluir Projeto
                                                                                     </button>
                                                                                 )}
                                                                             </div>
