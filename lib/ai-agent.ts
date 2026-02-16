@@ -336,7 +336,7 @@ export async function generateUserFeedback(userEmail: string, userName: string):
         - Não use markdown, apenas texto puro.
         `;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
