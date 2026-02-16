@@ -256,14 +256,14 @@ const Users: React.FC = () => {
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowNoticeModal(true)}
-                                className="bg-amber-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20"
+                                className="bg-transparent border-2 border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-amber-500/10"
                             >
                                 <Bell className="w-4 h-4" />
                                 Criar Aviso
                             </button>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="bg-brand-coral text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-red-500 transition-colors shadow-lg shadow-brand-coral/20"
+                                className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors shadow-lg shadow-brand-coral/10"
                             >
                                 <Plus className="w-4 h-4" />
                                 Novo Usuário
