@@ -94,6 +94,7 @@ const Dashboard: React.FC = () => {
     const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
     const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
     const [usersMap, setUsersMap] = useState<Map<string, any>>(new Map());
+    const [usersEmailMap, setUsersEmailMap] = useState<Map<string, any>>(new Map());
     const [loading, setLoading] = useState(true);
 
     // Derived State
@@ -167,11 +168,19 @@ const Dashboard: React.FC = () => {
 
     // Re-enrich access logs when usersMap changes
     const enrichedAccessLogs = useMemo(() => {
-        return accessLogs.map(log => ({
-            ...log,
-            user: usersMap.get(log.user_id)
-        }));
-    }, [accessLogs, usersMap]);
+        return accessLogs.map(log => {
+            // Try finding user by ID (if app_users.id matches auth.id)
+            let user = usersMap.get(log.user_id);
+            // If not found, try by email (if log has email)
+            if (!user && log.user_email) {
+                user = usersEmailMap.get(log.user_email);
+            }
+            return {
+                ...log,
+                user
+            };
+        });
+    }, [accessLogs, usersMap, usersEmailMap]);
 
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
@@ -246,14 +255,17 @@ const Dashboard: React.FC = () => {
         if (data) {
             const map: { [email: string]: string } = {};
             const uMap = new Map();
+            const eMap = new Map();
             data.forEach((u: any) => {
                 if (u.email && u.avatar_url) {
                     map[u.email] = u.avatar_url;
                 }
                 uMap.set(u.id, u);
+                if (u.email) eMap.set(u.email, u);
             });
             setUserAvatars(map);
             setUsersMap(uMap);
+            setUsersEmailMap(eMap);
         }
     };
 
@@ -955,7 +967,12 @@ const Dashboard: React.FC = () => {
                                             // Calculate Stats
                                             const currentMonth = new Date().toISOString().slice(0, 7);
                                             const stats = Array.from(usersMap.values()).map(user => {
-                                                const userLogs = accessLogs.filter(l => l.user_id === user.id && l.accessed_at.startsWith(currentMonth)).length;
+                                                const userLogs = accessLogs.filter(l => {
+                                                    const isSameMonth = l.accessed_at.startsWith(currentMonth);
+                                                    const matchesId = l.user_id === user.id;
+                                                    const matchesEmail = l.user_email && user.email && l.user_email === user.email;
+                                                    return isSameMonth && (matchesId || matchesEmail);
+                                                }).length;
                                                 // Note: Tasks normally don't have assignee_id linked clearly in this demo interface (it was assignee name string). 
                                                 // We will match by Name fuzzy or assume we can't fully link without ID.
                                                 // For this demo, we will try to match by name if user.full_name is in task.assignee
