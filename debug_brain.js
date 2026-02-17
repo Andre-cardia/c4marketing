@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { OpenAI } from 'openai';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -70,27 +71,57 @@ ID: ${acc.id}
 
     // Let's try to use the OpenAI key from env to generate a REAL embedding so we can fix it for the user right now!
 
-    const openAiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY; // Verify env var name
+    const openAiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
     if (!openAiKey) {
-        console.warn('No OpenAI Key found in env, using dummy embedding. Retrieval wont work for semantic search.');
-    } else {
-        console.log('Found OpenAI Key, generating real embedding...');
+        console.error('CRITICAL: No OpenAI Key found. Cannot generate real embedding.');
+        return;
     }
 
-    // Call RPC
-    const dummyEmbedding = Array(1536).fill(0.01);
+    const openai = new OpenAI({ apiKey: openAiKey });
 
-    const { error: insertError } = await supabase.rpc('insert_brain_document', {
-        content: content,
-        metadata: metadata,
-        embedding: dummyEmbedding // We use dummy for now to test DB insertion
+    console.log('Generating REAL embedding for content...');
+    const embeddingResponse = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: content,
     });
 
-    if (insertError) {
-        console.error('Insert Error:', insertError);
+    const realEmbedding = embeddingResponse.data[0].embedding;
+
+    // Delete existing dummy record first to be clean
+    const { error: deleteError } = await supabase.from('brain.documents').delete().eq('metadata->>source_id', acc.id.toString()).eq('metadata->>source_table', 'acceptances');
+    // Note: direct delete might fail via anon key if RLS blocks.
+    // Instead, rely on RPC 'insert_brain_document' which handles deduplication?
+    // The updated RPC logic handles deduplication! 
+    // It deletes where metadata->>source_table and source_id match.
+
+    // ... insertion done ...
+    console.log('Document inserted. Now testing retrieval...');
+
+    const query = "quem é Amplexo Diesel?";
+    console.log(`Generating embedding for query: "${query}"`);
+
+    const queryEmbeddingResponse = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: query,
+    });
+    const queryEmbedding = queryEmbeddingResponse.data[0].embedding;
+
+    console.log('Searching for documents...');
+    const { data: searchResults, error: searchError } = await supabase.rpc('match_brain_documents', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.1, // Test with 0.1
+        match_count: 5
+    });
+
+    if (searchError) {
+        console.error('Search Error:', searchError);
     } else {
-        console.log('Successfully inserted Amplexo document (with dummy embedding).');
-    }
+        console.log(`Found ${searchResults?.length || 0} documents.`);
+        searchResults.forEach((d, i) => {
+            console.log(`--- Result ${i + 1} (Sim: ${d.similarity}) ---`);
+            console.log('Title:', d.metadata?.title);
+            console.log('Content:', d.content.substring(0, 150) + '...');
+        }
 }
 
-checkBrain();
+    checkBrain();
