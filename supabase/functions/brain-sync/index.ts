@@ -27,30 +27,18 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        const openai = new OpenAI({
-            apiKey: Deno.env.get('OPENAI_API_KEY'),
-        })
-
-        // 1. Fetch pending items
-        const { data: queue, error: queueError } = await supabaseAdmin
-            .from('sync_queue')
-            .select('*')
-            .eq('status', 'pending')
-            .limit(5)
-            .schema('brain') // Typically brain schema, but supabase client usage depends on exposure. 
-        // Note: The table brain.sync_queue is in 'brain' schema. 
-        // Supabase JS client usually defaults to 'public'. We need to specify schema if possible or use rpc/view.
-        // Or if the table is exposed. Since we are admin, we can query it.
-        // Actually, supabase-js 'from' accepts 'schema.table' notation in some versions or we set schema in constructor.
-        // Let's assume we can set schema or use fully qualified name if not, but standard is .schema('brain').
-
-        // Re-creating client for brain schema might be safer if .schema() chaining isn't standard in older versions
         const brainClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
             { db: { schema: 'brain' } }
         )
 
+        const openai = new OpenAI({
+            apiKey: Deno.env.get('OPENAI_API_KEY'),
+        })
+
+        // 1. Fetch pending items
+        // Use brainClient directly since table is in brain schema
         const { data: pendingItems, error: fetchError } = await brainClient
             .from('sync_queue')
             .select('*')
