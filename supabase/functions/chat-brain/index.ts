@@ -92,40 +92,214 @@ Deno.serve(async (req) => {
             user_message: query,
         }
 
+        // LLM Router com Function Calling — o LLM escolhe qual RPC usar
+        const availableTools = [
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_all_proposals",
+                    description: "Consultar propostas comerciais. Use para listar, contar ou filtrar propostas criadas pela empresa.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_status_filter: {
+                                type: "string",
+                                enum: ["all", "open", "accepted"],
+                                description: "Filtro: 'open' = propostas ainda não aceitas/em aberto/pendentes. 'accepted' = propostas que já receberam aceite. 'all' = todas."
+                            }
+                        },
+                        required: ["p_status_filter"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_all_clients",
+                    description: "Consultar clientes (acceptances). Use para listar, contar ou filtrar clientes que aceitaram propostas.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_status: {
+                                type: "string",
+                                enum: ["Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado", null],
+                                description: "Filtro por status do cliente. null = todos."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_all_projects",
+                    description: "Consultar projetos de serviço (Gestão de Tráfego, Criação de Site, Landing Page). Use para listar projetos e seus status.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_service_type: {
+                                type: "string",
+                                enum: ["traffic", "website", "landing_page", null],
+                                description: "Filtro por tipo de serviço. null = todos os tipos."
+                            },
+                            p_status_filter: {
+                                type: "string",
+                                enum: ["Ativo", "Inativo", null],
+                                description: "Filtro por status do cliente vinculado. null = todos."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_all_users",
+                    description: "Consultar lista de usuários/colaboradores da equipe interna, com nome, email, cargo e último acesso.",
+                    parameters: { type: "object", properties: {} }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_all_tasks",
+                    description: "Consultar tarefas dos projetos. Use para listar pendências, tarefas por projeto ou por status.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_project_id: {
+                                type: "number",
+                                description: "ID do projeto para filtrar tarefas. null = todos os projetos."
+                            },
+                            p_status: {
+                                type: "string",
+                                enum: ["todo", "in_progress", "done", "review", null],
+                                description: "Filtro por status da tarefa. null = todas."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_access_summary",
+                    description: "Consultar logs de acesso ao sistema. Mostra quem acessou, quantas vezes, primeiro e último acesso.",
+                    parameters: { type: "object", properties: {} }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "rag_search",
+                    description: "Busca semântica no acervo de documentos (contratos, propostas, políticas, manuais). Use quando a pergunta é sobre conteúdo de documentos, cláusulas, análises ou informações que não estão em tabelas estruturadas.",
+                    parameters: { type: "object", properties: {} }
+                }
+            }
+        ]
+
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
+            // Classificação por Function Calling com GPT-4o-mini (rápido e barato)
             const completion = await openai.chat.completions.create({
-                model: 'gpt-4o',
+                model: 'gpt-4o-mini',
                 temperature: 0,
-                response_format: { type: "json_object" },
+                tools: availableTools,
+                tool_choice: "required",
                 messages: [
                     {
                         role: 'system',
-                        content: `
-Você é o ROUTER do "Segundo Cérebro".
-Classifique a solicitação e retorne um JSON.
-OUTPUT Schema:
-{
-  "artifact_kind": "contract|proposal|project|client|policy|ops|unknown",
-  "task_kind": "factual_lookup|summarization|drafting|analysis|operation",
-  "risk_level": "low|medium|high",
-  "agent": "Agent_Contracts|Agent_Proposals|Agent_Projects|Agent_Client360|Agent_GovernanceSecurity|Agent_BrainOps",
-  "retrieval_policy": "STRICT_DOCS_ONLY|DOCS_PLUS_RECENT_CHAT|CHAT_ONLY|OPS_ONLY",
-  "filters": {
-     "artifact_kind": string,
-     "status": "active", 
-     "type_blocklist": ["chat_log"]
-  },
-  "top_k": 5,
-  "confidence": 0.8,
-  "reason": "explanation"
-}
-                        `.trim()
+                        content: `Você é o ROUTER inteligente do "Segundo Cérebro" da C4 Marketing.
+Sua função é entender a intenção do usuário e escolher a ferramenta correta para responder.
+Analise o contexto semântico da pergunta — NÃO dependa de palavras-chave exatas.
+Exemplos:
+- "quais propostas estão em aberto?" → query_all_proposals(p_status_filter: "open")
+- "quem são nossos clientes ativos?" → query_all_clients(p_status: "Ativo")
+- "liste todos os projetos de tráfego" → query_all_projects(p_service_type: "traffic")
+- "quem acessou o sistema hoje?" → query_access_summary()
+- "o que diz o contrato com a empresa X?" → rag_search()
+- "quais tarefas estão pendentes?" → query_all_tasks(p_status: "todo")
+- "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
+- "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
+Escolha UMA ferramenta e seus parâmetros.`
                     },
-                    { role: 'user', content: `Message: ${input.user_message}` }
+                    { role: 'user', content: input.user_message }
                 ]
             })
-            const text = completion.choices[0].message.content ?? "{}"
-            return JSON.parse(text) as RouteDecision
+
+            const toolCall = completion.choices[0].message.tool_calls?.[0]
+
+            if (toolCall) {
+                const funcName = toolCall.function.name
+                const funcArgs = JSON.parse(toolCall.function.arguments || '{}')
+
+                console.log(`[LLM Router] Chose: ${funcName}(${JSON.stringify(funcArgs)})`)
+
+                // Mapear função para agente e configuração
+                const funcToAgent: Record<string, { agent: string; artifact_kind: string }> = {
+                    'query_all_proposals': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
+                    'query_all_clients': { agent: 'Agent_Client360', artifact_kind: 'client' },
+                    'query_all_projects': { agent: 'Agent_Projects', artifact_kind: 'project' },
+                    'query_all_users': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
+                    'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
+                    'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
+                    'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
+                }
+
+                const config = funcToAgent[funcName] || funcToAgent['rag_search']
+                const isDbQuery = funcName !== 'rag_search'
+
+                return {
+                    artifact_kind: config.artifact_kind,
+                    task_kind: 'factual_lookup',
+                    risk_level: 'low',
+                    agent: config.agent,
+                    retrieval_policy: 'STRICT_DOCS_ONLY',
+                    filters: {
+                        tenant_id: input.tenant_id,
+                        type_allowlist: ['official_doc', 'session_summary'],
+                        type_blocklist: ['chat_log'],
+                        artifact_kind: config.artifact_kind,
+                        source_table: null,
+                        client_id: null,
+                        project_id: null,
+                        source_id: null,
+                        status: 'active',
+                        time_window_minutes: null,
+                    },
+                    top_k: isDbQuery ? 0 : 10,
+                    tools_allowed: ['rag_search', 'db_read'],
+                    tool_hint: isDbQuery ? 'db_query' : 'rag_search',
+                    db_query_params: isDbQuery ? { rpc_name: funcName, ...funcArgs } : undefined,
+                    confidence: 0.95,
+                    reason: `LLM Router: ${funcName}(${JSON.stringify(funcArgs)})`,
+                } as RouteDecision
+            }
+
+            // Fallback se LLM não escolheu tool
+            return {
+                artifact_kind: 'unknown',
+                task_kind: 'factual_lookup',
+                risk_level: 'low',
+                agent: 'Agent_Projects',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                filters: {
+                    tenant_id: input.tenant_id,
+                    type_allowlist: ['official_doc', 'session_summary'],
+                    type_blocklist: ['chat_log'],
+                    artifact_kind: null,
+                    source_table: null,
+                    client_id: null,
+                    project_id: null,
+                    source_id: null,
+                    status: 'active',
+                    time_window_minutes: null,
+                },
+                top_k: 6,
+                tools_allowed: ['rag_search'],
+                tool_hint: 'rag_search',
+                confidence: 0.5,
+                reason: 'LLM Router: no tool selected, fallback to RAG',
+            } as RouteDecision
         }
 
         const decision = await routeRequestHybrid(routerInput, { callRouterLLM })

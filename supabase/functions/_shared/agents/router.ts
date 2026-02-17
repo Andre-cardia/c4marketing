@@ -521,22 +521,20 @@ export async function routeRequestHybrid(
 ): Promise<RouteDecision> {
     const msg = input.user_message;
 
-    // 1) Hard Gates
+    // 1) Hard Gates (segurança — sempre primeiro)
     const hard = hardGatePolicy(msg, input);
     if (hard) return hard;
 
-    // 2) Heuristic
-    const heuristic = routeHeuristic(msg, input);
-    if (heuristic.confidence >= 0.78) {
-        return heuristic;
-    }
-
-    // 3) Fallback LLM
+    // 2) LLM Router (function calling — entende contexto semântico)
     try {
         const llm = await deps.callRouterLLM(input);
-        return enforcePostLLMGuards(llm, msg, input);
+        if (llm.confidence >= 0.7) {
+            return enforcePostLLMGuards(llm, msg, input);
+        }
     } catch (err) {
-        console.error("Router LLM failed, using heuristic fallback", err);
-        return heuristic;
+        console.error("LLM Router failed, falling back to heuristic", err);
     }
+
+    // 3) Heuristic fallback (rápido, para quando LLM falha)
+    return routeHeuristic(msg, input);
 }
