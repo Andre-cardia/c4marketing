@@ -80,14 +80,14 @@ function applyPolicy(filters: MatchFilters, policy: RetrievalPolicy): MatchFilte
     switch (policy) {
         case "STRICT_DOCS_ONLY": {
             // official docs + summaries allowed; chat logs blocked
-            ensureAllow("official_doc", "session_summary");
+            ensureAllow("official_doc", "database_record", "session_summary");
             ensureBlock("chat_log");
             f.time_window_minutes = null; // not needed
             break;
         }
 
         case "DOCS_PLUS_RECENT_CHAT": {
-            ensureAllow("official_doc", "session_summary");
+            ensureAllow("official_doc", "database_record", "session_summary");
             // allow chat logs ONLY when time window is set
             if (f.time_window_minutes && f.time_window_minutes > 0) {
                 ensureAllow("chat_log");

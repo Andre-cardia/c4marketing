@@ -7,6 +7,7 @@ export type RetrievalPolicy =
 
 export type BrainDocType =
   | "official_doc"
+  | "database_record" // Legacy/Default type from ingestion
   | "chat_log"
   | "session_summary"
   | "system_note";
@@ -71,7 +72,7 @@ export interface RetrievedDoc {
   metadata: Record<string, any>;
 }
 
-export interface RouteFilters extends MatchFilters {}
+export interface RouteFilters extends MatchFilters { }
 
 export interface RouteDecision {
   artifact_kind: ArtifactKind;
