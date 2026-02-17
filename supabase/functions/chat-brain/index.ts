@@ -122,8 +122,8 @@ Deno.serve(async (req) => {
                         properties: {
                             p_status: {
                                 type: "string",
-                                enum: ["Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado", null],
-                                description: "Filtro por status do cliente. null = todos."
+                                enum: ["Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado"],
+                                description: "Filtro por status do cliente. Omita para retornar todos."
                             }
                         }
                     }
@@ -139,13 +139,13 @@ Deno.serve(async (req) => {
                         properties: {
                             p_service_type: {
                                 type: "string",
-                                enum: ["traffic", "website", "landing_page", null],
-                                description: "Filtro por tipo de serviço. null = todos os tipos."
+                                enum: ["traffic", "website", "landing_page"],
+                                description: "Filtro por tipo de serviço. Omita para retornar todos."
                             },
                             p_status_filter: {
                                 type: "string",
-                                enum: ["Ativo", "Inativo", null],
-                                description: "Filtro por status do cliente vinculado. null = todos."
+                                enum: ["Ativo", "Inativo"],
+                                description: "Filtro por status do cliente vinculado. Omita para retornar todos."
                             }
                         }
                     }
@@ -163,18 +163,18 @@ Deno.serve(async (req) => {
                 type: "function" as const,
                 function: {
                     name: "query_all_tasks",
-                    description: "Consultar tarefas dos projetos. Use para listar pendências, tarefas por projeto ou por status.",
+                    description: "Consultar tarefas e pendências dos projetos/clientes. Use para: 'tem tarefa pendente?', 'quais as pendências?', 'tarefas em andamento', etc. Sempre use esta ferramenta quando o usuário perguntar sobre tarefas, pendências ou atividades.",
                     parameters: {
                         type: "object",
                         properties: {
                             p_project_id: {
                                 type: "number",
-                                description: "ID do projeto para filtrar tarefas. null = todos os projetos."
+                                description: "ID do projeto para filtrar tarefas. Omita para retornar todos os projetos."
                             },
                             p_status: {
                                 type: "string",
-                                enum: ["todo", "in_progress", "done", "review", null],
-                                description: "Filtro por status da tarefa. null = todas."
+                                enum: ["todo", "in_progress", "done", "review"],
+                                description: "Filtro por status da tarefa. Omita para retornar todas. 'todo' = pendentes, 'in_progress' = em andamento."
                             }
                         }
                     }
@@ -314,13 +314,19 @@ Escolha UMA ferramenta e seus parâmetros.`
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
             console.log(`[Tool] db_query → ${decision.db_query_params.rpc_name}`)
             const { rpc_name, ...rpcParams } = decision.db_query_params
-            const { data, error: rpcError } = await supabaseAdmin.rpc(rpc_name, rpcParams)
+            // Limpar valores null/undefined dos parâmetros (RPCs usam DEFAULT NULL)
+            const cleanParams: Record<string, any> = {}
+            for (const [k, v] of Object.entries(rpcParams)) {
+                if (v !== null && v !== undefined && v !== 'null') cleanParams[k] = v
+            }
+            console.log(`[Tool] db_query params:`, JSON.stringify(cleanParams))
+            const { data, error: rpcError } = await supabaseAdmin.rpc(rpc_name, cleanParams)
 
             if (rpcError) {
                 console.error('RPC error:', rpcError)
                 contextText = `Erro ao consultar banco de dados: ${rpcError.message}`
-            } else if (!data || (Array.isArray(data) && data.length === 0)) {
-                contextText = 'Nenhum registro encontrado no banco de dados.'
+            } else if (!data || (Array.isArray(data) && data.length === 0) || data === '[]') {
+                contextText = `CONSULTA REALIZADA COM SUCESSO via ${rpc_name}, mas NENHUM registro foi encontrado. Informe ao usuário que a consulta foi feita no banco de dados e não há registros correspondentes no momento.`
             } else {
                 const records = Array.isArray(data) ? data : [data]
                 contextText = `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n`
