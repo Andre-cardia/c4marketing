@@ -269,14 +269,15 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
     if (hasAny(msg, ["proposta", "propostas", "orçamento", "orcamento", "escopo", "pricing", "preço", "preco"])) {
         const isListing = hasAny(msg, [
             "liste", "listar", "todos", "todas", "quantos", "quantas",
-            "total de", "mostrar", "quais são", "quais sao", "cadastradas",
+            "total de", "mostrar", "quais são", "quais sao", "quais",
+            "cadastradas", "existem", "tem",
         ]);
 
         if (isListing) {
             let statusFilter = 'all'
-            if (hasAny(msg, ["aberta", "pendente", "aguardando"])) {
+            if (hasAny(msg, ["aberta", "aberto", "em aberto", "pendente", "aguardando", "não aceita", "nao aceita", "sem aceite"])) {
                 statusFilter = 'open'
-            } else if (hasAny(msg, ["aceita", "fechada", "aprovada"])) {
+            } else if (hasAny(msg, ["aceita", "fechada", "aprovada", "aceitas", "aceite"])) {
                 statusFilter = 'accepted'
             }
 
