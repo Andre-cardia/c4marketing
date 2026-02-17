@@ -121,7 +121,10 @@ ID: ${acc.id}
             console.log(`--- Result ${i + 1} (Sim: ${d.similarity}) ---`);
             console.log('Title:', d.metadata?.title);
             console.log('Content:', d.content.substring(0, 150) + '...');
-        }
+        });
+    }
 }
 
-    checkBrain();
+checkBrain();
+
+checkBrain();
