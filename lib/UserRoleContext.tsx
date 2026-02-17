@@ -23,6 +23,27 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [email, setEmail] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const logAccess = async (userId: string, userEmail: string) => {
+        const THROTTLE_MINUTES = 15;
+        const lastLogKey = `lastAccessLog_${userId}`;
+        const lastLogTime = localStorage.getItem(lastLogKey);
+        const now = new Date().getTime();
+
+        if (lastLogTime && (now - parseInt(lastLogTime)) < THROTTLE_MINUTES * 60 * 1000) {
+            return; // Skip if logged recently
+        }
+
+        try {
+            await supabase.from('access_logs').insert({
+                user_id: userId,
+                user_email: userEmail
+            });
+            localStorage.setItem(lastLogKey, now.toString());
+        } catch (error) {
+            console.error('Error logging access:', error);
+        }
+    };
+
     const fetchUserRole = async () => {
         setLoading(true);
         try {
@@ -40,6 +61,9 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     setFullName(data.full_name);
                     setAvatarUrl(data.avatar_url);
                     setCalComLink(data.cal_com_link);
+
+                    // Log access
+                    logAccess(session.user.id, session.user.email);
                 } else {
                     setUserRole(null);
                 }
@@ -52,6 +76,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             console.error('Error fetching user role:', error);
             setUserRole(null);
         } finally {
+            console.log('User role fetch complete');
             setLoading(false);
         }
     };
