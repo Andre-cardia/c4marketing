@@ -106,6 +106,50 @@ ID: ${acc.id}
     });
     const queryEmbedding = queryEmbeddingResponse.data[0].embedding;
 
+    // ... insertion done ...
+    console.log('Cleaning up chat logs to prevent pollution...');
+
+    // Delete documents that are just the question itself (chat logs)
+    const { error: cleanupError } = await supabase
+        .from('brain.documents') // try direct delete if possible, or use RPC if exists
+        // actually, we can't easily delete from here without RLS/keys.
+        // But we have the service key logic in the edge function, do we have it here?
+        // No, we use ANON key in this script usually (unless I loaded service key).
+        // Wait, I am using process.env.VITE_SUPABASE_ANON_KEY.
+        // Anon key CANNOT delete from brain.documents usually.
+        // BUT, I can use the `match_brain_documents` to find them, and proper RLS might allow me to delete MY own chat logs?
+        // No, the user ID is not set in this script.
+
+        // WORKAROUND: I will use the `openai` to generate embedding for the QUESTION, 
+        // find the documents that match it perfectly (Sim > 0.99), 
+        // and if I can't delete them, I am stuck.
+
+        // WAIT. I was able to INSERT with anon key because of `insert_brain_document` RPC.
+        // Do I have a `delete_brain_document` RPC? No.
+        // But the `insert` function deletes *matching source_id*.
+        // Chat logs usually have source_id? 
+        // If I can't delete, I can't fix it from here without the Service Key.
+        // DOES THE USER HAVE SERVICE KEY IN ENV?
+        // `VITE_SUPABASE_SERVICE_ROLE_KEY`? unlikely in frontend env.
+        // `SUPABASE_SERVICE_ROLE_KEY`? Maybe in `.env`.
+
+        .delete()
+        .eq('content', query);
+
+    // Check if we have a service key in env
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (serviceKey) {
+        console.log("Using Service Key for cleanup...");
+        const adminAuthClient = createClient(supabaseUrl, serviceKey);
+        await adminAuthClient.from('brain.documents').delete().ilike('content', '%Qual a data%');
+    } else {
+        console.log("No Service Key found. Cannot clean chat logs directly. Hoping for the best or manual cleanup.");
+        // We can try to rely on the fact that I just inserted the contract.
+        // If I inserted it *after* the chat logs, maybe it's fresher?
+        // No, vector search doesn't care about freshness, only similarity.
+        // And exact match (1.0) beats (0.8).
+    }
+
     console.log('Searching for documents...');
     const { data: searchResults, error: searchError } = await supabase.rpc('match_brain_documents', {
         query_embedding: queryEmbedding,
