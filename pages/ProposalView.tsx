@@ -134,7 +134,8 @@ const ProposalView: React.FC = () => {
                         company_name: formData.companyName,
                         cnpj: formData.cnpj,
                         proposal_id: proposal.id,
-                        contract_snapshot: contractSnapshot
+                        contract_snapshot: contractSnapshot,
+                        status: 'Inativo' // Status inicial padrão
                     }
                 ]);
 

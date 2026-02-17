@@ -265,58 +265,60 @@ const Proposals: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    {proposals.map((proposal) => (
-                                        <tr key={proposal.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span className="font-medium text-slate-700 dark:text-slate-200">
-                                                        {new Date(proposal.created_at).toLocaleDateString('pt-BR')}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span className="font-bold text-slate-800 dark:text-white">{proposal.company_name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Users className="w-4 h-4 text-slate-300 dark:text-slate-500" />
-                                                    <span>{proposal.responsible_name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-3">
+                                    {proposals
+                                        .filter(proposal => !acceptances.some(acc => acc.proposal_id === proposal.id))
+                                        .map((proposal) => (
+                                            <tr key={proposal.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-500" />
+                                                        <span className="font-medium text-slate-700 dark:text-slate-200">
+                                                            {new Date(proposal.created_at).toLocaleDateString('pt-BR')}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building className="w-4 h-4 text-slate-300 dark:text-slate-500" />
+                                                        <span className="font-bold text-slate-800 dark:text-white">{proposal.company_name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-2">
+                                                        <Users className="w-4 h-4 text-slate-300 dark:text-slate-500" />
+                                                        <span>{proposal.responsible_name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => copyLink(proposal.slug)}
+                                                            className="text-slate-400 hover:text-brand-coral p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                                            title="Copiar Link"
+                                                        >
+                                                            <LinkIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <a
+                                                            href={`/p/${proposal.slug}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs font-bold text-brand-coral flex items-center gap-1 hover:underline"
+                                                        >
+                                                            Visualizar <ExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5 text-right">
                                                     <button
-                                                        onClick={() => copyLink(proposal.slug)}
-                                                        className="text-slate-400 hover:text-brand-coral p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                                                        title="Copiar Link"
+                                                        onClick={() => handleDeleteProposal(proposal.id)}
+                                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"
+                                                        title="Excluir Proposta"
                                                     >
-                                                        <LinkIcon className="w-4 h-4" />
+                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
-                                                    <a
-                                                        href={`/p/${proposal.slug}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs font-bold text-brand-coral flex items-center gap-1 hover:underline"
-                                                    >
-                                                        Visualizar <ExternalLink className="w-3 h-3" />
-                                                    </a>
-                                                </div>
-                                            </td>
-                                            <td className="p-5 text-right">
-                                                <button
-                                                    onClick={() => handleDeleteProposal(proposal.id)}
-                                                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-all"
-                                                    title="Excluir Proposta"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                            </tr>
+                                        ))}
                                 </tbody>
                             </table>
                         </div>
