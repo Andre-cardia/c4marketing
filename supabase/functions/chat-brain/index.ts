@@ -98,8 +98,7 @@ OUTPUT Schema:
 
         const decision = await routeRequestHybrid(routerInput, { callRouterLLM })
 
-        console.log(`[Router] Decision: ${decision.agent} (Risk: ${decision.risk_level})`);
-        console.log(`[Router] Filters:`, JSON.stringify(decision.filters, null, 2));
+        console.log(`[Router] Decision: ${decision.agent} (Risk: ${decision.risk_level})`)
 
         // 3. Retrieval Step (Specialist)
         const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
@@ -115,10 +114,7 @@ OUTPUT Schema:
             embedder
         })
 
-        console.log(`[Retrieval] Found ${retrievedDocs.length} documents.`);
-        if (retrievedDocs.length > 0) {
-            console.log(`[Retrieval] Top Doc: ${retrievedDocs[0].metadata?.title} (${retrievedDocs[0].similarity})`);
-        }
+
 
         // 4. Generation Step
         const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"] // default
