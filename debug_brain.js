@@ -37,6 +37,37 @@ async function checkBrain() {
     // Let's try to list documents via a direct query if the policy allows. 
     // Usually brain schema is hidden. 
     // We'll rely on the source data verification first.
+
+    // Create a dummy embedding of size 1536
+    const dummyEmbedding = Array(1536).fill(0.01);
+
+    console.log('Calling match_brain_documents with threshold 0.0, limit 50...');
+
+    const { data: brainDocs, error: brainError } = await supabase.rpc('match_brain_documents', {
+        query_embedding: dummyEmbedding,
+        match_threshold: 0.0, // Get everything
+        match_count: 50
+    });
+
+    if (brainError) {
+        console.error('RPC Error:', brainError);
+    } else {
+        console.log(`Found ${brainDocs?.length || 0} documents.`);
+        if (brainDocs && brainDocs.length > 0) {
+
+            // Check specifically for Amplexo
+            const amplexoDoc = brainDocs.find(d => d.content.includes('Amplexo'));
+            if (amplexoDoc) {
+                console.log('!!! FOUND AMPLEXO DOC !!!');
+                console.log('Metadata:', amplexoDoc.metadata);
+                console.log(amplexoDoc.content);
+            } else {
+                console.log('WARNING: Amplexo NOT found in top 50 docs.');
+                // Log titles of found docs to see what's there
+                console.log('Docs found:', brainDocs.map(d => (d.metadata?.title || d.content.substring(0, 30))).join(', '));
+            }
+        }
+    }
 }
 
 checkBrain();
