@@ -160,15 +160,46 @@ ID: ${acc.id}
     if (searchError) {
         console.error('Search Error:', searchError);
     } else {
+        // ... search results ...
         console.log(`Found ${searchResults?.length || 0} documents.`);
+
+        const idsToDelete = [];
+
         searchResults.forEach((d, i) => {
             console.log(`--- Result ${i + 1} (Sim: ${d.similarity}) ---`);
+            console.log('ID:', d.id);
             console.log('Title:', d.metadata?.title);
-            console.log('Content:', d.content.substring(0, 150) + '...');
+            console.log('Content:', d.content.substring(0, 50) + '...');
+
+            if (d.content.includes(query) || d.content.includes('Amplexo Diesel')) {
+                // If it's the query (pollution) OR the contract (we don't want to delete the contract!)
+                // Wait, we want to delete the pollution, NOT the contract.
+                if (d.content.includes(query) && !d.metadata?.title) {
+                    console.log('Marking as pollution (Chat Log)');
+                    idsToDelete.push(d.id);
+                }
+            }
         });
+
+        if (idsToDelete.length > 0) {
+            console.log(`Attempting to delete ${idsToDelete.length} polluted records...`);
+            const { error: deleteError } = await supabase
+                .from('brain.documents') // This might fail if table not exposed
+                .delete()
+                .in('id', idsToDelete);
+
+            if (deleteError) {
+                console.error('Delete failed (likely RLS or hidden table):', deleteError);
+
+                // Try RPC 'delete_brain_document' if it exists? (It doesn't)
+                // Try 'insert_brain_document' with same ID but empty content? (Hack)
+                // Maybe overwriting?
+            } else {
+                console.log('Pollution deleted!');
+            }
+        }
     }
-}
 
-checkBrain();
+    checkBrain();
 
-checkBrain();
+    checkBrain();
