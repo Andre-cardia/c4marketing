@@ -1,5 +1,11 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OpenAI } from 'https://esm.sh/openai@4'
+
+import { matchBrainDocuments, makeOpenAIEmbedder } from '../_shared/brain-retrieval.ts'
+import { routeRequestHybrid } from '../_shared/agents/router.ts'
+import { AGENTS } from '../_shared/agents/specialists.ts'
+import { RouterInput, RouteDecision } from '../_shared/brain-types.ts'
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -12,95 +18,143 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { query } = await req.json()
+        const { query, session_id } = await req.json()
 
-        if (!query) {
-            throw new Error('Query is required')
-        }
+        if (!query) throw new Error('Query is required')
+
+        // 0. Setup Clients
+        const supabaseAdmin = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
 
         const openai = new OpenAI({
             apiKey: Deno.env.get('OPENAI_API_KEY'),
         })
 
-        // 1. Generate embedding for the query
-        const embeddingResponse = await openai.embeddings.create({
-            model: 'text-embedding-3-small',
-            input: query,
-        })
+        // 1. Get User Context (Optional but recommended for strict tenant isolation)
+        // For now, we use a placeholder tenant if not extracted from JWT
+        const authHeader = req.headers.get('Authorization')
+        let userRole = 'anon'
+        let userId = 'anon_user'
 
-        const queryEmbedding = embeddingResponse.data[0].embedding
-
-        // 2. Search for similar documents in 'brain' schema
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
-        // Call the RPC function which is inside the 'brain' schema
-        // Note: RPC calls are usually unaware of schema unless the function is in public or explicitly called.
-        // However, the function `brain.match_documents` is in `brain`. 
-        // Supabase client `rpc` method calls functions in the `public` schema by default OR matching the exposed schema.
-        // If the function is in `brain`, we might need to expose `brain` schema or call it differently.
-        // A robust way in Edge Functions is to use SQL/PG via postgres.js or valid RPC if exposed.
-        // But `supabase-js` `rpc` usually defaults to looking in the schema defined in the client options or `public`.
-        // Let's try calling it. If `brain.match_documents` is the name, we might simply pass the name `match_documents` if we switch schema, or `brain.match_documents`?
-        // Actually, `supabase-js` `rpc` takes the function name.
-        // If the function is defined as `brain.match_documents`, we might have issues calling it directly if `brain` is not in the search path.
-        // WORKAROUND: We can use `.rpc('match_documents', ...)` but we need to ensure the client is configured to see it,
-        // OR we change the function to be in `public` but accessing `brain` tables (which breaks isolation slightly but is easier), 
-        // OR we just assume `supabase-js` can call namespaced functions? No, it usually can't.
-        // BETTER APPROACH: Since we are in an Edge Function using Service Role, we can use the `rpc` call but we might need to specify the schema `brain` when creating the client?
-        // Let's configure the client with `db: { schema: 'brain' }`.
-
-        // 2. Search for similar documents using Public RPC wrapper
-        // supabaseClient is already defined above
-
-        const { data: documents, error: searchError } = await supabaseClient
-            .rpc('match_brain_documents', {
-                query_embedding: queryEmbedding,
-                match_threshold: 0.2, // Lowered to 0.2 to improve recall with text-embedding-3-small
-                match_count: 5
-            })
-
-        if (searchError) {
-            throw searchError
+        if (authHeader) {
+            const client = createClient(
+                Deno.env.get('SUPABASE_URL') ?? '',
+                Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+                { global: { headers: { Authorization: authHeader } } }
+            )
+            const { data: { user } } = await client.auth.getUser()
+            if (user) {
+                userId = user.id
+                userRole = user.role ?? 'authenticated'
+            }
         }
 
-        // 3. Construct prompt for LLM
-        const contextText = documents?.map(d => {
+        // 2. Router Step
+        const routerInput: RouterInput = {
+            tenant_id: userId, // Using UserID as TenantID alias for single-tenant logic, or literal tenant if multi-tenant
+            session_id: session_id,
+            user_role: userRole,
+            user_message: query,
+            // Optional hints could be extracted here if needed
+        }
+
+        const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
+            const completion = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                temperature: 0,
+                response_format: { type: "json_object" },
+                messages: [
+                    {
+                        role: 'system',
+                        content: `
+Você é o ROUTER do “Segundo Cérebro”.
+Classifique a solicitação e retorne um JSON.
+OUTPUT Schema:
+{
+  "artifact_kind": "contract|proposal|project|client|policy|ops|unknown",
+  "task_kind": "factual_lookup|summarization|drafting|analysis|operation",
+  "risk_level": "low|medium|high",
+  "agent": "Agent_Contracts|Agent_Proposals|Agent_Projects|Agent_Client360|Agent_GovernanceSecurity|Agent_BrainOps",
+  "retrieval_policy": "STRICT_DOCS_ONLY|DOCS_PLUS_RECENT_CHAT|CHAT_ONLY|OPS_ONLY",
+  "filters": {
+     "artifact_kind": string,
+     "status": "active", 
+     "type_blocklist": ["chat_log"]
+  },
+  "top_k": 5,
+  "confidence": 0.8,
+  "reason": "explanation"
+}
+                        `.trim()
+                    },
+                    { role: 'user', content: `Message: ${input.user_message}` }
+                ]
+            })
+            const text = completion.choices[0].message.content ?? "{}"
+            return JSON.parse(text) as RouteDecision
+        }
+
+        const decision = await routeRequestHybrid(routerInput, { callRouterLLM })
+
+        console.log(`[Router] Decision: ${decision.agent} (Risk: ${decision.risk_level})`)
+
+        // 3. Retrieval Step (Specialist)
+        const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+
+        const retrievedDocs = await matchBrainDocuments({
+            supabase: supabaseAdmin, // Use admin client for reading brain.documents (protected by RLS usually, but RPC handles it)
+            queryText: query,
+            filters: decision.filters,
+            options: {
+                topK: decision.top_k,
+                policy: decision.retrieval_policy
+            },
+            embedder
+        })
+
+        // 4. Generation Step
+        const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"] // default
+
+        const contextText = retrievedDocs.map(d => {
             const meta = d.metadata || {};
-            if (meta.type === 'chat_log') {
-                return `[Histórico de Conversa - ${meta.role} - ${meta.timestamp}]: ${d.content}`;
-            }
-            const sourceInfo = meta.source || meta.title || 'Desconhecida';
-            return `[Documento - Fonte: ${sourceInfo}]: ${d.content}`;
-        }).join('\n---\n') || 'Nenhum contexto encontrado.';
+            const source = meta.source_table || meta.title || 'Unknown Source';
+            return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
+        }).join('\n\n')
 
-        const systemPrompt = `Você é o "Segundo Cérebro" corporativo. Você é responsavel por:analisar e arquitetar soluções de marketing digital para os clientes da C4 Marketing; analisar todas os dados
-        e informações que tiver acesso e planejar as melhores estratégias comerciais, financeiras, de marketing, de RH, para a C4 Marketing. Também ajudará na solução de crises com clientes. Use o contexto abaixo para responder à pergunta do usuário.
-        Se a resposta não estiver no contexto, diga que não sabe, mas tente ser útil com o que tem.
-        Sempre responda em Português do Brasil.
-    
-    Contexto:
-    ${contextText}`
+        const systemPrompt = `
+${agentConfig.getSystemPrompt()}
 
-        // 4. Generate answer with GPT-4o
-        const chatCompletion = await openai.chat.completions.create({
+CONTEXTO RECUPERADO:
+${contextText || "Nenhum documento relevante encontrado."}
+        `.trim()
+
+        const chatResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: query }
             ],
-            model: 'gpt-4o',
-            temperature: 0.1,
+            temperature: 0.1
         })
 
-        const answer = chatCompletion.choices[0].message.content
+        const answer = chatResponse.choices[0].message.content
 
-        return new Response(JSON.stringify({ answer, documents }), {
+        // 5. Return
+        return new Response(JSON.stringify({
+            answer,
+            documents: retrievedDocs,
+            meta: {
+                decision: decision,
+                agent: agentConfig.name
+            }
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
 
     } catch (error) {
+        console.error("Error in chat-brain:", error)
         return new Response(JSON.stringify({ error: error.message }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

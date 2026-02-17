@@ -1,0 +1,99 @@
+
+export type RetrievalPolicy =
+  | "STRICT_DOCS_ONLY"
+  | "DOCS_PLUS_RECENT_CHAT"
+  | "CHAT_ONLY"
+  | "OPS_ONLY";
+
+export type BrainDocType =
+  | "official_doc"
+  | "chat_log"
+  | "session_summary"
+  | "system_note";
+
+export type ArtifactKind =
+  | "contract"
+  | "proposal"
+  | "project"
+  | "client"
+  | "policy"
+  | "ops"
+  | "unknown";
+
+export type TaskKind =
+  | "factual_lookup"
+  | "summarization"
+  | "drafting"
+  | "analysis"
+  | "operation";
+
+export type RiskLevel = "low" | "medium" | "high";
+
+export type AgentName =
+  | "Agent_Contracts"
+  | "Agent_Proposals"
+  | "Agent_Projects"
+  | "Agent_Client360"
+  | "Agent_GovernanceSecurity"
+  | "Agent_BrainOps";
+
+export interface MatchFilters {
+  tenant_id: string;
+
+  // allow/block doc types
+  type_allowlist?: BrainDocType[];
+  type_blocklist?: BrainDocType[];
+
+  // segmentation
+  artifact_kind?: ArtifactKind | null;
+  source_table?: string[] | string | null;
+
+  // identity / scope
+  client_id?: string | null;
+  project_id?: string | null;
+  source_id?: string | null;
+
+  // lifecycle
+  status?: "active" | "draft" | "superseded" | "archived" | string;
+
+  // time window (only for chat/session scoped retrieval)
+  time_window_minutes?: number | null;
+
+  // optional: security tier and authority gating
+  security_tier_allowlist?: string[];
+  authority_allowlist?: string[];
+}
+
+export interface RetrievedDoc {
+  id: string;
+  content: string;
+  similarity: number; // 0..1 (cosine similarity)
+  metadata: Record<string, any>;
+}
+
+export interface RouteFilters extends MatchFilters {}
+
+export interface RouteDecision {
+  artifact_kind: ArtifactKind;
+  task_kind: TaskKind;
+  risk_level: RiskLevel;
+  agent: AgentName;
+  retrieval_policy: RetrievalPolicy;
+  filters: RouteFilters;
+  top_k: number;
+  tools_allowed: Array<"rag_search" | "db_read" | "brain_sync">;
+  confidence: number; // 0..1
+  reason: string; // audit/debug
+}
+
+export interface RouterInput {
+  tenant_id: string;
+  session_id: string;
+  user_role: string; // "gestor" etc
+  user_message: string;
+
+  // optional hints resolved upstream (if you already extracted ids)
+  client_id?: string | null;
+  project_id?: string | null;
+  source_id?: string | null;
+}
