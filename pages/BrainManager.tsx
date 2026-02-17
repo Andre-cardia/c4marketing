@@ -158,11 +158,15 @@ export default function BrainManager() {
         let count = 0;
 
         try {
+            // Helper for delay
+            const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
             // 1. Users
             const { data: users } = await supabase.from('app_users').select('*');
             if (users) {
                 for (const u of users) {
-                    const content = `RETORNO DO BANCO DE DADOS:
+                    try {
+                        const content = `RETORNO DO BANCO DE DADOS:
 === TÍTULO: Usuário: ${u.email} ===
 === FONTE: Tabela app_users ===
 === DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
@@ -172,14 +176,18 @@ Email: ${u.email}
 Função (Role): ${u.role}
 ID do Sistema: ${u.id}
 `;
-                    await addToBrain(content, {
-                        type: 'database_record',
-                        source_table: 'app_users',
-                        source_id: u.id,
-                        title: `Usuário: ${u.email}`,
-                        source: `Tabela app_users`
-                    });
-                    count++;
+                        await addToBrain(content, {
+                            type: 'database_record',
+                            source_table: 'app_users',
+                            source_id: u.id,
+                            title: `Usuário: ${u.email}`,
+                            source: `Tabela app_users`
+                        });
+                        count++;
+                        await delay(200); // Prevent rate limiting
+                    } catch (err) {
+                        console.error(`Erro ao sincronizar usuário ${u.email}:`, err);
+                    }
                 }
             }
 
@@ -187,11 +195,12 @@ ID do Sistema: ${u.id}
             const { data: proposals } = await supabase.from('proposals').select('*');
             if (proposals) {
                 for (const p of proposals) {
-                    const services = Array.isArray(p.services)
-                        ? p.services.map((s: any) => typeof s === 'string' ? s : s.id).join(', ')
-                        : 'Nenhum';
+                    try {
+                        const services = Array.isArray(p.services)
+                            ? p.services.map((s: any) => typeof s === 'string' ? s : s.id).join(', ')
+                            : 'Nenhum';
 
-                    const content = `RETORNO DO BANCO DE DADOS:
+                        const content = `RETORNO DO BANCO DE DADOS:
 === TÍTULO: Proposta: ${p.company_name} ===
 === FONTE: Tabela proposals ===
 === DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
@@ -208,14 +217,18 @@ ID: ${p.id}
 Link: /p/${p.id}
 `;
 
-                    await addToBrain(content, {
-                        type: 'database_record',
-                        source_table: 'proposals',
-                        source_id: p.id.toString(),
-                        title: `Proposta: ${p.company_name}`,
-                        source: `Proposta Comercial`
-                    });
-                    count++;
+                        await addToBrain(content, {
+                            type: 'database_record',
+                            source_table: 'proposals',
+                            source_id: p.id.toString(),
+                            title: `Proposta: ${p.company_name}`,
+                            source: `Proposta Comercial`
+                        });
+                        count++;
+                        await delay(200);
+                    } catch (err) {
+                        console.error(`Erro ao sincronizar proposta ${p.id}:`, err);
+                    }
                 }
             }
 
@@ -223,7 +236,8 @@ Link: /p/${p.id}
             const { data: acceptances } = await supabase.from('acceptances').select('*');
             if (acceptances) {
                 for (const acc of acceptances) {
-                    const content = `RETORNO DO BANCO DE DADOS:
+                    try {
+                        const content = `RETORNO DO BANCO DE DADOS:
 === TÍTULO: Contrato: ${acc.company_name} ===
 === FONTE: Tabela acceptances (Contratos Ativos) ===
 === DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
@@ -238,14 +252,18 @@ Validade/Término: ${acc.expiration_date ? new Date(acc.expiration_date).toLocal
 ID: ${acc.id}
 `;
 
-                    await addToBrain(content, {
-                        type: 'database_record',
-                        source_table: 'acceptances',
-                        source_id: acc.id.toString(),
-                        title: `Contrato: ${acc.company_name}`,
-                        source: `Contrato Ativo`
-                    });
-                    count++;
+                        await addToBrain(content, {
+                            type: 'database_record',
+                            source_table: 'acceptances',
+                            source_id: acc.id.toString(),
+                            title: `Contrato: ${acc.company_name}`,
+                            source: `Contrato Ativo`
+                        });
+                        count++;
+                        await delay(200);
+                    } catch (err) {
+                        console.error(`Erro ao sincronizar contrato ${acc.id}:`, err);
+                    }
                 }
             }
 
@@ -254,18 +272,19 @@ ID: ${acc.id}
             const { data: trafficParams } = await supabase.from('traffic_projects').select('*');
             if (trafficParams) {
                 for (const tp of trafficParams) {
-                    // Try to fetch client name from associated acceptance if not directly available (though schema suggests it might not be joined here easily without join query)
-                    // For now, assume client_name exists or we use ID.
-                    // Wait, traffic_projects schema I saw earlier DOES NOT have client_name!
-                    // It links to acceptance_id.
-                    // I need to fetch acceptances to get the name.
+                    try {
+                        // Try to fetch client name from associated acceptance if not directly available (though schema suggests it might not be joined here easily without join query)
+                        // For now, assume client_name exists or we use ID.
+                        // Wait, traffic_projects schema I saw earlier DOES NOT have client_name!
+                        // It links to acceptance_id.
+                        // I need to fetch acceptances to get the name.
 
-                    // Let's do a join or map.
-                    // Since I already fetched acceptances above, I can map ID to Name.
-                    const acceptance = acceptances?.find(a => a.id === tp.acceptance_id);
-                    const clientName = acceptance?.company_name || 'Empresa Desconhecida';
+                        // Let's do a join or map.
+                        // Since I already fetched acceptances above, I can map ID to Name.
+                        const acceptance = acceptances?.find(a => a.id === tp.acceptance_id);
+                        const clientName = acceptance?.company_name || 'Empresa Desconhecida';
 
-                    const content = `RETORNO DO BANCO DE DADOS:
+                        const content = `RETORNO DO BANCO DE DADOS:
 === TÍTULO: Projeto Tráfego: ${clientName} ===
 === FONTE: Tabela traffic_projects ===
 === DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
@@ -278,14 +297,18 @@ Objetivo: ${tp.strategy_meeting_notes || 'Não definido'}
 ID: ${tp.id}
 `;
 
-                    await addToBrain(content, {
-                        type: 'database_record',
-                        source_table: 'traffic_projects',
-                        source_id: tp.id,
-                        title: `Projeto Tráfego: ${clientName}`,
-                        source: `Gestão de Tráfego`
-                    });
-                    count++;
+                        await addToBrain(content, {
+                            type: 'database_record',
+                            source_table: 'traffic_projects',
+                            source_id: tp.id,
+                            title: `Projeto Tráfego: ${clientName}`,
+                            source: `Gestão de Tráfego`
+                        });
+                        count++;
+                        await delay(200);
+                    } catch (err) {
+                        console.error(`Erro ao sincronizar projeto ${tp.id}:`, err);
+                    }
                 }
             }
 
