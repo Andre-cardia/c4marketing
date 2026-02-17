@@ -99,6 +99,8 @@ function makeDecision(
         retrieval_policy: RetrievalPolicy;
         top_k: number;
         tools_allowed: Array<"rag_search" | "db_read" | "brain_sync">;
+        tool_hint?: "rag_search" | "db_query";
+        db_query_params?: Record<string, any>;
         confidence: number;
         reason: string;
         filtersPatch: Partial<RouteFilters>;
@@ -130,8 +132,10 @@ function makeDecision(
         agent: d.agent,
         retrieval_policy: d.retrieval_policy,
         filters: finalFilters,
-        top_k: clampInt(d.top_k, 1, 30),
+        top_k: clampInt(d.top_k, 1, 50),
         tools_allowed: d.tools_allowed,
+        tool_hint: d.tool_hint ?? "rag_search",
+        db_query_params: d.db_query_params,
         confidence: clamp01(d.confidence),
         reason: d.reason,
     };
@@ -158,7 +162,8 @@ function normalizeDecision(dec: RouteDecision, input: RouterInput): RouteDecisio
     return {
         ...dec,
         filters: applied,
-        top_k: clampInt(dec.top_k ?? 5, 1, 30),
+        top_k: clampInt(dec.top_k ?? 5, 1, 50),
+        tool_hint: dec.tool_hint ?? "rag_search",
         confidence: clamp01(dec.confidence ?? 0.6),
     };
 }
@@ -261,7 +266,32 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
     }
 
     // Proposals (weaker intent than hard gate)
-    if (hasAny(msg, ["proposta", "orçamento", "orcamento", "escopo", "pricing", "preço", "preco"])) {
+    if (hasAny(msg, ["proposta", "propostas", "orçamento", "orcamento", "escopo", "pricing", "preço", "preco"])) {
+        const isListing = hasAny(msg, [
+            "liste", "listar", "todos", "todas", "quantos", "quantas",
+            "total de", "mostrar", "quais são", "quais sao", "cadastradas",
+        ]);
+
+        if (isListing) {
+            return makeDecision(input, {
+                artifact_kind: "proposal",
+                task_kind: "factual_lookup",
+                risk_level: "low",
+                agent: "Agent_Proposals",
+                retrieval_policy: "STRICT_DOCS_ONLY",
+                top_k: 30,
+                tools_allowed: ["rag_search", "db_read"],
+                tool_hint: "db_query",
+                db_query_params: { rpc_name: "query_all_proposals" },
+                confidence: 0.9,
+                reason: "Heuristic: proposal listing → SQL direto",
+                filtersPatch: {
+                    artifact_kind: "proposal",
+                    source_table: ["proposals"],
+                },
+            });
+        }
+
         return makeDecision(input, {
             artifact_kind: "proposal",
             task_kind: inferTaskKind(msg),
@@ -271,7 +301,7 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
             top_k: 6,
             tools_allowed: ["rag_search", "db_read"],
             confidence: 0.84,
-            reason: "Heuristic: proposal intent detected",
+            reason: "Heuristic: proposal semantic query → RAG",
             filtersPatch: {
                 artifact_kind: "proposal",
                 source_table: ["proposals", "budgets", "proposal_versions"],
@@ -280,9 +310,46 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
     }
 
     // Projects
-    if (hasAny(msg, ["projeto", "status", "entrega", "timeline", "cronograma", "tarefa", "pendência", "pendencia", "milestone"])) {
+    if (hasAny(msg, ["projeto", "projetos", "status", "entrega", "timeline", "cronograma", "tarefa", "pendência", "pendencia", "milestone"])) {
         const task = inferTaskKind(msg);
         const policy: RetrievalPolicy = task === "factual_lookup" ? "STRICT_DOCS_ONLY" : "DOCS_PLUS_RECENT_CHAT";
+
+        // Detectar se é pergunta de listagem (precisa SQL direto) ou semântica (serve RAG)
+        const isListingQuery = hasAny(msg, [
+            "liste", "listar", "todos os", "todas as", "quantos", "quantas",
+            "total de", "mostrar todos", "quais são", "quais sao",
+            "cadastrados", "ativos no sistema", "registrados",
+        ]);
+
+        // Detectar filtro de serviço
+        let serviceType: string | null = null;
+        if (hasAny(msg, ["tráfego", "trafego", "traffic", "gestão de tráfego"])) serviceType = "traffic";
+        else if (hasAny(msg, ["site", "website"])) serviceType = "website";
+        else if (hasAny(msg, ["landing", "lp", "página de captura"])) serviceType = "landing_page";
+
+        if (isListingQuery) {
+            return makeDecision(input, {
+                artifact_kind: "project",
+                task_kind: task,
+                risk_level: "low",
+                agent: "Agent_Projects",
+                retrieval_policy: policy,
+                top_k: 30,
+                tools_allowed: ["rag_search", "db_read"],
+                tool_hint: "db_query",
+                db_query_params: {
+                    rpc_name: "query_all_projects",
+                    p_service_type: serviceType,
+                    p_status_filter: hasAny(msg, ["ativo", "ativos", "ativas", "ativa"]) ? "Ativo" : null,
+                },
+                confidence: 0.92,
+                reason: "Heuristic: project listing query → SQL direto",
+                filtersPatch: {
+                    artifact_kind: "project",
+                    source_table: ["projects", "tasks", "milestones", "activity_logs", "website_projects", "landing_page_projects", "traffic_projects"],
+                },
+            });
+        }
 
         return makeDecision(input, {
             artifact_kind: "project",
@@ -290,21 +357,49 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
             risk_level: "medium",
             agent: "Agent_Projects",
             retrieval_policy: policy,
-            top_k: 8,
+            top_k: 15,
             tools_allowed: ["rag_search", "db_read"],
+            tool_hint: "rag_search",
             confidence: 0.82,
-            reason: "Heuristic: project intent detected",
+            reason: "Heuristic: project semantic query → RAG",
             filtersPatch: {
                 artifact_kind: "project",
                 source_table: ["projects", "tasks", "milestones", "activity_logs", "website_projects", "landing_page_projects", "traffic_projects"],
-                // allow chat only if policy allows
                 time_window_minutes: policy === "DOCS_PLUS_RECENT_CHAT" ? 15 : null,
             },
         });
     }
 
     // Client 360
-    if (hasAny(msg, ["cliente", "histórico", "historico", "visão 360", "panorama", "resumo do cliente"])) {
+    if (hasAny(msg, ["cliente", "clientes", "histórico", "historico", "visão 360", "panorama", "resumo do cliente"])) {
+        const isListing = hasAny(msg, [
+            "liste", "listar", "todos", "todas", "quantos", "quantas",
+            "total de", "mostrar", "quais são", "quais sao", "cadastrados",
+        ]);
+
+        if (isListing) {
+            return makeDecision(input, {
+                artifact_kind: "client",
+                task_kind: "factual_lookup",
+                risk_level: "low",
+                agent: "Agent_Client360",
+                retrieval_policy: "STRICT_DOCS_ONLY",
+                top_k: 30,
+                tools_allowed: ["rag_search", "db_read"],
+                tool_hint: "db_query",
+                db_query_params: {
+                    rpc_name: "query_all_clients",
+                    p_status: hasAny(msg, ["ativo", "ativos"]) ? "Ativo" : null,
+                },
+                confidence: 0.9,
+                reason: "Heuristic: client listing → SQL direto",
+                filtersPatch: {
+                    artifact_kind: "client",
+                    source_table: ["acceptances"],
+                },
+            });
+        }
+
         return makeDecision(input, {
             artifact_kind: "client",
             task_kind: "summarization",
@@ -314,10 +409,35 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
             top_k: 10,
             tools_allowed: ["rag_search", "db_read"],
             confidence: 0.78,
-            reason: "Heuristic: client360 intent detected",
+            reason: "Heuristic: client semantic query → RAG",
             filtersPatch: {
                 artifact_kind: "client",
                 source_table: ["clients", "acceptances", "contracts", "proposals", "projects"],
+            },
+        });
+    }
+
+    // Users / Access
+    if (hasAny(msg, ["usuário", "usuario", "usuários", "usuarios", "equipe", "time", "colaborador", "acesso", "acessos", "quem acessou"])) {
+        const isAccessQuery = hasAny(msg, ["acesso", "acessos", "acessou", "logou", "entrou"]);
+
+        return makeDecision(input, {
+            artifact_kind: "ops",
+            task_kind: "factual_lookup",
+            risk_level: "low",
+            agent: "Agent_BrainOps",
+            retrieval_policy: "STRICT_DOCS_ONLY",
+            top_k: 10,
+            tools_allowed: ["rag_search", "db_read"],
+            tool_hint: "db_query",
+            db_query_params: {
+                rpc_name: isAccessQuery ? "query_access_summary" : "query_all_users",
+            },
+            confidence: 0.88,
+            reason: `Heuristic: ${isAccessQuery ? 'access' : 'users'} listing → SQL direto`,
+            filtersPatch: {
+                artifact_kind: "ops",
+                source_table: isAccessQuery ? ["access_logs"] : ["app_users"],
             },
         });
     }

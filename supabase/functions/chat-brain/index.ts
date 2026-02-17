@@ -100,33 +100,57 @@ OUTPUT Schema:
 
         console.log(`[Router] Decision: ${decision.agent} (Risk: ${decision.risk_level})`)
 
-        // 3. Retrieval Step (Specialist)
-        const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+        // 3. Retrieval Step (Hybrid: RAG ou SQL direto)
+        let contextText = ''
+        let retrievedDocs: any[] = []
 
-        const retrievedDocs = await matchBrainDocuments({
-            supabase: supabaseAdmin,
-            queryText: query,
-            filters: decision.filters,
-            options: {
-                topK: decision.top_k,
-                policy: decision.retrieval_policy
-            },
-            embedder
-        })
+        if (decision.tool_hint === 'db_query' && decision.db_query_params) {
+            // === SQL DIRETO (listagens, contagens, filtros exatos) ===
+            console.log(`[Tool] db_query → ${decision.db_query_params.rpc_name}`)
+            const { rpc_name, ...rpcParams } = decision.db_query_params
+            const { data, error: rpcError } = await supabaseAdmin.rpc(rpc_name, rpcParams)
 
+            if (rpcError) {
+                console.error('RPC error:', rpcError)
+                contextText = `Erro ao consultar banco de dados: ${rpcError.message}`
+            } else if (!data || (Array.isArray(data) && data.length === 0)) {
+                contextText = 'Nenhum registro encontrado no banco de dados.'
+            } else {
+                // Formatar dados do banco como contexto legível para o agente
+                const records = Array.isArray(data) ? data : [data]
+                contextText = `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n`
+                contextText += JSON.stringify(records, null, 2)
+            }
+        } else {
+            // === RAG (busca semântica) ===
+            console.log(`[Tool] rag_search → top_k: ${decision.top_k}`)
+            const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
 
+            retrievedDocs = await matchBrainDocuments({
+                supabase: supabaseAdmin,
+                queryText: query,
+                filters: decision.filters,
+                options: {
+                    topK: decision.top_k,
+                    policy: decision.retrieval_policy
+                },
+                embedder
+            })
+
+            contextText = retrievedDocs.map(d => {
+                const meta = d.metadata || {};
+                const source = meta.source_table || meta.title || 'Unknown Source';
+                return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
+            }).join('\n\n')
+        }
 
         // 4. Generation Step
         const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"] // default
 
-        const contextText = retrievedDocs.map(d => {
-            const meta = d.metadata || {};
-            const source = meta.source_table || meta.title || 'Unknown Source';
-            return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
-        }).join('\n\n')
-
         const systemPrompt = `
 ${agentConfig.getSystemPrompt()}
+
+FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no banco de dados (dados completos e atualizados)' : 'Busca semântica no acervo vetorial'}
 
 CONTEXTO RECUPERADO:
 ${contextText || "Nenhum documento relevante encontrado."}

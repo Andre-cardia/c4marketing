@@ -83,6 +83,8 @@ export interface RouteDecision {
   filters: RouteFilters;
   top_k: number;
   tools_allowed: Array<"rag_search" | "db_read" | "brain_sync">;
+  tool_hint: "rag_search" | "db_query";  // qual ferramenta principal usar
+  db_query_params?: Record<string, any>; // parâmetros para query SQL direta
   confidence: number; // 0..1
   reason: string; // audit/debug
 }
