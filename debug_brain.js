@@ -201,5 +201,3 @@ ID: ${acc.id}
     }
 
     checkBrain();
-
-    checkBrain();
