@@ -273,6 +273,13 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
         ]);
 
         if (isListing) {
+            let statusFilter = 'all'
+            if (hasAny(msg, ["aberta", "pendente", "aguardando"])) {
+                statusFilter = 'open'
+            } else if (hasAny(msg, ["aceita", "fechada", "aprovada"])) {
+                statusFilter = 'accepted'
+            }
+
             return makeDecision(input, {
                 artifact_kind: "proposal",
                 task_kind: "factual_lookup",
@@ -282,9 +289,12 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
                 top_k: 30,
                 tools_allowed: ["rag_search", "db_read"],
                 tool_hint: "db_query",
-                db_query_params: { rpc_name: "query_all_proposals" },
-                confidence: 0.9,
-                reason: "Heuristic: proposal listing → SQL direto",
+                db_query_params: {
+                    rpc_name: "query_all_proposals",
+                    p_status_filter: statusFilter
+                },
+                confidence: 0.95,
+                reason: `Heuristic: proposal listing (${statusFilter}) → SQL direto`,
                 filtersPatch: {
                     artifact_kind: "proposal",
                     source_table: ["proposals"],
