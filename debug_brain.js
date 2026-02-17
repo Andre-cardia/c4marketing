@@ -97,7 +97,7 @@ ID: ${acc.id}
     // ... insertion done ...
     console.log('Document inserted. Now testing retrieval...');
 
-    const query = "quem é Amplexo Diesel?";
+    const query = "Qual a data de início de contrato da empresa Amplexo Diesel?";
     console.log(`Generating embedding for query: "${query}"`);
 
     const queryEmbeddingResponse = await openai.embeddings.create({
