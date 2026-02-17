@@ -7,95 +7,18 @@ dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const openAiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase credentials');
+if (!supabaseUrl || !supabaseKey || !openAiKey) {
+    console.error('Missing credentials');
     process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const openai = new OpenAI({ apiKey: openAiKey });
 
 async function checkBrain() {
-    // Fetch Amplexo data again
-    const { data: sourceData, error: sourceError } = await supabase
-        .from('acceptances')
-        .select('*')
-        .ilike('company_name', '%Amplexo%')
-        .limit(1);
-
-    if (sourceError || !sourceData || sourceData.length === 0) {
-        console.error('Could not find Amplexo in source:', sourceError);
-        return;
-    }
-
-    const acc = sourceData[0];
-    console.log('Attempting to manually insert Amplexo Acceptance ID:', acc.id);
-
-    // Construct the text content EXACTLY as the frontend does
-    const content = `RETORNO DO BANCO DE DADOS:
-=== TÍTULO: Contrato: ${acc.company_name} ===
-=== FONTE: Tabela acceptances (Contratos Ativos) ===
-=== DATA DE REFERÊNCIA: ${new Date().toLocaleDateString('pt-BR')} ===
-
-[DETALHES DO CONTRATO]
-Empresa: ${acc.company_name}
-CNPJ: ${acc.cnpj || 'Não cadastrado'}
-Cliente: ${acc.name} (${acc.email})
-Status: ${acc.status}
-Data de Início (Aceite): ${new Date(acc.timestamp).toLocaleDateString('pt-BR')}
-Validade/Término: ${acc.expiration_date ? new Date(acc.expiration_date).toLocaleDateString('pt-BR') : 'Indeterminado'}
-ID: ${acc.id}
-`;
-
-    // Metadata
-    const metadata = {
-        type: 'database_record',
-        source_table: 'acceptances',
-        source_id: acc.id.toString(),
-        title: `Contrato: ${acc.company_name}`,
-        source: `Contrato Ativo`
-    };
-
-    console.log('Content to insert:\n', content);
-
-    // Generate embedding (DUMMY for test, real embedding requires OpenAI)
-    // We will just verify if we CAN insert.
-    // However, `insert_brain_document` requires an embedding.
-    // Since I cannot generate a real embedding easily here without OpenAI key setup (it is in .env but I need to call OpenAI API),
-    // I will try to call the Edge Function `embed-content` if possible? 
-    // No, standard `fetch` to the local/remote function URL.
-
-    // Instead, I will use a dummy embedding and call RPC `insert_brain_document` just to see if DB rejects it.
-    // If it succeeds, the document will exist but be unsearchable by semantic meaning (dummy embedding).
-    // BUT the text search might work if we have hybrid search? We use vector search `match_brain_documents`.
-
-    // Let's try to use the OpenAI key from env to generate a REAL embedding so we can fix it for the user right now!
-
-    const openAiKey = process.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-    if (!openAiKey) {
-        console.error('CRITICAL: No OpenAI Key found. Cannot generate real embedding.');
-        return;
-    }
-
-    const openai = new OpenAI({ apiKey: openAiKey });
-
-    console.log('Generating REAL embedding for content...');
-    const embeddingResponse = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: content,
-    });
-
-    const realEmbedding = embeddingResponse.data[0].embedding;
-
-    // Delete existing dummy record first to be clean
-    const { error: deleteError } = await supabase.from('brain.documents').delete().eq('metadata->>source_id', acc.id.toString()).eq('metadata->>source_table', 'acceptances');
-    // Note: direct delete might fail via anon key if RLS blocks.
-    // Instead, rely on RPC 'insert_brain_document' which handles deduplication?
-    // The updated RPC logic handles deduplication! 
-    // It deletes where metadata->>source_table and source_id match.
-
-    // ... insertion done ...
-    console.log('Document inserted. Now testing retrieval...');
+    console.log('Testing retrieval for Amplexo...');
 
     const query = "Qual a data de início de contrato da empresa Amplexo Diesel?";
     console.log(`Generating embedding for query: "${query}"`);
@@ -106,98 +29,25 @@ ID: ${acc.id}
     });
     const queryEmbedding = queryEmbeddingResponse.data[0].embedding;
 
-    // ... insertion done ...
-    console.log('Cleaning up chat logs to prevent pollution...');
-
-    // Delete documents that are just the question itself (chat logs)
-    const { error: cleanupError } = await supabase
-        .from('brain.documents') // try direct delete if possible, or use RPC if exists
-        // actually, we can't easily delete from here without RLS/keys.
-        // But we have the service key logic in the edge function, do we have it here?
-        // No, we use ANON key in this script usually (unless I loaded service key).
-        // Wait, I am using process.env.VITE_SUPABASE_ANON_KEY.
-        // Anon key CANNOT delete from brain.documents usually.
-        // BUT, I can use the `match_brain_documents` to find them, and proper RLS might allow me to delete MY own chat logs?
-        // No, the user ID is not set in this script.
-
-        // WORKAROUND: I will use the `openai` to generate embedding for the QUESTION, 
-        // find the documents that match it perfectly (Sim > 0.99), 
-        // and if I can't delete them, I am stuck.
-
-        // WAIT. I was able to INSERT with anon key because of `insert_brain_document` RPC.
-        // Do I have a `delete_brain_document` RPC? No.
-        // But the `insert` function deletes *matching source_id*.
-        // Chat logs usually have source_id? 
-        // If I can't delete, I can't fix it from here without the Service Key.
-        // DOES THE USER HAVE SERVICE KEY IN ENV?
-        // `VITE_SUPABASE_SERVICE_ROLE_KEY`? unlikely in frontend env.
-        // `SUPABASE_SERVICE_ROLE_KEY`? Maybe in `.env`.
-
-        .delete()
-        .eq('content', query);
-
-    // Check if we have a service key in env
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (serviceKey) {
-        console.log("Using Service Key for cleanup...");
-        const adminAuthClient = createClient(supabaseUrl, serviceKey);
-        await adminAuthClient.from('brain.documents').delete().ilike('content', '%Qual a data%');
-    } else {
-        console.log("No Service Key found. Cannot clean chat logs directly. Hoping for the best or manual cleanup.");
-        // We can try to rely on the fact that I just inserted the contract.
-        // If I inserted it *after* the chat logs, maybe it's fresher?
-        // No, vector search doesn't care about freshness, only similarity.
-        // And exact match (1.0) beats (0.8).
-    }
-
-    console.log('Searching for documents...');
+    console.log('Searching for documents (Top 10)...');
     const { data: searchResults, error: searchError } = await supabase.rpc('match_brain_documents', {
         query_embedding: queryEmbedding,
-        match_threshold: 0.1, // Test with 0.1
-        match_count: 5
+        match_threshold: 0.1,
+        match_count: 10
     });
 
     if (searchError) {
         console.error('Search Error:', searchError);
     } else {
-        // ... search results ...
         console.log(`Found ${searchResults?.length || 0} documents.`);
-
-        const idsToDelete = [];
-
         searchResults.forEach((d, i) => {
             console.log(`--- Result ${i + 1} (Sim: ${d.similarity}) ---`);
             console.log('ID:', d.id);
-            console.log('Title:', d.metadata?.title);
-            console.log('Content:', d.content.substring(0, 50) + '...');
-
-            if (d.content.includes(query) || d.content.includes('Amplexo Diesel')) {
-                // If it's the query (pollution) OR the contract (we don't want to delete the contract!)
-                // Wait, we want to delete the pollution, NOT the contract.
-                if (d.content.includes(query) && !d.metadata?.title) {
-                    console.log('Marking as pollution (Chat Log)');
-                    idsToDelete.push(d.id);
-                }
-            }
+            console.log('Title:', d.metadata?.title); // Title is usually undefined for chat logs
+            console.log('Source:', d.metadata?.source);
+            console.log('Content Preview:', d.content.substring(0, 100).replace(/\n/g, ' '));
         });
-
-        if (idsToDelete.length > 0) {
-            console.log(`Attempting to delete ${idsToDelete.length} polluted records...`);
-            const { error: deleteError } = await supabase
-                .from('brain.documents') // This might fail if table not exposed
-                .delete()
-                .in('id', idsToDelete);
-
-            if (deleteError) {
-                console.error('Delete failed (likely RLS or hidden table):', deleteError);
-
-                // Try RPC 'delete_brain_document' if it exists? (It doesn't)
-                // Try 'insert_brain_document' with same ID but empty content? (Hack)
-                // Maybe overwriting?
-            } else {
-                console.log('Pollution deleted!');
-            }
-        }
     }
+}
 
-    checkBrain();
+checkBrain();
