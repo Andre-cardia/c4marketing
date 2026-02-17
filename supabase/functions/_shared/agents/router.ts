@@ -296,7 +296,7 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
             reason: "Heuristic: project intent detected",
             filtersPatch: {
                 artifact_kind: "project",
-                source_table: ["projects", "tasks", "milestones", "activity_logs", "website_projects"],
+                source_table: ["projects", "tasks", "milestones", "activity_logs", "website_projects", "landing_page_projects", "traffic_projects"],
                 // allow chat only if policy allows
                 time_window_minutes: policy === "DOCS_PLUS_RECENT_CHAT" ? 15 : null,
             },

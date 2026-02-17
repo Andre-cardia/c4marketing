@@ -140,6 +140,35 @@ Deno.serve(async (req) => {
                             source_table: 'landing_page_projects',
                             status: 'active'
                         }
+                    } else if (item.source_table === 'traffic_projects') {
+                        const { data: proj, error: pErr } = await supabaseAdmin
+                            .from('traffic_projects')
+                            .select(`
+                                *,
+                                acceptances ( company_name ),
+                                traffic_campaigns ( * )
+                            `)
+                            .eq('id', item.source_id)
+                            .single()
+                        if (pErr) throw pErr
+
+                        docContent = `[PROJETO TRÁFEGO] Gestão de Tráfego: ${proj.acceptances?.company_name || 'N/A'}\n`
+                        docContent += `Status Survey: ${proj.survey_status}\n`
+                        docContent += `Status Setup: ${proj.account_setup_status}\n`
+                        if (proj.traffic_campaigns && proj.traffic_campaigns.length > 0) {
+                            docContent += `Campanhas Ativas:\n`
+                            for (const camp of proj.traffic_campaigns) {
+                                docContent += `- [${camp.platform}] ${camp.name || 'Sem nome'} (${camp.status})\n`
+                            }
+                        }
+
+                        docMetadata = {
+                            type: 'official_doc',
+                            artifact_kind: 'project',
+                            title: `Projeto Tráfego ${proj.acceptances?.company_name}`,
+                            source_table: 'traffic_projects',
+                            status: 'active'
+                        }
                     } else {
                         // Unknown table or not implemented yet
                         throw new Error(`Processor for ${item.source_table} not implemented`)
