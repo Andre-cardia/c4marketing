@@ -49,16 +49,19 @@ Deno.serve(async (req) => {
                 userId = user.id
                 userRole = user.role ?? 'authenticated'
 
-                // Buscar perfil completo do usuário
-                const { data: profile } = await supabaseAdmin
-                    .from('app_users')
-                    .select('name, email, role, full_name')
-                    .eq('id', userId)
-                    .single()
+                // Buscar perfil completo do usuário (por email, pois app_users.id ≠ auth.users.id)
+                const userEmail = user.email
+                if (userEmail) {
+                    const { data: profile } = await supabaseAdmin
+                        .from('app_users')
+                        .select('name, email, role, full_name')
+                        .eq('email', userEmail)
+                        .single()
 
-                if (profile) {
-                    userProfile = profile
-                    userRole = profile.role || userRole
+                    if (profile) {
+                        userProfile = profile
+                        userRole = profile.role || userRole
+                    }
                 }
             }
         }
