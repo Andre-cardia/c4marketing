@@ -122,8 +122,8 @@ export default function BrainManager() {
                 session_id: sessionId
             }).catch(console.error);
 
-            // 3. Ask Brain (RAG)
-            const response = await askBrain(userMsgContent);
+            // 3. Ask Brain (RAG) — com session_id para memória de sessão
+            const response = await askBrain(userMsgContent, sessionId);
             const aiMsgContent = response.answer;
 
             // 4. Save AI Message to DB

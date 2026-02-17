@@ -32,11 +32,11 @@ Deno.serve(async (req) => {
             apiKey: Deno.env.get('OPENAI_API_KEY'),
         })
 
-        // 1. Get User Context (Optional but recommended for strict tenant isolation)
-        // For now, we use a placeholder tenant if not extracted from JWT
+        // 1. Get User Context
         const authHeader = req.headers.get('Authorization')
         let userRole = 'anon'
         let userId = 'anon_user'
+        let userProfile: any = null
 
         if (authHeader) {
             const client = createClient(
@@ -48,16 +48,45 @@ Deno.serve(async (req) => {
             if (user) {
                 userId = user.id
                 userRole = user.role ?? 'authenticated'
+
+                // Buscar perfil completo do usuário
+                const { data: profile } = await supabaseAdmin
+                    .from('app_users')
+                    .select('name, email, role, full_name')
+                    .eq('id', userId)
+                    .single()
+
+                if (profile) {
+                    userProfile = profile
+                    userRole = profile.role || userRole
+                }
+            }
+        }
+
+        // 1b. Carregar histórico da sessão (memória cognitiva)
+        let sessionMessages: Array<{ role: string; content: string }> = []
+
+        if (session_id) {
+            const { data: history } = await supabaseAdmin
+                .rpc('get_session_history', { p_session_id: session_id, p_limit: 20 })
+
+            if (history && history.length > 0) {
+                // O RPC retorna em ordem DESC, precisamos inverter para cronológico
+                sessionMessages = history
+                    .reverse()
+                    .map((m: any) => ({
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content
+                    }))
             }
         }
 
         // 2. Router Step
         const routerInput: RouterInput = {
-            tenant_id: userId, // Using UserID as TenantID alias for single-tenant logic, or literal tenant if multi-tenant
+            tenant_id: userId,
             session_id: session_id,
             user_role: userRole,
             user_message: query,
-            // Optional hints could be extracted here if needed
         }
 
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
@@ -69,7 +98,7 @@ Deno.serve(async (req) => {
                     {
                         role: 'system',
                         content: `
-Você é o ROUTER do “Segundo Cérebro”.
+Você é o ROUTER do "Segundo Cérebro".
 Classifique a solicitação e retorne um JSON.
 OUTPUT Schema:
 {
@@ -116,7 +145,6 @@ OUTPUT Schema:
             } else if (!data || (Array.isArray(data) && data.length === 0)) {
                 contextText = 'Nenhum registro encontrado no banco de dados.'
             } else {
-                // Formatar dados do banco como contexto legível para o agente
                 const records = Array.isArray(data) ? data : [data]
                 contextText = `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n`
                 contextText += JSON.stringify(records, null, 2)
@@ -144,11 +172,17 @@ OUTPUT Schema:
             }).join('\n\n')
         }
 
-        // 4. Generation Step
-        const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"] // default
+        // 4. Generation Step — com identidade do usuário e histórico
+        const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"]
+
+        // Montar bloco de identidade
+        const identityBlock = userProfile
+            ? `\nIDENTIDADE DO USUÁRIO (quem está conversando com você):\n- Nome: ${userProfile.full_name || userProfile.name}\n- Email: ${userProfile.email}\n- Cargo: ${userProfile.role}\nVocê deve se dirigir ao usuário pelo nome e adaptar sua linguagem ao cargo dele.`
+            : ''
 
         const systemPrompt = `
 ${agentConfig.getSystemPrompt()}
+${identityBlock}
 
 FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no banco de dados (dados completos e atualizados)' : 'Busca semântica no acervo vetorial'}
 
@@ -156,12 +190,24 @@ CONTEXTO RECUPERADO:
 ${contextText || "Nenhum documento relevante encontrado."}
         `.trim()
 
+        // Montar mensagens multi-turn (system + histórico + pergunta atual)
+        const messages: Array<{ role: string; content: string }> = [
+            { role: 'system', content: systemPrompt },
+        ]
+
+        // Incluir histórico da sessão (memória de curto prazo)
+        if (sessionMessages.length > 0) {
+            for (const msg of sessionMessages) {
+                messages.push({ role: msg.role, content: msg.content })
+            }
+        }
+
+        // Mensagem atual do usuário
+        messages.push({ role: 'user', content: query })
+
         const chatResponse = await openai.chat.completions.create({
             model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: query }
-            ],
+            messages: messages as any,
             temperature: 0.1
         })
 
