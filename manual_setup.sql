@@ -20,7 +20,7 @@ USING (
   EXISTS (
     SELECT 1 FROM acceptances a
     WHERE a.id = traffic_projects.acceptance_id
-    AND lower(a.client_email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
+    AND lower(a.email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
   )
 );
 
@@ -35,7 +35,7 @@ USING (
     SELECT 1 FROM traffic_projects tp
     JOIN acceptances a ON tp.acceptance_id = a.id
     WHERE tp.id = traffic_campaigns.traffic_project_id
-    AND lower(a.client_email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
+    AND lower(a.email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
   )
 );
 
@@ -51,7 +51,7 @@ USING (
     JOIN traffic_projects tp ON tc.traffic_project_id = tp.id
     JOIN acceptances a ON tp.acceptance_id = a.id
     WHERE tc.id = traffic_campaign_timeline.campaign_id
-    AND lower(a.client_email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
+    AND lower(a.email) = lower((SELECT email FROM app_users WHERE id = auth.uid()))
   )
 );
 
@@ -76,4 +76,4 @@ $$;
 -- 1. Run this entire script in Supabase SQL Editor.
 -- 2. Go to Authentication > Users and create a new user (e.g., client@test.com).
 -- 3. In SQL Editor, run: SELECT make_user_client('client@test.com');
--- 4. Ensure there is a Project (Acceptance) with client_email = 'client@test.com'.
+-- 4. Ensure there is a Project (Acceptance) with email = 'client@test.com'.
