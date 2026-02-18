@@ -157,7 +157,7 @@ const ClientDashboard: React.FC = () => {
         <div className="min-h-screen bg-slate-950 text-white font-sans flex relative overflow-hidden">
             {/* Preview Banner */}
             {isPreviewMode && (
-                <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-amber-600 to-orange-600 text-white py-2 px-4 shadow-lg flex items-center justify-between text-xs md:text-sm font-medium">
+                <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 shadow-lg flex items-center justify-between text-xs md:text-sm font-medium">
                     <div className="flex items-center gap-2">
                         <Eye size={16} className="animate-pulse" />
                         <span className="truncate">Visualizando como: <strong>{project.acceptance?.name}</strong></span>
@@ -189,7 +189,7 @@ const ClientDashboard: React.FC = () => {
             `}>
                 <div className="p-6 md:p-8 flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent tracking-tight">
+                        <h2 className="text-2xl font-black bg-gradient-to-r from-brand-coral to-red-500 bg-clip-text text-transparent tracking-tight">
                             C4 Marketing
                         </h2>
                         <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Client Office</p>
@@ -203,7 +203,7 @@ const ClientDashboard: React.FC = () => {
                     <button
                         onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'overview'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
                             : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                             }`}
                     >
@@ -214,7 +214,7 @@ const ClientDashboard: React.FC = () => {
                     <button
                         onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'reports'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
                             : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                             }`}
                     >
@@ -225,7 +225,7 @@ const ClientDashboard: React.FC = () => {
                     <button
                         onClick={() => { setActiveTab('finance'); setIsSidebarOpen(false); }}
                         className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'finance'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
                             : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                             }`}
                     >
@@ -236,7 +236,7 @@ const ClientDashboard: React.FC = () => {
 
                 <div className="p-4 border-t border-slate-800/50 bg-slate-900/50">
                     <div className="flex items-center gap-3 px-4 py-3 mb-2 bg-slate-800/30 rounded-xl border border-slate-800">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-sm font-bold shadow-lg text-white">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-coral to-red-600 flex items-center justify-center text-sm font-bold shadow-lg text-white">
                             {(isPreviewMode ? project.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </div>
                         <div className="overflow-hidden">
@@ -264,14 +264,14 @@ const ClientDashboard: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={toggleSidebar}
-                            className="p-2 bg-slate-900 rounded-lg text-amber-500 border border-slate-800 active:scale-95 transition-transform"
+                            className="p-2 bg-slate-900 rounded-lg text-brand-coral border border-slate-800 active:scale-95 transition-transform"
                         >
                             <Menu size={24} />
                         </button>
                         <span className="font-bold text-lg tracking-tight">C4 Marketing</span>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                        <span className="text-xs font-bold text-amber-500">
+                        <span className="text-xs font-bold text-brand-coral">
                             {(isPreviewMode ? project.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </span>
                     </div>
@@ -296,7 +296,7 @@ const ClientDashboard: React.FC = () => {
                         </div>
                         {activeTab === 'overview' && (
                             <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 rounded-lg border border-slate-800 text-sm text-slate-400">
-                                <Clock size={16} className="text-amber-500" />
+                                <Clock size={16} className="text-brand-coral" />
                                 <span>Próxima atualização: Em 24h</span>
                             </div>
                         )}
@@ -328,19 +328,19 @@ const ClientDashboard: React.FC = () => {
 
                                 <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all">
                                     <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <PieChart size={100} className="text-amber-500 transform translate-x-4 -translate-y-4" />
+                                        <PieChart size={100} className="text-brand-coral transform translate-x-4 -translate-y-4" />
                                     </div>
                                     <div className="relative z-10">
                                         <p className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Campanhas Ativas</p>
                                         <div className="text-3xl font-black text-white flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                                <PieChart className="text-amber-500 w-6 h-6" />
+                                            <div className="w-10 h-10 rounded-full bg-brand-coral/10 flex items-center justify-center">
+                                                <PieChart className="text-brand-coral w-6 h-6" />
                                             </div>
                                             {campaigns.filter(c => c.status === 'active').length}
                                         </div>
                                     </div>
                                     <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-500 flex items-center gap-1">
-                                        <TrendingUp size={12} className="text-amber-500" />
+                                        <TrendingUp size={12} className="text-brand-coral" />
                                         <span>Estratégias em andamento</span>
                                     </div>
                                 </div>
@@ -368,8 +368,8 @@ const ClientDashboard: React.FC = () => {
                             {/* Campaigns List */}
                             <div className="flex items-center justify-between mb-8">
                                 <h2 className="text-2xl font-bold flex items-center gap-3">
-                                    <div className="p-2 bg-amber-500/10 rounded-lg">
-                                        <LayoutDashboard className="text-amber-500 w-6 h-6" />
+                                    <div className="p-2 bg-brand-coral/10 rounded-lg">
+                                        <LayoutDashboard className="text-brand-coral w-6 h-6" />
                                     </div>
                                     Minhas Campanhas
                                 </h2>
@@ -390,7 +390,7 @@ const ClientDashboard: React.FC = () => {
                                             <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/20 backdrop-blur-sm">
                                                 <div className="flex items-center gap-5">
                                                     <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner">
-                                                        <BarChart3 className="text-amber-500 w-6 h-6" />
+                                                        <BarChart3 className="text-brand-coral w-6 h-6" />
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-xl text-white tracking-tight">{campaign.name}</h3>
@@ -432,17 +432,29 @@ const ClientDashboard: React.FC = () => {
                                                                         {step.status === 'pending' && <div className="w-2 h-2 rounded-full bg-slate-600" />}
                                                                     </div>
                                                                 </div>
-                                                                <div className="pt-2 flex-grow">
+                                                                <div className="pt-2 flex-grow flex items-center justify-between">
                                                                     <p className={`text-base font-bold transition-colors ${step.status === 'completed' ? 'text-green-400' :
                                                                         step.status === 'in_progress' ? 'text-brand-coral' :
                                                                             'text-slate-500'
                                                                         }`}>
                                                                         {step.title}
                                                                     </p>
+
+                                                                    {/* Status Label to the right as requested */}
                                                                     {step.status === 'in_progress' && (
-                                                                        <div className="mt-2 inline-block px-3 py-1 rounded-lg bg-brand-coral/10 border border-brand-coral/20 text-brand-coral text-xs font-bold animate-pulse">
-                                                                            EM ANDAMENTO
-                                                                        </div>
+                                                                        <span className="text-xs font-bold text-brand-coral uppercase tracking-wider animate-pulse">
+                                                                            Em andamento
+                                                                        </span>
+                                                                    )}
+                                                                    {step.status === 'completed' && (
+                                                                        <span className="text-xs font-bold text-green-500 uppercase tracking-wider">
+                                                                            Concluído
+                                                                        </span>
+                                                                    )}
+                                                                    {step.status === 'pending' && (
+                                                                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                            Aguardando
+                                                                        </span>
                                                                     )}
                                                                 </div>
                                                             </div>
@@ -464,13 +476,13 @@ const ClientDashboard: React.FC = () => {
                     {activeTab === 'reports' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px] flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30 p-12 text-center">
                             <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-700/50">
-                                <BarChart3 className="text-amber-500/50" size={48} />
+                                <BarChart3 className="text-brand-coral/50" size={48} />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">Relatórios em Construção</h2>
                             <p className="text-slate-400 max-w-md mx-auto mb-8">
                                 Estamos processando os dados das suas campanhas para gerar insights valiosos. Em breve você terá acesso a métricas detalhadas aqui.
                             </p>
-                            <button onClick={() => setActiveTab('overview')} className="text-amber-500 font-bold hover:text-amber-400 hover:underline">
+                            <button onClick={() => setActiveTab('overview')} className="text-brand-coral font-bold hover:text-red-400 hover:underline">
                                 Voltar para Visão Geral
                             </button>
                         </div>
@@ -485,7 +497,7 @@ const ClientDashboard: React.FC = () => {
                             <p className="text-slate-400 max-w-md mx-auto mb-8">
                                 O histórico de faturas e pagamentos estará disponível nesta seção em breve.
                             </p>
-                            <button onClick={() => setActiveTab('overview')} className="text-amber-500 font-bold hover:text-amber-400 hover:underline">
+                            <button onClick={() => setActiveTab('overview')} className="text-brand-coral font-bold hover:text-red-400 hover:underline">
                                 Voltar para Visão Geral
                             </button>
                         </div>
