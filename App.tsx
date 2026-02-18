@@ -32,6 +32,7 @@ import { UserRoleProvider } from './lib/UserRoleContext';
 import { ThemeProvider } from './lib/ThemeContext';
 import { BrainWidgetWrapper } from './components/BrainWidgetWrapper';
 import BrainManager from './pages/BrainManager';
+import ResetPasswordHandler from './components/ResetPasswordHandler';
 
 const App: React.FC = () => {
 
@@ -213,6 +214,7 @@ const App: React.FC = () => {
               />
             </Routes>
 
+            <ResetPasswordHandler />
             <BrainWidgetWrapper />
           </div>
         </Router>
