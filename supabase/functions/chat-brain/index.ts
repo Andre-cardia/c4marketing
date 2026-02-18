@@ -195,6 +195,27 @@ Deno.serve(async (req) => {
                     description: "Busca semântica no acervo de documentos (contratos, propostas, políticas, manuais). Use quando a pergunta é sobre conteúdo de documentos, cláusulas, análises ou informações que não estão em tabelas estruturadas.",
                     parameters: { type: "object", properties: {} }
                 }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "query_survey_responses",
+                    description: "Consultar respostas de pesquisas/formulários preenchidos pelos clientes. Use para perguntas como 'o que o cliente achou?', 'respostas do onboarding', 'feedback do cliente', 'dados do formulário', etc.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_client_name: {
+                                type: "string",
+                                description: "Nome do cliente (partial match). Ex: 'Amplexo' para buscar 'Grupo Amplexo'."
+                            },
+                            p_project_type: {
+                                type: "string",
+                                enum: ["traffic", "website", "landing_page"],
+                                description: "Tipo de projeto/pesquisa. Omita para buscar em todos."
+                            }
+                        }
+                    }
+                }
             }
         ]
 
@@ -219,7 +240,10 @@ Exemplos:
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "todo")
 - "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
+- "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
+- "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
+- "mostre as respostas do formulário de tráfego" → query_survey_responses(p_project_type: "traffic")
 Escolha UMA ferramenta e seus parâmetros.`
                     },
                     { role: 'user', content: input.user_message }
@@ -242,6 +266,7 @@ Escolha UMA ferramenta e seus parâmetros.`
                     'query_all_users': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
+                    'query_survey_responses': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                 }
 
