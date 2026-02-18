@@ -18,16 +18,16 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function inspect() {
-    console.log('--- Listing Tables ---');
-    // Using a query to valid table existence via error message or success of a known table
+    console.log('--- Checking traffic_projects ---');
     const { data, error } = await supabase
         .from('traffic_projects')
-        .select('count', { count: 'exact', head: true });
+        .select('*')
+        .limit(1);
 
     if (error) {
-        console.error('Error accessing traffic_projects:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
     } else {
-        console.log('traffic_projects is accessible.');
+        console.log('Success. Row count:', data.length);
     }
 }
 
