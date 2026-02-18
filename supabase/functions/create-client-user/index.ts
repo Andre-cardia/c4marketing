@@ -24,6 +24,47 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // --- SELF-HEALING: Check for or create traffic_projects record ---
+        // Run this regardless of user existence to ensure data consistency
+        try {
+            const { data: latestAcceptance } = await supabaseAdmin
+                .from('acceptances')
+                .select('id, company_name, name')
+                .eq('email', email.toLowerCase())
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (latestAcceptance) {
+                const { data: existingProject } = await supabaseAdmin
+                    .from('traffic_projects')
+                    .select('id')
+                    .eq('acceptance_id', latestAcceptance.id)
+                    .single();
+
+                if (!existingProject) {
+                    console.log(`Creating missing traffic_project for acceptance ${latestAcceptance.id}`);
+                    const { error: projError } = await supabaseAdmin
+                        .from('traffic_projects')
+                        .insert({
+                            acceptance_id: latestAcceptance.id,
+                            name: latestAcceptance.company_name || latestAcceptance.name || name,
+                            status: 'active'
+                        });
+
+                    if (projError) {
+                        console.error('Error creating traffic_project:', projError);
+                    } else {
+                        console.log('traffic_project created successfully.');
+                    }
+                }
+            }
+        } catch (projCheckErr) {
+            console.error('Error in self-healing project check:', projCheckErr);
+            // Continue execution, don't fail user creation
+        }
+        // ----------------------------------------------------------------
+
         // 1. Check if user already exists in app_users
         const { data: existingUser } = await supabaseAdmin
             .from('app_users')
@@ -34,7 +75,6 @@ Deno.serve(async (req) => {
         if (existingUser) {
             // User already exists - just ensure role is 'cliente'
             if (existingUser.role !== 'cliente') {
-                // Don't override existing staff roles
                 return new Response(
                     JSON.stringify({
                         status: 'existing',
@@ -43,10 +83,18 @@ Deno.serve(async (req) => {
                     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                 )
             }
+            // Send password reset email (acts as welcome/invite email) - even if existing, maybe they forgot password?
+            // Optional: Uncomment to resend invite for existing users
+            const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
+            const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/client' : `${siteUrl}/client`;
+            await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
+                redirectTo: finalRedirectUrl,
+            })
+
             return new Response(
                 JSON.stringify({
                     status: 'existing',
-                    message: 'Client user already exists.',
+                    message: 'Client user already exists. Project check complete. Welcome email resent.',
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
@@ -128,7 +176,7 @@ Deno.serve(async (req) => {
         return new Response(
             JSON.stringify({
                 status: 'created',
-                message: 'Client user created successfully. Welcome email sent.',
+                message: 'Client user created/verified. Project check complete. Welcome email sent.',
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
