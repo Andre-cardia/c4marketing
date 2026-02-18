@@ -424,7 +424,7 @@ const ClientDashboard: React.FC = () => {
                                                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${step.status === 'completed'
                                                                         ? 'bg-green-500 border-green-900 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
                                                                         : step.status === 'in_progress'
-                                                                            ? 'bg-amber-500 border-amber-900 shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                                                                            ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,77,77,0.3)]'
                                                                             : 'bg-slate-800 border-slate-900'
                                                                         }`}>
                                                                         {step.status === 'completed' && <CheckCircle2 size={16} className="text-white" />}
@@ -434,14 +434,14 @@ const ClientDashboard: React.FC = () => {
                                                                 </div>
                                                                 <div className="pt-2 flex-grow">
                                                                     <p className={`text-base font-bold transition-colors ${step.status === 'completed' ? 'text-green-400' :
-                                                                        step.status === 'in_progress' ? 'text-amber-400' :
+                                                                        step.status === 'in_progress' ? 'text-brand-coral' :
                                                                             'text-slate-500'
                                                                         }`}>
                                                                         {step.title}
                                                                     </p>
                                                                     {step.status === 'in_progress' && (
-                                                                        <div className="mt-2 inline-block px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold animate-pulse">
-                                                                            Em andamento
+                                                                        <div className="mt-2 inline-block px-3 py-1 rounded-lg bg-brand-coral/10 border border-brand-coral/20 text-brand-coral text-xs font-bold animate-pulse">
+                                                                            EM ANDAMENTO
                                                                         </div>
                                                                     )}
                                                                 </div>
