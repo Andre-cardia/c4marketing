@@ -196,6 +196,14 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/client/preview/:acceptanceId"
+                element={
+                  <ProtectedRoute allowedRoles={['admin', 'gestor']}>
+                    <ClientDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/client"
                 element={
                   <ProtectedRoute allowedRoles={['cliente']}>

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
-import { LogOut, LayoutDashboard, BarChart3, PieChart, AlertCircle, FileText, CheckCircle2, Clock } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { LogOut, LayoutDashboard, BarChart3, PieChart, AlertCircle, FileText, CheckCircle2, Clock, ArrowLeft, Eye } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const ClientDashboard: React.FC = () => {
+    const { acceptanceId } = useParams<{ acceptanceId?: string }>();
     const { email, fullName, userRole } = useUserRole();
     const navigate = useNavigate();
     const [project, setProject] = useState<any>(null);
@@ -12,17 +13,69 @@ const ClientDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
 
+    // Preview mode: gestor viewing a specific project as if they were the client
+    const isPreviewMode = !!acceptanceId && (userRole === 'gestor' || userRole === 'admin');
+
     useEffect(() => {
-        if (email) {
+        if (isPreviewMode) {
+            fetchByAcceptanceId(Number(acceptanceId));
+        } else if (email) {
             fetchClientProject();
         }
-    }, [email]);
+    }, [email, acceptanceId]);
+
+    const fetchByAcceptanceId = async (accId: number) => {
+        try {
+            setLoading(true);
+
+            // Get acceptance info
+            const { data: acceptance, error: accErr } = await supabase
+                .from('acceptances')
+                .select('id, name, email, company_name, timestamp')
+                .eq('id', accId)
+                .single();
+
+            if (accErr || !acceptance) {
+                console.error('No acceptance found for ID:', accId, accErr);
+                setLoading(false);
+                return;
+            }
+
+            // Get traffic project
+            const { data: projectData, error: projErr } = await supabase
+                .from('traffic_projects')
+                .select('*')
+                .eq('acceptance_id', accId)
+                .limit(1)
+                .single();
+
+            if (projErr || !projectData) {
+                console.error('No traffic project found:', projErr);
+                setLoading(false);
+                return;
+            }
+
+            setProject({ ...projectData, acceptance });
+
+            // Get campaigns
+            const { data: campaignsData } = await supabase
+                .from('traffic_campaigns')
+                .select(`*, timeline:traffic_campaign_timeline (*)`)
+                .eq('traffic_project_id', projectData.id)
+                .order('created_at', { ascending: false });
+
+            if (campaignsData) setCampaigns(campaignsData);
+        } catch (error) {
+            console.error('Error in fetchByAcceptanceId:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchClientProject = async () => {
         try {
             setLoading(true);
 
-            // Step 1: Find the acceptance linked to this client's email
             const { data: acceptance, error: accErr } = await supabase
                 .from('acceptances')
                 .select('id, name, email, company_name, timestamp')
@@ -36,7 +89,6 @@ const ClientDashboard: React.FC = () => {
                 return;
             }
 
-            // Step 2: Find the traffic_project linked to this acceptance
             const { data: projectData, error: projErr } = await supabase
                 .from('traffic_projects')
                 .select('*')
@@ -50,23 +102,15 @@ const ClientDashboard: React.FC = () => {
                 return;
             }
 
-            // Attach acceptance info to project for display
             setProject({ ...projectData, acceptance });
 
-            // Step 3: Fetch Campaigns for this project 
             const { data: campaignsData } = await supabase
                 .from('traffic_campaigns')
-                .select(`
-                    *,
-                    timeline:traffic_campaign_timeline (*)
-                `)
+                .select(`*, timeline:traffic_campaign_timeline (*)`)
                 .eq('traffic_project_id', projectData.id)
                 .order('created_at', { ascending: false });
 
-            if (campaignsData) {
-                setCampaigns(campaignsData);
-            }
-
+            if (campaignsData) setCampaigns(campaignsData);
         } catch (error) {
             console.error('Error in fetchClientProject:', error);
         } finally {
@@ -80,7 +124,7 @@ const ClientDashboard: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500">Carregando seus dados...</div>;
+        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500">Carregando dados do projeto...</div>;
     }
 
     if (!project) {
@@ -89,14 +133,16 @@ const ClientDashboard: React.FC = () => {
                 <AlertCircle className="w-16 h-16 text-amber-500 mb-4" />
                 <h1 className="text-2xl font-bold mb-2">Projeto não encontrado</h1>
                 <p className="text-slate-400 text-center max-w-md mb-8">
-                    Não encontramos um projeto de Tráfego vinculado ao email <strong>{email}</strong>.
-                    Entre em contato com o suporte se acredita que isso é um erro.
+                    {isPreviewMode
+                        ? 'Este projeto ainda não possui dados de tráfego para visualização do cliente.'
+                        : <>Não encontramos um projeto de Tráfego vinculado ao email <strong>{email}</strong>. Entre em contato com o suporte se acredita que isso é um erro.</>
+                    }
                 </p>
                 <button
-                    onClick={handleLogout}
+                    onClick={() => isPreviewMode ? navigate(-1) : handleLogout()}
                     className="px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors border border-slate-700"
                 >
-                    Sair
+                    {isPreviewMode ? 'Voltar' : 'Sair'}
                 </button>
             </div>
         );
@@ -104,8 +150,25 @@ const ClientDashboard: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-950 text-white font-sans flex">
+            {/* Preview Mode Banner */}
+            {isPreviewMode && (
+                <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4 flex items-center justify-between text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                        <Eye size={16} />
+                        <span>Modo Preview — Visualizando como o cliente <strong>{project.acceptance?.name}</strong> vê este painel</span>
+                    </div>
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors"
+                    >
+                        <ArrowLeft size={14} />
+                        Voltar ao Painel
+                    </button>
+                </div>
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 border-r border-slate-800/50 bg-slate-900/50 backdrop-blur-xl fixed h-full z-20 hidden md:flex flex-col">
+            <aside className={`w-64 border-r border-slate-800/50 bg-slate-900/50 backdrop-blur-xl fixed h-full z-20 hidden md:flex flex-col ${isPreviewMode ? 'pt-10' : ''}`}>
                 <div className="p-6 border-b border-slate-800/50">
                     <h2 className="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
                         C4 Marketing
@@ -139,28 +202,30 @@ const ClientDashboard: React.FC = () => {
                 <div className="p-4 border-t border-slate-800/50">
                     <div className="flex items-center gap-3 px-4 py-3 mb-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-xs font-bold">
-                            {fullName?.charAt(0) || email?.charAt(0)}
+                            {(isPreviewMode ? project.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-medium truncate">{fullName || 'Cliente'}</p>
-                            <p className="text-xs text-slate-500 truncate">{email}</p>
+                            <p className="text-sm font-medium truncate">{isPreviewMode ? project.acceptance?.name : (fullName || 'Cliente')}</p>
+                            <p className="text-xs text-slate-500 truncate">{isPreviewMode ? project.acceptance?.email : email}</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-400 hover:text-red-400 transition-colors"
-                    >
-                        <LogOut size={16} />
-                        Sair
-                    </button>
+                    {!isPreviewMode && (
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-400 hover:text-red-400 transition-colors"
+                        >
+                            <LogOut size={16} />
+                            Sair
+                        </button>
+                    )}
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-64 p-8">
+            <main className={`flex-1 md:ml-64 p-8 ${isPreviewMode ? 'pt-18' : ''}`}>
                 <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">{project.acceptance?.name || 'Seu Projeto'}</h1>
+                        <h1 className="text-3xl font-bold mb-2">{project.acceptance?.company_name || project.acceptance?.name || 'Seu Projeto'}</h1>
                         <p className="text-slate-400 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                             Projeto Ativo desde {new Date(project.created_at).toLocaleDateString('pt-BR')}
@@ -225,7 +290,6 @@ const ClientDashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Timeline Visualization (Read Only) */}
                                 <div className="p-6">
                                     <h4 className="text-sm font-medium text-slate-400 mb-4">Cronograma de Execução</h4>
                                     <div className="space-y-4">
