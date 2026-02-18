@@ -125,7 +125,7 @@ const ProposalView: React.FC = () => {
                 generated_at: new Date().toISOString()
             };
 
-            const { error } = await supabase
+            const { data: acceptanceData, error } = await supabase
                 .from('acceptances')
                 .insert([
                     {
@@ -136,13 +136,35 @@ const ProposalView: React.FC = () => {
                         cnpj: formData.cnpj,
                         proposal_id: proposal.id,
                         contract_snapshot: contractSnapshot,
-                        status: 'Inativo' // Status inicial padrão
+                        status: 'Ativo' // Mudança de regra: inicia ativo
                     }
-                ]);
+                ])
+                .select()
+                .single();
 
             if (error) throw error;
 
-            // 3. Create client user account (Edge Function)
+            // 3. Create Traffic Project immediately (Frontend attempt)
+            // This ensures the dashboard works instantly without waiting for Edge Function
+            try {
+                const { error: projectError } = await supabase
+                    .from('traffic_projects')
+                    .insert({
+                        acceptance_id: acceptanceData.id,
+                        name: formData.companyName || formData.name,
+                        status: 'active'
+                    });
+
+                if (projectError) {
+                    console.error('Frontend traffic_projects creation failed (likely RLS). Edge Function will retry:', projectError);
+                } else {
+                    console.log('Frontend traffic_projects created successfully');
+                }
+            } catch (projErr) {
+                console.error('Error creating project in frontend:', projErr);
+            }
+
+            // 4. Create client user account (Edge Function)
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
