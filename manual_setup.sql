@@ -1,11 +1,19 @@
--- 1. APPLY RLS POLICIES (Client Area)
+-- 1. FIX APP_USERS PERMISSIONS (Critical for creation)
 -------------------------------------------------------------------------------
--- Add 'cliente' to valid roles
+-- Allow 'Gestor' (Authenticated) to insert new users into profiles
+CREATE POLICY "Authenticated users can insert profiles" 
+ON app_users FOR INSERT TO authenticated 
+WITH CHECK (true);
+
+-- Add 'cliente' to valid roles (if not already)
 ALTER TABLE app_users DROP CONSTRAINT IF EXISTS app_users_role_check;
 ALTER TABLE app_users ADD CONSTRAINT app_users_role_check 
   CHECK (role IN ('admin', 'gestor', 'operacional', 'comercial', 'leitor', 'cliente'));
 
--- Enable RLS
+
+-- 2. APPLY RLS POLICIES (Client Area)
+-------------------------------------------------------------------------------
+-- Enable RLS (Idempotent)
 ALTER TABLE traffic_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE traffic_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE traffic_campaign_timeline ENABLE ROW LEVEL SECURITY;
@@ -55,9 +63,8 @@ USING (
   )
 );
 
--- 2. CREATE TEST USER HELPER FUNCTION
+-- 3. CREATE TEST USER HELPER FUNCTION
 -------------------------------------------------------------------------------
--- Use this function to quickly convert an existing user to a client role
 CREATE OR REPLACE FUNCTION public.make_user_client(target_email text)
 RETURNS text
 LANGUAGE plpgsql
@@ -71,9 +78,3 @@ BEGIN
   RETURN 'User ' || target_email || ' is now a client.';
 END;
 $$;
-
--- INSTRUCTIONS FOR USER:
--- 1. Run this entire script in Supabase SQL Editor.
--- 2. Go to Authentication > Users and create a new user (e.g., client@test.com).
--- 3. In SQL Editor, run: SELECT make_user_client('client@test.com');
--- 4. Ensure there is a Project (Acceptance) with email = 'client@test.com'.
