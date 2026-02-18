@@ -25,6 +25,16 @@ const PLANNING_CHECKLIST_ITEMS = [
     "Orçamento"
 ];
 
+const META_ADS_PLANNING_CHECKLIST_ITEMS = [
+    "Análise geral da conta",
+    "Verificar possibilidade de importação de compradores anteriores",
+    "Definir regiões",
+    "Definição de público/persona",
+    "Definição de copy",
+    "Criativo do anúncio",
+    "Destino do anúncio"
+];
+
 const CREATIVES_CHECKLIST_ITEMS = [
     "Criativos Estáticos",
     "Criativos Animados (Video/Motion)",
@@ -698,9 +708,14 @@ const TrafficManagement: React.FC = () => {
                                                         const isActive = step.status === 'in_progress';
                                                         const isCompleted = step.status === 'completed';
 
+                                                        // Determine which checklist to use
+                                                        const currentPlanningChecklist = campaign.platform === 'meta_ads'
+                                                            ? META_ADS_PLANNING_CHECKLIST_ITEMS
+                                                            : PLANNING_CHECKLIST_ITEMS;
+
                                                         // Progress Bar Calculation for Planning
-                                                        const completedCount = PLANNING_CHECKLIST_ITEMS.filter(i => step.checklist_data?.[i]).length;
-                                                        const totalCount = PLANNING_CHECKLIST_ITEMS.length;
+                                                        const completedCount = currentPlanningChecklist.filter(i => step.checklist_data?.[i]).length;
+                                                        const totalCount = currentPlanningChecklist.length;
                                                         const progress = Math.round((completedCount / totalCount) * 100);
 
                                                         // Progress Bar Calculation for Creatives
@@ -896,7 +911,7 @@ const TrafficManagement: React.FC = () => {
                                                                                     </div>
 
                                                                                     <div className="grid grid-cols-1 gap-3">
-                                                                                        {PLANNING_CHECKLIST_ITEMS.map((item) => {
+                                                                                        {currentPlanningChecklist.map((item) => {
                                                                                             const isChecked = step.checklist_data?.[item] || false;
                                                                                             return (
                                                                                                 <label key={item} className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all border
