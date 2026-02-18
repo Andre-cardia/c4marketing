@@ -215,74 +215,74 @@ const ClientDashboard: React.FC = () => {
 
             {/* Sidebar Navigation */}
             <aside className={`
-                fixed md:static inset-y-0 left-0 z-50 w-72 bg-slate-900 border-r border-slate-800/50 
+                fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 
                 transform transition-transform duration-300 ease-in-out md:translate-x-0 flex flex-col shadow-2xl md:shadow-none
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 ${isPreviewMode ? 'pt-16 md:pt-0' : ''}
             `}>
-                <div className="p-6 md:p-8 flex items-center justify-between">
+                <div className="p-6 flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-black bg-gradient-to-r from-brand-coral to-red-500 bg-clip-text text-transparent tracking-tight">
-                            C4 Marketing
+                        <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                            <div className="w-8 h-8 bg-brand-coral rounded-lg flex items-center justify-center text-slate-900">C4</div>
+                            Marketing
                         </h2>
-                        <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-bold">Client Office</p>
                     </div>
                     <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
                         <X size={24} />
                     </button>
                 </div>
 
-                <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
+                <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
                     <button
                         onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'overview'
-                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'overview'
+                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
+                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <LayoutDashboard size={20} className={`transition-transform duration-300 ${activeTab === 'overview' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="font-semibold">Visão Geral</span>
+                        <LayoutDashboard size={18} className={`transition-transform duration-300 ${activeTab === 'overview' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm">Visão Geral</span>
                     </button>
 
                     <button
                         onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'reports'
-                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'reports'
+                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
+                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <BarChart3 size={20} className={`transition-transform duration-300 ${activeTab === 'reports' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="font-semibold">Relatórios</span>
+                        <BarChart3 size={18} className={`transition-transform duration-300 ${activeTab === 'reports' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm">Relatórios</span>
                     </button>
 
                     <button
                         onClick={() => { setActiveTab('finance'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all group ${activeTab === 'finance'
-                            ? 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20 shadow-[0_0_20px_rgba(255,100,100,0.1)]'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'finance'
+                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
+                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <Wallet size={20} className={`transition-transform duration-300 ${activeTab === 'finance' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                        <span className="font-semibold">Financeiro</span>
+                        <Wallet size={18} className={`transition-transform duration-300 ${activeTab === 'finance' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm">Financeiro</span>
                     </button>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800/50 bg-slate-900/50">
-                    <div className="flex items-center gap-3 px-4 py-3 mb-2 bg-slate-800/30 rounded-xl border border-slate-800">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-brand-coral to-red-600 flex items-center justify-center text-sm font-bold shadow-lg text-white">
+                <div className="p-4 border-t border-slate-800 bg-slate-900">
+                    <div className="flex items-center gap-3 px-3 py-2 mb-2 bg-slate-800 rounded-lg border border-slate-700">
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white border border-slate-600">
                             {(isPreviewMode ? project.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-bold truncate text-white">{isPreviewMode ? project.acceptance?.name : (fullName || 'Cliente')}</p>
-                            <p className="text-xs text-slate-500 truncate">{isPreviewMode ? project.acceptance?.email : email}</p>
+                            <p className="text-xs font-bold truncate text-white">{isPreviewMode ? project.acceptance?.name : (fullName || 'Cliente')}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{isPreviewMode ? project.acceptance?.email : email}</p>
                         </div>
                     </div>
                     {!isPreviewMode && (
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all border border-transparent hover:border-red-500/20"
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all border border-transparent hover:border-red-500/20"
                         >
-                            <LogOut size={16} />
+                            <LogOut size={14} />
                             Encerrar Sessão
                         </button>
                     )}
@@ -328,9 +328,9 @@ const ClientDashboard: React.FC = () => {
                             </p>
                         </div>
                         {activeTab === 'overview' && (
-                            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 rounded-lg border border-slate-800 text-sm text-slate-400">
-                                <Clock size={16} className="text-brand-coral" />
-                                <span>Próxima atualização: Em 24h</span>
+                            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-400">
+                                <Clock size={14} className="text-brand-coral" />
+                                <span>Próxima atualização: {timeUntilUpdate}</span>
                             </div>
                         )}
                     </header>
@@ -339,59 +339,59 @@ const ClientDashboard: React.FC = () => {
                     {activeTab === 'overview' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* KPI Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                                <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all">
-                                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <CheckCircle2 size={100} className="text-green-500 transform translate-x-4 -translate-y-4" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all">
+                                    <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <CheckCircle2 size={80} className="text-green-500 transform translate-x-4 -translate-y-4" />
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Status do Projeto</p>
-                                        <div className="text-3xl font-black text-white flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                                                <CheckCircle2 className="text-green-500 w-6 h-6" />
+                                        <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider">Status do Projeto</p>
+                                        <div className="text-2xl font-bold text-white flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                                                <CheckCircle2 className="text-green-500 w-4 h-4" />
                                             </div>
                                             Em Execução
                                         </div>
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-500 flex items-center gap-1">
+                                    <div className="mt-4 pt-4 border-t border-slate-800/50 text-[10px] text-slate-500 flex items-center gap-1 font-medium">
                                         <TrendingUp size={12} className="text-green-500" />
                                         <span>Tudo operando normalmente</span>
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all">
-                                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <PieChart size={100} className="text-brand-coral transform translate-x-4 -translate-y-4" />
+                                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all">
+                                    <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <PieChart size={80} className="text-brand-coral transform translate-x-4 -translate-y-4" />
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Campanhas Ativas</p>
-                                        <div className="text-3xl font-black text-white flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-brand-coral/10 flex items-center justify-center">
-                                                <PieChart className="text-brand-coral w-6 h-6" />
+                                        <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider">Campanhas Ativas</p>
+                                        <div className="text-2xl font-bold text-white flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand-coral/10 flex items-center justify-center">
+                                                <PieChart className="text-brand-coral w-4 h-4" />
                                             </div>
                                             {campaigns.filter(c => c.status === 'active').length}
                                         </div>
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-500 flex items-center gap-1">
+                                    <div className="mt-4 pt-4 border-t border-slate-800/50 text-[10px] text-slate-500 flex items-center gap-1 font-medium">
                                         <TrendingUp size={12} className="text-brand-coral" />
                                         <span>Estratégias em andamento</span>
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all">
-                                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <Calendar size={100} className="text-blue-500 transform translate-x-4 -translate-y-4" />
+                                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all">
+                                    <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <Calendar size={80} className="text-blue-500 transform translate-x-4 -translate-y-4" />
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Próxima Reunião</p>
-                                        <div className="text-2xl font-black text-white flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                                                <Calendar className="text-blue-500 w-6 h-6" />
+                                        <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider">Próxima Reunião</p>
+                                        <div className="text-xl font-bold text-white flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                                <Calendar className="text-blue-500 w-4 h-4" />
                                             </div>
                                             <span className="truncate">A definir</span>
                                         </div>
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-500 flex items-center gap-1">
+                                    <div className="mt-4 pt-4 border-t border-slate-800/50 text-[10px] text-slate-500 flex items-center gap-1 font-medium">
                                         <Clock size={12} className="text-blue-500" />
                                         <span>Agendamento pendente</span>
                                     </div>
