@@ -184,8 +184,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         setLoading(true);
 
         try {
+            // Exclude project_name (UI only) from data sent to DB
+            const { project_name, ...cleanData } = formData as any;
+
             const dataToSave = {
-                ...formData,
+                ...cleanData,
                 due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
             };
 
