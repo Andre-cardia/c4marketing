@@ -10,7 +10,21 @@ const SetPassword: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [email, setEmail] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user && user.email) {
+                setEmail(user.email);
+            } else {
+                // If not logged in (no session from magic link), redirect home
+                navigate('/');
+            }
+        };
+        checkUser();
+    }, [navigate]);
 
     const handleUpdatePassword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -59,14 +73,21 @@ const SetPassword: React.FC = () => {
                     <h1 className="text-2xl font-black text-center text-slate-800 dark:text-white mb-2">
                         Bem-vindo(a)!
                     </h1>
+                    {email && (
+                        <div className="flex justify-center mb-4">
+                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-700">
+                                {email}
+                            </span>
+                        </div>
+                    )}
                     <p className="text-center text-slate-500 dark:text-slate-400 mb-8 text-sm">
                         Para garantir sua segurança, defina uma senha de acesso para sua conta.
                     </p>
 
                     {message && (
                         <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 text-sm animate-in fade-in slide-in-from-top-2 ${message.type === 'success'
-                                ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30'
-                                : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30'
+                            ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30'
+                            : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/30'
                             }`}>
                             {message.type === 'success' ? <CheckCircle size={18} className="shrink-0 mt-0.5" /> : <AlertCircle size={18} className="shrink-0 mt-0.5" />}
                             <span>{message.text}</span>
