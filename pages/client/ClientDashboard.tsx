@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
-import { Campaign, Project } from '../../types';
 import { LogOut, LayoutDashboard, BarChart3, Settings, PieChart, AlertCircle, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,16 +27,13 @@ const ClientDashboard: React.FC = () => {
                 .select(`
                     *,
                     acceptance:acceptances (
-                        client_name,
-                        client_email,
-                        signed_at
+                        name,
+                        email,
+                        timestamp
                     )
                 `)
-                .eq('acceptance.client_email', email) // This filtering is also enforcing by RLS, but good to be explicit/safe 
-                // Note: The RLS policy on traffic_projects handles the filtering by auth.email() matching acceptances.client_email
-                // So a simple select * should return ONLY the client's project. 
-                // However, Supabase syntax for joining requires careful handling.
-                // Let's rely on RLS and just fetch.
+                // Use the correct column 'email' from acceptances table
+                .eq('acceptance.email', email)
                 .single();
 
             if (projectError) {
@@ -114,8 +110,8 @@ const ClientDashboard: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('overview')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'overview'
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                             }`}
                     >
                         <LayoutDashboard size={20} />
@@ -157,7 +153,7 @@ const ClientDashboard: React.FC = () => {
             <main className="flex-1 md:ml-64 p-8">
                 <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2">{project.acceptance?.client_name || 'Seu Projeto'}</h1>
+                        <h1 className="text-3xl font-bold mb-2">{project.acceptance?.name || 'Seu Projeto'}</h1>
                         <p className="text-slate-400 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                             Projeto Ativo desde {new Date(project.created_at).toLocaleDateString('pt-BR')}
@@ -216,8 +212,8 @@ const ClientDashboard: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className={`px-3 py-1 rounded-full text-xs font-bold border ${campaign.status === 'active'
-                                            ? 'bg-green-500/10 text-green-500 border-green-500/20'
-                                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                                        ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                                        : 'bg-slate-800 text-slate-400 border-slate-700'
                                         }`}>
                                         {campaign.status === 'active' ? 'ATIVA' : 'PAUSADA'}
                                     </div>
@@ -232,8 +228,8 @@ const ClientDashboard: React.FC = () => {
                                                 <div key={step.id} className="flex gap-4">
                                                     <div className="flex flex-col items-center">
                                                         <div className={`w-3 h-3 rounded-full mt-1.5 ${step.status === 'completed' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' :
-                                                                step.status === 'in_progress' ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' :
-                                                                    'bg-slate-700'
+                                                            step.status === 'in_progress' ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' :
+                                                                'bg-slate-700'
                                                             }`}></div>
                                                         {index < campaign.timeline.length - 1 && (
                                                             <div className="w-0.5 flex-1 bg-slate-800 my-1"></div>
@@ -241,8 +237,8 @@ const ClientDashboard: React.FC = () => {
                                                     </div>
                                                     <div className="pb-6">
                                                         <p className={`text-sm font-medium ${step.status === 'completed' ? 'text-green-400 line-through opacity-70' :
-                                                                step.status === 'in_progress' ? 'text-white' :
-                                                                    'text-slate-500'
+                                                            step.status === 'in_progress' ? 'text-white' :
+                                                                'text-slate-500'
                                                             }`}>
                                                             {step.title}
                                                         </p>
