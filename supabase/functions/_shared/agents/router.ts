@@ -40,6 +40,13 @@ function inferTaskKind(msg: string): TaskKind {
     return "factual_lookup";
 }
 
+function inferSurveyProjectType(msg: string): "traffic" | "landing_page" | "website" | null {
+    if (hasAny(msg, ["tráfego", "trafego", "traffic", "gestão de tráfego"])) return "traffic";
+    if (hasAny(msg, ["landing", "lp", "página de captura"])) return "landing_page";
+    if (hasAny(msg, ["site", "website"])) return "website";
+    return null;
+}
+
 // --- Filter Logic ---
 
 function applyPolicyToFilters(filters: RouteFilters, policy: RetrievalPolicy): RouteFilters {
@@ -316,6 +323,34 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
             filtersPatch: {
                 artifact_kind: "proposal",
                 source_table: ["proposals", "budgets", "proposal_versions"],
+            },
+        });
+    }
+
+    // Survey / Briefing responses
+    if (hasAny(msg, ["pesquisa", "survey", "formulário", "formulario", "briefing", "questionário", "questionario"])) {
+        const projectType = inferSurveyProjectType(msg);
+        const isBroadListing = hasAny(msg, ["todos", "todas", "liste", "listar", "mostrar", "quais"]);
+
+        return makeDecision(input, {
+            artifact_kind: "project",
+            task_kind: "factual_lookup",
+            risk_level: "medium",
+            agent: "Agent_Projects",
+            retrieval_policy: "STRICT_DOCS_ONLY",
+            top_k: 0,
+            tools_allowed: ["rag_search", "db_read"],
+            tool_hint: "db_query",
+            db_query_params: {
+                rpc_name: "query_survey_responses",
+                p_project_type: projectType,
+                p_limit: isBroadListing ? 30 : 10,
+            },
+            confidence: 0.9,
+            reason: "Heuristic: survey/form intent detected → SQL direto",
+            filtersPatch: {
+                artifact_kind: "project",
+                source_table: ["traffic_projects", "landing_page_projects", "website_projects"],
             },
         });
     }

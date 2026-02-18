@@ -212,6 +212,10 @@ Deno.serve(async (req) => {
                                 type: "string",
                                 enum: ["traffic", "website", "landing_page"],
                                 description: "Tipo de projeto/pesquisa. Omita para buscar em todos."
+                            },
+                            p_limit: {
+                                type: "number",
+                                description: "Limite máximo de registros retornados. Padrão recomendado: 10."
                             }
                         }
                     }
@@ -239,7 +243,6 @@ Exemplos:
 - "quem acessou o sistema hoje?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "todo")
-- "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
 - "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
