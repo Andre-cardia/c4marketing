@@ -24,6 +24,7 @@ import WebsiteSurvey from './pages/external/WebsiteSurvey';
 import AccessGuideSurvey from './pages/external/AccessGuideSurvey';
 import Account from './pages/Account';
 import Meetings from './pages/Meetings';
+import ClientDashboard from './pages/client/ClientDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProtectionRoute from './components/ProtectedRoute'; // Duplicate import kept for safety
 import AIAgent from './pages/AIAgent';
