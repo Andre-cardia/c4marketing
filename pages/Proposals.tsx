@@ -392,16 +392,28 @@ const Proposals: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="p-5">
-                                                <a
-                                                    href={`/contracts/${acc.id}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 text-xs font-bold text-brand-coral hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-brand-coral/20 hover:border-brand-coral"
-                                                    title="Visualizar Contrato"
-                                                >
-                                                    <FileText className="w-4 h-4" />
-                                                    Visualizar
-                                                </a>
+                                                <div className="flex items-center gap-2">
+                                                    <a
+                                                        href={`/contracts/${acc.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-xs font-bold text-brand-coral hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors border border-brand-coral/20 hover:border-brand-coral"
+                                                        title="Visualizar Contrato"
+                                                    >
+                                                        <FileText className="w-4 h-4" />
+                                                        Contrato
+                                                    </a>
+                                                    <a
+                                                        href={`/client/preview/${acc.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors border border-blue-200 hover:border-blue-400"
+                                                        title="Visualizar como Cliente"
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                        Cliente
+                                                    </a>
+                                                </div>
                                             </td>
                                             <td className="p-5">
                                                 <input
