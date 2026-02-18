@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
-import { LogOut, LayoutDashboard, BarChart3, PieChart, AlertCircle, FileText, CheckCircle2, Clock, ArrowLeft, Eye, Menu, X, Wallet, TrendingUp, Calendar } from 'lucide-react';
+import { LogOut, LayoutDashboard, BarChart3, PieChart, AlertCircle, FileText, CheckCircle2, Clock, ArrowLeft, Eye, Menu, X, Wallet, TrendingUp, Calendar, ChevronDown } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 const ClientDashboard: React.FC = () => {
@@ -13,6 +13,39 @@ const ClientDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [expandedCampaigns, setExpandedCampaigns] = useState<Record<string, boolean>>({});
+    const [timeUntilUpdate, setTimeUntilUpdate] = useState('24h');
+
+    const toggleCampaign = (campaignId: string) => {
+        setExpandedCampaigns(prev => ({
+            ...prev,
+            [campaignId]: !prev[campaignId]
+        }));
+    };
+
+    useEffect(() => {
+        if (!project?.created_at) return;
+
+        const updateClock = () => {
+            const now = new Date();
+            const createdAt = new Date(project.created_at);
+            // Calculate next update time (assuming 24h cycles from creation)
+            const cycleMs = 24 * 60 * 60 * 1000;
+            const timeSinceCreation = now.getTime() - createdAt.getTime();
+            const msIntoCycle = timeSinceCreation % cycleMs;
+            const msUntilNextUpdate = cycleMs - msIntoCycle;
+
+            const hours = Math.floor(msUntilNextUpdate / (1000 * 60 * 60));
+            const minutes = Math.floor((msUntilNextUpdate % (1000 * 60 * 60)) / (1000 * 60));
+
+            setTimeUntilUpdate(`${hours}h ${minutes}m`);
+        };
+
+        const timer = setInterval(updateClock, 60000); // Update every minute
+        updateClock(); // Initial call
+
+        return () => clearInterval(timer);
+    }, [project?.created_at]);
 
     // Preview mode: gestor viewing a specific project as if they were the client
     const isPreviewMode = !!acceptanceId && (userRole === 'gestor' || userRole === 'admin');
@@ -396,19 +429,14 @@ const ClientDashboard: React.FC = () => {
                                         ];
 
                                         // Determine active phase based on DB timeline or default to Planning
-                                        // We look for the latest 'in_progress' or 'completed' step in DB that matches our standard phases
                                         let activePhaseIndex = 0;
 
-                                        if (campaign.timeline && campaign.timeline.length > 0) {
-                                            // Strategy: find the index of the standard phase that matches the current DB status
-                                            // This is a simplification; ideally DB would store 'current_phase_index'
-                                            // We'll traverse our standard phases and see if they exist and are completed in the DB timeline
+                                        if (campaign.timeline && Array.isArray(campaign.timeline) && campaign.timeline.length > 0) {
+                                            const normalize = (s: any) => (typeof s === 'string' ? s : '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-                                            // Normalize strings for comparison
-                                            const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-                                            // Find the furthest step in the DB that is completed or in progress
                                             campaign.timeline.forEach((dbStep: any) => {
+                                                if (!dbStep || !dbStep.title) return;
+
                                                 const matchIndex = STANDARD_PHASES.findIndex(p => normalize(p.title) === normalize(dbStep.title));
                                                 if (matchIndex !== -1) {
                                                     if (dbStep.status === 'completed' && matchIndex >= activePhaseIndex) {
@@ -420,100 +448,111 @@ const ClientDashboard: React.FC = () => {
                                             });
                                         }
 
-                                        const activePhase = STANDARD_PHASES[activePhaseIndex];
+                                        const activePhase = STANDARD_PHASES[activePhaseIndex] || STANDARD_PHASES[0];
 
-                                        // Determine Campaign Status Label based on active phase
+                                        // Determine Campaign Status Label
                                         let statusLabel = 'NÃO VEICULADO';
                                         let statusColorClass = 'bg-slate-800 text-slate-400 border-slate-700';
                                         let statusDotClass = 'bg-slate-500';
 
                                         if (activePhase.title === 'Execução') {
                                             statusLabel = 'EM VEICULAÇÃO';
-                                            statusColorClass = 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]';
-                                            statusDotClass = 'bg-green-400 animate-pulse';
+                                            statusColorClass = 'bg-green-500/10 text-green-400 border-green-500/20';
+                                            statusDotClass = 'bg-green-500 animate-pulse';
                                         } else if (activePhase.title === 'Análise e Otimização') {
                                             statusLabel = 'EM REVISÃO';
-                                            statusColorClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]';
+                                            statusColorClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
                                             statusDotClass = 'bg-blue-400 animate-pulse';
                                         }
 
+                                        const isExpanded = expandedCampaigns[campaign.id];
+
                                         return (
-                                            <div key={campaign.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 hover:border-slate-700">
-                                                <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/20 backdrop-blur-sm">
-                                                    <div className="flex items-center gap-5">
-                                                        <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner">
-                                                            <BarChart3 className="text-brand-coral w-6 h-6" />
+                                            <div key={campaign.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors">
+                                                <div
+                                                    className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-800/50 transition-colors"
+                                                    onClick={() => toggleCampaign(campaign.id)}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                                                            <BarChart3 className="text-brand-coral w-5 h-5" />
                                                         </div>
                                                         <div>
-                                                            <h3 className="font-bold text-xl text-white tracking-tight">{campaign.name}</h3>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-800 rounded-md border border-slate-700">{campaign.platform}</span>
+                                                            <h3 className="font-bold text-lg text-white tracking-tight">{campaign.name}</h3>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-800 rounded border border-slate-700">{campaign.platform}</span>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className={`px-4 py-2 rounded-full text-xs font-bold border uppercase tracking-widest flex items-center gap-2 self-start md:self-auto ${statusColorClass}`}>
-                                                        <span className={`w-2 h-2 rounded-full ${statusDotClass}`}></span>
-                                                        {statusLabel}
+                                                    <div className="flex items-center gap-4 self-start md:self-auto">
+                                                        <div className={`px-3 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-widest flex items-center gap-2 ${statusColorClass}`}>
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`}></span>
+                                                            {statusLabel}
+                                                        </div>
+                                                        <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                                                     </div>
                                                 </div>
 
-                                                <div className="p-6 md:p-8">
-                                                    <h4 className="text-sm font-bold text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
-                                                        <Clock size={16} />
-                                                        Linha do Tempo
-                                                    </h4>
-                                                    <div className="space-y-0 relative">
-                                                        {/* Vertical Line */}
-                                                        <div className="absolute left-[19px] top-2 bottom-4 w-0.5 bg-slate-800/50"></div>
+                                                {/* Expanded Content */}
+                                                <div className={`grid transition-all duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                                                    <div className="overflow-hidden">
+                                                        <div className="p-6 pt-0 border-t border-slate-800/50">
+                                                            <h4 className="text-xs font-bold text-slate-500 mb-6 mt-6 uppercase tracking-widest flex items-center gap-2">
+                                                                <Clock size={14} />
+                                                                Linha do Tempo
+                                                            </h4>
+                                                            <div className="space-y-0 relative pl-2">
+                                                                {/* Vertical Line */}
+                                                                <div className="absolute left-[27px] top-2 bottom-4 w-px bg-slate-800"></div>
 
-                                                        {STANDARD_PHASES.map((phase, index) => {
-                                                            // Determine status of this specific phase
-                                                            let stepStatus = 'pending';
-                                                            if (index < activePhaseIndex) stepStatus = 'completed';
-                                                            else if (index === activePhaseIndex) stepStatus = 'in_progress';
+                                                                {STANDARD_PHASES.map((phase, index) => {
+                                                                    let stepStatus = 'pending';
+                                                                    if (index < activePhaseIndex) stepStatus = 'completed';
+                                                                    else if (index === activePhaseIndex) stepStatus = 'in_progress';
 
-                                                            return (
-                                                                <div key={phase.id} className="relative flex gap-6 pb-8 last:pb-0 group">
-                                                                    <div className="relative z-10 flex-shrink-0">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${stepStatus === 'completed'
-                                                                            ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,100,100,0.3)]'
-                                                                            : stepStatus === 'in_progress'
-                                                                                ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,100,100,0.3)]'
-                                                                                : 'bg-slate-800 border-slate-900'
-                                                                            }`}>
-                                                                            {stepStatus === 'completed' && <CheckCircle2 size={16} className="text-white" />}
-                                                                            {stepStatus === 'in_progress' && <Clock size={16} className="text-white animate-spin-slow" />}
-                                                                            {stepStatus === 'pending' && <div className="w-2 h-2 rounded-full bg-slate-600" />}
+                                                                    return (
+                                                                        <div key={phase.id} className="relative flex gap-5 pb-6 last:pb-0 group">
+                                                                            <div className="relative z-10 flex-shrink-0">
+                                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${stepStatus === 'completed'
+                                                                                    ? 'bg-slate-900 border-brand-coral'
+                                                                                    : stepStatus === 'in_progress'
+                                                                                        ? 'bg-slate-900 border-brand-coral'
+                                                                                        : 'bg-slate-900 border-slate-800'
+                                                                                    }`}>
+                                                                                    {stepStatus === 'completed' && <CheckCircle2 size={14} className="text-brand-coral" />}
+                                                                                    {stepStatus === 'in_progress' && <div className="w-2.5 h-2.5 bg-brand-coral rounded-full animate-pulse" />}
+                                                                                    {stepStatus === 'pending' && <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="pt-1 flex-grow flex items-center justify-between">
+                                                                                <p className={`text-sm font-semibold transition-colors ${stepStatus === 'completed' ? 'text-white' :
+                                                                                    stepStatus === 'in_progress' ? 'text-white' :
+                                                                                        'text-slate-600'
+                                                                                    }`}>
+                                                                                    {phase.title}
+                                                                                </p>
+
+                                                                                {stepStatus === 'in_progress' && (
+                                                                                    <span className="text-[10px] font-bold text-brand-coral uppercase tracking-wider">
+                                                                                        EM ANDAMENTO
+                                                                                    </span>
+                                                                                )}
+                                                                                {stepStatus === 'completed' && (
+                                                                                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                                                                                        CONCLUÍDO
+                                                                                    </span>
+                                                                                )}
+                                                                                {stepStatus === 'pending' && (
+                                                                                    <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                                                                                        AGUARDANDO
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                    <div className="pt-2 flex-grow flex items-center justify-between">
-                                                                        <p className={`text-base font-bold transition-colors ${stepStatus === 'completed' ? 'text-brand-coral' :
-                                                                            stepStatus === 'in_progress' ? 'text-brand-coral' :
-                                                                                'text-slate-500'
-                                                                            }`}>
-                                                                            {phase.title}
-                                                                        </p>
-
-                                                                        {/* Status Label */}
-                                                                        {stepStatus === 'in_progress' && (
-                                                                            <span className="text-xs font-bold text-brand-coral uppercase tracking-wider animate-pulse">
-                                                                                EM ANDAMENTO
-                                                                            </span>
-                                                                        )}
-                                                                        {stepStatus === 'completed' && (
-                                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                                CONCLUÍDO
-                                                                            </span>
-                                                                        )}
-                                                                        {stepStatus === 'pending' && (
-                                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                                AGUARDANDO
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
