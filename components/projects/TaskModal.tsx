@@ -437,14 +437,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-6 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                                className="px-4 py-2 text-xs text-slate-500 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading || uploading}
-                                className="px-8 py-2 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 shadow-lg shadow-brand-coral/20 transition-all disabled:opacity-70"
+                                className="px-4 py-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-lg border border-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? 'Salvando...' : 'Salvar'}
                             </button>
