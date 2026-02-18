@@ -195,6 +195,14 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/client"
+                element={
+                  <ProtectedRoute allowedRoles={['cliente']}>
+                    <ClientDashboard />
+                  </ProtectedRoute>
+                }
+              />
             </Routes>
 
             <BrainWidgetWrapper />
