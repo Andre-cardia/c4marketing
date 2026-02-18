@@ -13,9 +13,16 @@ const ResetPasswordHandler: React.FC = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        // Check URL hash for recovery mode (fallback if event is missed)
+        if (window.location.hash && window.location.hash.includes('type=recovery')) {
+            console.log('Recovery mode detected via URL hash');
+            setIsOpen(true);
+        }
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('[ResetPasswordHandler] Auth event:', event);
             if (event === 'PASSWORD_RECOVERY') {
-                console.log('Password recovery mode triggered');
+                console.log('Password recovery event captured');
                 setIsOpen(true);
             }
         });
