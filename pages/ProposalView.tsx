@@ -159,11 +159,17 @@ const ProposalView: React.FC = () => {
                         }),
                     }
                 );
+
+                if (!response.ok) {
+                    throw new Error(`Edge Function failed: ${response.statusText}`);
+                }
+
                 const result = await response.json();
                 console.log('Client user creation result:', result);
             } catch (clientErr) {
-                // Don't block acceptance if client creation fails
+                // Don't block acceptance if client creation fails, but notify UI
                 console.error('Error creating client user (non-blocking):', clientErr);
+                setClientCreationError(true);
             }
 
             setTimestamp(new Date().toLocaleString('pt-BR'));
