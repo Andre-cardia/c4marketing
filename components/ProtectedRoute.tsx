@@ -11,6 +11,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     const [session, setSession] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
+    const [userRole, setUserRole] = useState<string | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -50,6 +51,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
                 alert('Acesso negado. Seu usuário não tem permissão para acessar este sistema.');
                 setSession(null);
             } else {
+                setUserRole(userRecord.role);
                 // Check if role is allowed
                 if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRecord.role)) {
                     console.warn(`Access Denied: Role ${userRecord.role} not in allowed list [${allowedRoles}]`);
@@ -77,6 +79,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     }
 
     if (!authorized) {
+        if (userRole === 'cliente') {
+            return <Navigate to="/client" replace />;
+        }
         return <Navigate to="/dashboard" replace />; // Redirect to Dashboard if logged in but unauthorized for specific page
     }
 
