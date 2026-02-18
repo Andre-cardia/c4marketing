@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
 
                     // Send password reset (welcome email)
                     const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
-                    const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/client' : `${siteUrl}/client`;
+                    const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
 
                     await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
                         redirectTo: finalRedirectUrl,
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
         // 4. Send password reset email (acts as welcome/invite email)
         const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
         // Ensure we don't accidentally use localhost in production if env var is wrong
-        const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/client' : `${siteUrl}/client`;
+        const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
 
         const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(
             email.toLowerCase(),

@@ -33,6 +33,7 @@ import { ThemeProvider } from './lib/ThemeContext';
 import { BrainWidgetWrapper } from './components/BrainWidgetWrapper';
 import BrainManager from './pages/BrainManager';
 import ResetPasswordHandler from './components/ResetPasswordHandler';
+import SetPassword from './pages/SetPassword';
 
 const App: React.FC = () => {
 
@@ -43,6 +44,7 @@ const App: React.FC = () => {
           <div className="relative min-h-screen">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/update-password" element={<SetPassword />} />
               <Route path="/p/:slug" element={<ProposalView />} />
               <Route path="/p/:slug/contract" element={<ContractView />} />
               <Route path="/contracts/:id" element={<ContractView />} />
