@@ -500,7 +500,7 @@ const Account: React.FC = () => {
                                     <button
                                         onClick={handleSaveProfile}
                                         disabled={saving}
-                                        className="w-full py-2 bg-brand-coral text-white font-bold rounded-xl hover:bg-red-500 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
+                                        className="w-full py-2 text-sm font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-xl border border-brand-coral/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
                                         {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                                         Salvar Alterações
@@ -545,7 +545,7 @@ const Account: React.FC = () => {
                                 <button
                                     onClick={handleUpdatePassword}
                                     disabled={updatingPassword}
-                                    className="w-full py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-70"
+                                    className="w-full py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-white transition-colors bg-slate-500/10 hover:bg-slate-600 rounded-xl border border-slate-500/20 dark:border-slate-600/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
                                     {updatingPassword ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
                                     Atualizar Senha
