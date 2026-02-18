@@ -385,89 +385,140 @@ const ClientDashboard: React.FC = () => {
                                         <p className="text-slate-500">Aguarde enquanto nossa equipe configura seus primeiros projetos.</p>
                                     </div>
                                 ) : (
-                                    campaigns.map((campaign) => (
-                                        <div key={campaign.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 hover:border-slate-700">
-                                            <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/20 backdrop-blur-sm">
-                                                <div className="flex items-center gap-5">
-                                                    <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner">
-                                                        <BarChart3 className="text-brand-coral w-6 h-6" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-bold text-xl text-white tracking-tight">{campaign.name}</h3>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-800 rounded-md border border-slate-700">{campaign.platform}</span>
+                                    campaigns.map((campaign) => {
+                                        // Standard phases definition
+                                        const STANDARD_PHASES = [
+                                            { id: 'planning', title: 'Planejamento' },
+                                            { id: 'creatives', title: 'Criativos' },
+                                            { id: 'execution', title: 'Execução' },
+                                            { id: 'analysis', title: 'Análise e Otimização' },
+                                            { id: 'finalization', title: 'Finalização' }
+                                        ];
+
+                                        // Determine active phase based on DB timeline or default to Planning
+                                        // We look for the latest 'in_progress' or 'completed' step in DB that matches our standard phases
+                                        let activePhaseIndex = 0;
+
+                                        if (campaign.timeline && campaign.timeline.length > 0) {
+                                            // Strategy: find the index of the standard phase that matches the current DB status
+                                            // This is a simplification; ideally DB would store 'current_phase_index'
+                                            // We'll traverse our standard phases and see if they exist and are completed in the DB timeline
+
+                                            // Normalize strings for comparison
+                                            const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+                                            // Find the furthest step in the DB that is completed or in progress
+                                            campaign.timeline.forEach((dbStep: any) => {
+                                                const matchIndex = STANDARD_PHASES.findIndex(p => normalize(p.title) === normalize(dbStep.title));
+                                                if (matchIndex !== -1) {
+                                                    if (dbStep.status === 'completed' && matchIndex >= activePhaseIndex) {
+                                                        activePhaseIndex = Math.min(matchIndex + 1, STANDARD_PHASES.length - 1);
+                                                    } else if (dbStep.status === 'in_progress' && matchIndex >= activePhaseIndex) {
+                                                        activePhaseIndex = matchIndex;
+                                                    }
+                                                }
+                                            });
+                                        }
+
+                                        const activePhase = STANDARD_PHASES[activePhaseIndex];
+
+                                        // Determine Campaign Status Label based on active phase
+                                        let statusLabel = 'NÃO VEICULADO';
+                                        let statusColorClass = 'bg-slate-800 text-slate-400 border-slate-700';
+                                        let statusDotClass = 'bg-slate-500';
+
+                                        if (activePhase.title === 'Execução') {
+                                            statusLabel = 'EM VEICULAÇÃO';
+                                            statusColorClass = 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]';
+                                            statusDotClass = 'bg-green-400 animate-pulse';
+                                        } else if (activePhase.title === 'Análise e Otimização') {
+                                            statusLabel = 'EM REVISÃO';
+                                            statusColorClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]';
+                                            statusDotClass = 'bg-blue-400 animate-pulse';
+                                        }
+
+                                        return (
+                                            <div key={campaign.id} className="bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-black/50 transition-all duration-300 hover:border-slate-700">
+                                                <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-800/20 backdrop-blur-sm">
+                                                    <div className="flex items-center gap-5">
+                                                        <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner">
+                                                            <BarChart3 className="text-brand-coral w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="font-bold text-xl text-white tracking-tight">{campaign.name}</h3>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 py-0.5 bg-slate-800 rounded-md border border-slate-700">{campaign.platform}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    <div className={`px-4 py-2 rounded-full text-xs font-bold border uppercase tracking-widest flex items-center gap-2 self-start md:self-auto ${statusColorClass}`}>
+                                                        <span className={`w-2 h-2 rounded-full ${statusDotClass}`}></span>
+                                                        {statusLabel}
+                                                    </div>
                                                 </div>
-                                                <div className={`px-4 py-2 rounded-full text-xs font-bold border uppercase tracking-widest flex items-center gap-2 self-start md:self-auto ${campaign.status === 'active'
-                                                    ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
-                                                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                                                    }`}>
-                                                    <span className={`w-2 h-2 rounded-full ${campaign.status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-slate-500'}`}></span>
-                                                    {campaign.status === 'active' ? 'Em Veiculação' : 'Pausada'}
-                                                </div>
-                                            </div>
 
-                                            <div className="p-6 md:p-8">
-                                                <h4 className="text-sm font-bold text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
-                                                    <Clock size={16} />
-                                                    Linha do Tempo
-                                                </h4>
-                                                <div className="space-y-0 relative">
-                                                    {/* Vertical Line */}
-                                                    <div className="absolute left-[19px] top-2 bottom-4 w-0.5 bg-slate-800/50"></div>
+                                                <div className="p-6 md:p-8">
+                                                    <h4 className="text-sm font-bold text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
+                                                        <Clock size={16} />
+                                                        Linha do Tempo
+                                                    </h4>
+                                                    <div className="space-y-0 relative">
+                                                        {/* Vertical Line */}
+                                                        <div className="absolute left-[19px] top-2 bottom-4 w-0.5 bg-slate-800/50"></div>
 
-                                                    {campaign.timeline && campaign.timeline.length > 0 ? (
-                                                        campaign.timeline.map((step: any, index: number) => (
-                                                            <div key={step.id} className="relative flex gap-6 pb-8 last:pb-0 group">
-                                                                <div className="relative z-10 flex-shrink-0">
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${step.status === 'completed'
-                                                                        ? 'bg-green-500 border-green-900 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
-                                                                        : step.status === 'in_progress'
-                                                                            ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,77,77,0.3)]'
-                                                                            : 'bg-slate-800 border-slate-900'
-                                                                        }`}>
-                                                                        {step.status === 'completed' && <CheckCircle2 size={16} className="text-white" />}
-                                                                        {step.status === 'in_progress' && <Clock size={16} className="text-white animate-spin-slow" />}
-                                                                        {step.status === 'pending' && <div className="w-2 h-2 rounded-full bg-slate-600" />}
+                                                        {STANDARD_PHASES.map((phase, index) => {
+                                                            // Determine status of this specific phase
+                                                            let stepStatus = 'pending';
+                                                            if (index < activePhaseIndex) stepStatus = 'completed';
+                                                            else if (index === activePhaseIndex) stepStatus = 'in_progress';
+
+                                                            return (
+                                                                <div key={phase.id} className="relative flex gap-6 pb-8 last:pb-0 group">
+                                                                    <div className="relative z-10 flex-shrink-0">
+                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-300 ${stepStatus === 'completed'
+                                                                            ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,100,100,0.3)]'
+                                                                            : stepStatus === 'in_progress'
+                                                                                ? 'bg-brand-coral border-brand-coral/20 shadow-[0_0_15px_rgba(255,100,100,0.3)]'
+                                                                                : 'bg-slate-800 border-slate-900'
+                                                                            }`}>
+                                                                            {stepStatus === 'completed' && <CheckCircle2 size={16} className="text-white" />}
+                                                                            {stepStatus === 'in_progress' && <Clock size={16} className="text-white animate-spin-slow" />}
+                                                                            {stepStatus === 'pending' && <div className="w-2 h-2 rounded-full bg-slate-600" />}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="pt-2 flex-grow flex items-center justify-between">
+                                                                        <p className={`text-base font-bold transition-colors ${stepStatus === 'completed' ? 'text-brand-coral' :
+                                                                            stepStatus === 'in_progress' ? 'text-brand-coral' :
+                                                                                'text-slate-500'
+                                                                            }`}>
+                                                                            {phase.title}
+                                                                        </p>
+
+                                                                        {/* Status Label */}
+                                                                        {stepStatus === 'in_progress' && (
+                                                                            <span className="text-xs font-bold text-brand-coral uppercase tracking-wider animate-pulse">
+                                                                                EM ANDAMENTO
+                                                                            </span>
+                                                                        )}
+                                                                        {stepStatus === 'completed' && (
+                                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                                CONCLUÍDO
+                                                                            </span>
+                                                                        )}
+                                                                        {stepStatus === 'pending' && (
+                                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                                AGUARDANDO
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                <div className="pt-2 flex-grow flex items-center justify-between">
-                                                                    <p className={`text-base font-bold transition-colors ${step.status === 'completed' ? 'text-green-400' :
-                                                                        step.status === 'in_progress' ? 'text-brand-coral' :
-                                                                            'text-slate-500'
-                                                                        }`}>
-                                                                        {step.title}
-                                                                    </p>
-
-                                                                    {/* Status Label to the right as requested */}
-                                                                    {step.status === 'in_progress' && (
-                                                                        <span className="text-xs font-bold text-brand-coral uppercase tracking-wider animate-pulse">
-                                                                            Em andamento
-                                                                        </span>
-                                                                    )}
-                                                                    {step.status === 'completed' && (
-                                                                        <span className="text-xs font-bold text-green-500 uppercase tracking-wider">
-                                                                            Concluído
-                                                                        </span>
-                                                                    )}
-                                                                    {step.status === 'pending' && (
-                                                                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                            Aguardando
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="text-center py-8 text-slate-600 italic">
-                                                            Nenhuma etapa definida para esta campanha.
-                                                        </div>
-                                                    )}
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        )
+                                    })
                                 )}
                             </div>
                         </div>
