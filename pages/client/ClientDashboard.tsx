@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
-import { LogOut, LayoutDashboard, BarChart3, Settings, PieChart, AlertCircle, FileText, CheckCircle2, Clock } from 'lucide-react';
+import { LogOut, LayoutDashboard, BarChart3, PieChart, AlertCircle, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ClientDashboard: React.FC = () => {
@@ -21,43 +21,50 @@ const ClientDashboard: React.FC = () => {
     const fetchClientProject = async () => {
         try {
             setLoading(true);
-            // 1. Find the project linked to this user's email via Acceptance
-            const { data: projectData, error: projectError } = await supabase
-                .from('traffic_projects')
-                .select(`
-                    *,
-                    acceptance:acceptances (
-                        name,
-                        email,
-                        timestamp
-                    )
-                `)
-                // Use the correct column 'email' from acceptances table
-                .eq('acceptance.email', email)
+
+            // Step 1: Find the acceptance linked to this client's email
+            const { data: acceptance, error: accErr } = await supabase
+                .from('acceptances')
+                .select('id, name, email, company_name, timestamp')
+                .eq('email', email)
+                .limit(1)
                 .single();
 
-            if (projectError) {
-                // If single() fails it might be because of RLS filtering 0 rows or multiple.
-                // For a client, they should have 1 active project or we pick the latest.
-                console.error('Error fetching project:', projectError);
+            if (accErr || !acceptance) {
+                console.error('No acceptance found for email:', email, accErr);
+                setLoading(false);
+                return;
             }
 
-            if (projectData) {
-                setProject(projectData);
+            // Step 2: Find the traffic_project linked to this acceptance
+            const { data: projectData, error: projErr } = await supabase
+                .from('traffic_projects')
+                .select('*')
+                .eq('acceptance_id', acceptance.id)
+                .limit(1)
+                .single();
 
-                // 2. Fetch Campaigns for this project
-                const { data: campaignsData } = await supabase
-                    .from('traffic_campaigns')
-                    .select(`
-                        *,
-                        timeline:traffic_campaign_timeline (*)
-                    `)
-                    .eq('traffic_project_id', projectData.id)
-                    .order('created_at', { ascending: false });
+            if (projErr || !projectData) {
+                console.error('No traffic project found:', projErr);
+                setLoading(false);
+                return;
+            }
 
-                if (campaignsData) {
-                    setCampaigns(campaignsData);
-                }
+            // Attach acceptance info to project for display
+            setProject({ ...projectData, acceptance });
+
+            // Step 3: Fetch Campaigns for this project 
+            const { data: campaignsData } = await supabase
+                .from('traffic_campaigns')
+                .select(`
+                    *,
+                    timeline:traffic_campaign_timeline (*)
+                `)
+                .eq('traffic_project_id', projectData.id)
+                .order('created_at', { ascending: false });
+
+            if (campaignsData) {
+                setCampaigns(campaignsData);
             }
 
         } catch (error) {
@@ -161,7 +168,7 @@ const ClientDashboard: React.FC = () => {
                     </div>
                 </header>
 
-                {/* KPI Cards (Static/Example for now, could be dynamic later) */}
+                {/* KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                     <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl">
                         <p className="text-slate-400 text-sm mb-2">Status do Projeto</p>
@@ -203,7 +210,6 @@ const ClientDashboard: React.FC = () => {
                                 <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-800/20">
                                     <div className="flex items-center gap-4">
                                         <div className="p-3 bg-slate-800 rounded-xl">
-                                            {/* Icon based on platform */}
                                             <BarChart3 className="text-amber-500" />
                                         </div>
                                         <div>

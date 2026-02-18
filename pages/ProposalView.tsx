@@ -140,6 +140,32 @@ const ProposalView: React.FC = () => {
                 ]);
 
             if (error) throw error;
+
+            // 3. Create client user account (Edge Function)
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const response = await fetch(
+                    `${supabaseUrl}/functions/v1/create-client-user`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                        },
+                        body: JSON.stringify({
+                            email: formData.email,
+                            name: formData.name,
+                        }),
+                    }
+                );
+                const result = await response.json();
+                console.log('Client user creation result:', result);
+            } catch (clientErr) {
+                // Don't block acceptance if client creation fails
+                console.error('Error creating client user (non-blocking):', clientErr);
+            }
+
             setTimestamp(new Date().toLocaleString('pt-BR'));
             setIsAccepted(true);
             setShowForm(false);
@@ -356,7 +382,16 @@ const ProposalView: React.FC = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                         </div>
                         <h2 className="text-3xl font-black mb-3 text-slate-900 leading-tight">Proposta Aceita!</h2>
-                        <p className="text-slate-500 mb-8 leading-relaxed">Obrigado pela confiança. Nossa parceria começa agora.</p>
+                        <p className="text-slate-500 mb-4 leading-relaxed">Obrigado pela confiança. Nossa parceria começa agora.</p>
+                        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-8 text-left">
+                            <p className="text-blue-800 text-sm font-medium flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                                </svg>
+                                Enviamos um email para <strong>{formData.email}</strong> com instruções para criar sua senha e acessar a Área do Cliente.
+                            </p>
+                        </div>
                         <button onClick={() => setIsAccepted(false)} className="bg-brand-dark text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all w-full shadow-lg">Fechar</button>
                     </div>
                 </div>
