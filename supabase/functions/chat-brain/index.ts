@@ -386,6 +386,15 @@ Escolha UMA ferramenta e seus parâmetros.`
         // 4. Generation Step — com identidade do usuário e histórico
         const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"]
 
+        const responseStyleBlock = `
+ESTILO DE RESPOSTA (OBRIGATÓRIO):
+- Responda com tom executivo e profissional, direto ao ponto.
+- NUNCA use frases como "como assistente virtual", "não tenho opiniões pessoais" ou equivalentes.
+- Quando pedirem avaliação/opinião, entregue uma análise técnica baseada nos dados disponíveis.
+- Não se exima: traga conclusão objetiva, riscos e próxima ação recomendada.
+- Se faltar dado, diga exatamente o que falta e faça uma pergunta curta de esclarecimento.
+        `.trim()
+
         // Montar bloco de identidade
         const identityBlock = userProfile
             ? `\nIDENTIDADE DO USUÁRIO (quem está conversando com você):\n- Nome: ${userProfile.full_name || userProfile.name}\n- Email: ${userProfile.email}\n- Cargo: ${userProfile.role}\nVocê deve se dirigir ao usuário pelo nome e adaptar sua linguagem ao cargo dele.`
@@ -394,6 +403,8 @@ Escolha UMA ferramenta e seus parâmetros.`
         const systemPrompt = `
 ${agentConfig.getSystemPrompt()}
 ${identityBlock}
+
+${responseStyleBlock}
 
 FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no banco de dados (dados completos e atualizados)' : 'Busca semântica no acervo vetorial'}
 
