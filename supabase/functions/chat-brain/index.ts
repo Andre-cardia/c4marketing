@@ -230,7 +230,8 @@ Deno.serve(async (req) => {
             const mentionsUsers = hasAny(text, [
                 'usuario', 'usuário', 'usuarios', 'usuários',
                 'colaborador', 'colaboradores', 'equipe', 'time',
-                'ceo', 'cargo', 'funcao', 'função', 'papel',
+                'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cio',
+                'cargo', 'funcao', 'função', 'papel',
                 'presidente', 'fundador', 'dono', 'diretor executivo'
             ])
             const mentionsAccess = hasAny(text, ['acesso', 'acessos', 'acessou', 'logou', 'login', 'entrou'])
@@ -382,6 +383,68 @@ Deno.serve(async (req) => {
             return savedId
         }
 
+        const memoryWriteEvents: Array<{ stage: string; status: 'ok' | 'error'; id?: string; detail?: string }> = []
+
+        const persistCognitiveChatMemory = async (
+            role: 'user' | 'assistant',
+            content: string,
+            stage: string
+        ) => {
+            const normalizedContent = (content || '').replace(/\s+/g, ' ').trim()
+            if (!normalizedContent) return null
+
+            const memoryContent = `MEMÓRIA COGNITIVA (${new Date().toISOString()}) [${role.toUpperCase()}]: ${normalizedContent}`
+            const embeddingResponse = await openai.embeddings.create({
+                model: 'text-embedding-3-small',
+                input: memoryContent,
+            })
+            const embedding = embeddingResponse.data[0].embedding
+
+            const metadata = {
+                type: 'chat_log',
+                status: 'active',
+                artifact_kind: 'unknown',
+                source_table: 'chat_messages',
+                source: 'cognitive_live_memory',
+                tenant_id: userId,
+                user_id: userId,
+                session_id: session_id ?? null,
+                role,
+                created_by: 'chat-brain',
+                saved_at: new Date().toISOString(),
+            }
+
+            const { data: savedId, error: saveError } = await supabaseAdmin.rpc('insert_brain_document', {
+                content: memoryContent,
+                metadata,
+                embedding,
+            })
+
+            if (saveError) {
+                memoryWriteEvents.push({ stage, status: 'error', detail: saveError.message })
+                throw new Error(`Falha ao salvar memória cognitiva (${stage}): ${saveError.message}`)
+            }
+
+            memoryWriteEvents.push({ stage, status: 'ok', id: String(savedId || '') })
+            return savedId
+        }
+
+        const persistCognitiveMemorySafe = async (
+            role: 'user' | 'assistant',
+            content: string,
+            stage: string
+        ) => {
+            try {
+                return await persistCognitiveChatMemory(role, content, stage)
+            } catch (memoryError: any) {
+                console.error(`cognitive memory write failed (${stage}):`, memoryError?.message || memoryError)
+                return null
+            }
+        }
+
+        // Memoria viva: toda mensagem do usuario deve ser registrada.
+        await persistCognitiveMemorySafe('user', query, 'user_message_inbound')
+
         // 1b. Carregar histórico da sessão (memória cognitiva)
         let sessionMessages: Array<{ role: string; content: string }> = []
 
@@ -451,11 +514,14 @@ Deno.serve(async (req) => {
         // Resposta determinística para pergunta de memória sem histórico disponível.
         // Evita o modelo responder que "não tem acesso" ao histórico.
         if (isPastConversationIntent && sessionMessages.length === 0 && crossSessionMessages.length === 0) {
+            const noHistoryAnswer = 'Não encontrei registros recentes de conversas anteriores para recuperar agora. Se quiser, posso continuar deste ponto e manter o contexto nas próximas mensagens.'
+            await persistCognitiveMemorySafe('assistant', noHistoryAnswer, 'assistant_memory_lookup_empty')
             return new Response(JSON.stringify({
-                answer: 'Não encontrei registros recentes de conversas anteriores para recuperar agora. Se quiser, posso continuar deste ponto e manter o contexto nas próximas mensagens.',
+                answer: noHistoryAnswer,
                 documents: [],
                 meta: {
                     memory_lookup: 'empty',
+                    memory_write_events: memoryWriteEvents,
                 }
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -469,25 +535,31 @@ Deno.serve(async (req) => {
             if (factText && factText.length >= 8) {
                 try {
                     const memoryId = await persistExplicitMemoryFact(factText)
+                    const explicitSaveAnswer = `Memória registrada com sucesso no Segundo Cérebro. Vou considerar essa informação em consultas futuras.\n\nResumo salvo: "${factText}"`
+                    await persistCognitiveMemorySafe('assistant', explicitSaveAnswer, 'assistant_explicit_memory_ack')
                     return new Response(JSON.stringify({
-                        answer: `Memória registrada com sucesso no Segundo Cérebro. Vou considerar essa informação em consultas futuras.\n\nResumo salvo: "${factText}"`,
+                        answer: explicitSaveAnswer,
                         documents: [],
                         meta: {
                             memory_saved: true,
                             memory_id: memoryId,
                             memory_scope: 'vector_db',
+                            memory_write_events: memoryWriteEvents,
                         }
                     }), {
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     })
                 } catch (memorySaveError: any) {
                     console.error('explicit memory save failed:', memorySaveError)
+                    const explicitSaveErrorAnswer = `Entendi o pedido para salvar essa informação, mas houve falha ao gravar no cérebro agora. Detalhes: ${memorySaveError?.message || memorySaveError}.`
+                    await persistCognitiveMemorySafe('assistant', explicitSaveErrorAnswer, 'assistant_explicit_memory_error')
                     return new Response(JSON.stringify({
-                        answer: `Entendi o pedido para salvar essa informação, mas houve falha ao gravar no cérebro agora. Detalhes: ${memorySaveError?.message || memorySaveError}.`,
+                        answer: explicitSaveErrorAnswer,
                         documents: [],
                         meta: {
                             memory_saved: false,
                             error: memorySaveError?.message || String(memorySaveError),
+                            memory_write_events: memoryWriteEvents,
                         }
                     }), {
                         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -660,8 +732,9 @@ Exemplos:
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
 - "mostre as respostas do formulário de tráfego" → query_survey_responses(p_project_type: "traffic")
 - "quem é o CEO da C4?" → query_all_users()
+- "quem é o CTO da C4?" → query_all_users()
 - "qual é o cargo do André Cardia?" → query_all_users()
-Quando a pergunta for sobre pessoas, cargos, funções, CEO, fundador ou papéis internos, priorize query_all_users.
+Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -811,12 +884,24 @@ Retorne apenas function calls (sem texto livre).`
         // 3. Retrieval Step (Hybrid: RAG ou SQL direto)
         let contextText = ''
         let retrievedDocs: any[] = []
+        let cognitiveMemoryDocs: any[] = []
+        let cognitiveMemoryContext = ''
+        let explicitUserFacts: string[] = []
         let executedDbRpcs: string[] = []
         const isLeadershipQuery = hasAny(query, [
-            'ceo', 'cargo', 'funcao', 'função', 'papel',
+            'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cio',
+            'cargo', 'funcao', 'função', 'papel',
             'presidente', 'fundador', 'dono', 'diretor executivo'
         ])
         let explicitLeadershipFact: string | null = null
+        const leadershipHintRegex = /(ceo|cto|cfo|coo|cmo|cio|presidente|diretor executivo|fundador|dono)/i
+
+        const isExplicitUserFactDoc = (doc: any) => {
+            const meta = doc?.metadata || {}
+            const sourceTable = String(meta.source_table || '').toLowerCase()
+            const source = String(meta.source || '').toLowerCase()
+            return sourceTable === 'user_facts' || source === 'explicit_user_memory'
+        }
 
         const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
             const cleanParams = cleanRpcParams(rpcParams)
@@ -878,13 +963,8 @@ Retorne apenas function calls (sem texto livre).`
                 }
 
                 const explicitFactDoc = retrievedDocs.find((d: any) => {
-                    const meta = d?.metadata || {}
-                    const sourceTable = String(meta.source_table || '').toLowerCase()
-                    const source = String(meta.source || '').toLowerCase()
                     const content = String(d?.content || '')
-                    const isUserFact = sourceTable === 'user_facts' || source === 'explicit_user_memory'
-                    const hasLeadershipHint = /(ceo|presidente|diretor executivo|fundador|dono)/i.test(content)
-                    return isUserFact && hasLeadershipHint
+                    return isExplicitUserFactDoc(d) && leadershipHintRegex.test(content)
                 })
 
                 if (explicitFactDoc) {
@@ -899,6 +979,65 @@ Retorne apenas function calls (sem texto livre).`
             } catch (ragError: any) {
                 console.error('RAG retrieval failed:', ragError)
                 return `Falha ao recuperar contexto semântico no momento: ${ragError?.message || ragError}. Responda ao usuário de forma útil e peça uma reformulação curta se necessário.`
+            }
+        }
+
+        const runCognitiveMemoryRetrieval = async () => {
+            console.log('[Tool] cognitive_memory_search → top_k: 8')
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                cognitiveMemoryDocs = await matchBrainDocuments({
+                    supabase: supabaseAdmin,
+                    queryText: query,
+                    filters: {
+                        tenant_id: userId,
+                        type_allowlist: ['chat_log', 'session_summary'],
+                        type_blocklist: [],
+                        artifact_kind: null,
+                        source_table: null,
+                        client_id: null,
+                        project_id: null,
+                        source_id: null,
+                        status: 'active',
+                        time_window_minutes: null,
+                    } as any,
+                    options: {
+                        topK: 8,
+                        policy: 'STRICT_DOCS_ONLY'
+                    },
+                    embedder
+                })
+
+                if (!cognitiveMemoryDocs.length) {
+                    explicitUserFacts = []
+                    return 'CONSULTA DE MEMÓRIA COGNITIVA: nenhum item relevante encontrado para esta pergunta.'
+                }
+
+                explicitUserFacts = cognitiveMemoryDocs
+                    .filter((d: any) => isExplicitUserFactDoc(d))
+                    .map((d: any) => String(d?.content || '').trim())
+                    .filter((text: string) => text.length > 0)
+                    .slice(0, 6)
+
+                if (!explicitLeadershipFact) {
+                    const leadershipDoc = cognitiveMemoryDocs.find((d: any) => {
+                        const content = String(d?.content || '')
+                        return isExplicitUserFactDoc(d) && leadershipHintRegex.test(content)
+                    })
+                    if (leadershipDoc) {
+                        explicitLeadershipFact = String(leadershipDoc?.content || '').trim()
+                    }
+                }
+
+                return cognitiveMemoryDocs.map((d: any) => {
+                    const meta = d?.metadata || {}
+                    const source = meta.source_table || meta.source || 'Unknown Source'
+                    return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`
+                }).join('\n\n')
+            } catch (memoryRetrievalError: any) {
+                console.error('cognitive memory retrieval failed:', memoryRetrievalError)
+                explicitUserFacts = []
+                return `Falha ao consultar memória cognitiva: ${memoryRetrievalError?.message || memoryRetrievalError}.`
             }
         }
 
@@ -956,6 +1095,9 @@ Retorne apenas function calls (sem texto livre).`
             contextText = await runVectorRetrieval()
         }
 
+        // Guardrail global: sempre consultar memória cognitiva antes de responder.
+        cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+
         // 4. Generation Step — com identidade do usuário e histórico
         const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"]
 
@@ -969,6 +1111,8 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se houver histórico fornecido no prompt, use esse histórico. Não diga que não tem acesso ao histórico quando ele estiver disponível.
 - Se a FONTE DOS DADOS for SQL direta, nunca diga que precisa "acessar outro sistema" ou "confirmar qual banco". As consultas SQL já foram executadas.
 - Se a pergunta tiver mais de uma parte (ex: tarefas + usuários + projetos), responda em blocos separados cobrindo cada parte.
+- O sistema possui memória cognitiva ativa. Não diga que "não consegue armazenar informações" ou que "não tem memória" quando houver registro no contexto.
+- Sempre considere os blocos "MEMÓRIA COGNITIVA RELEVANTE" e "FATOS EXPLÍCITOS SALVOS PELO USUÁRIO" antes de concluir.
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
@@ -995,6 +1139,14 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
             ? `\nFATO EXPLÍCITO PRIORITÁRIO (informado e salvo pelo usuário):\n${explicitLeadershipFact}`
             : ''
 
+        const explicitUserFactsBlock = explicitUserFacts.length > 0
+            ? `\nFATOS EXPLÍCITOS SALVOS PELO USUÁRIO:\n${explicitUserFacts
+                .map((fact, idx) => `${idx + 1}. ${fact}`)
+                .join('\n')}`
+            : '\nFATOS EXPLÍCITOS SALVOS PELO USUÁRIO: nenhum fato explícito relevante foi encontrado para esta pergunta.'
+
+        const cognitiveMemoryBlock = `\nMEMÓRIA COGNITIVA RELEVANTE:\n${cognitiveMemoryContext}`
+
         const systemPrompt = `
 ${agentConfig.getSystemPrompt()}
 ${identityBlock}
@@ -1007,6 +1159,8 @@ CONTEXTO RECUPERADO:
 ${contextText || "Nenhum documento relevante encontrado."}
 
 ${explicitLeadershipFactBlock}
+${explicitUserFactsBlock}
+${cognitiveMemoryBlock}
 
 ${crossSessionMemoryBlock}
         `.trim()
@@ -1060,6 +1214,8 @@ ${crossSessionMemoryBlock}
             }
         }
 
+        await persistCognitiveMemorySafe('assistant', answer, 'assistant_answer_outbound')
+
         // 5. Return
         return new Response(JSON.stringify({
             answer,
@@ -1067,7 +1223,9 @@ ${crossSessionMemoryBlock}
             meta: {
                 decision: decision,
                 agent: agentConfig.name,
-                executed_db_rpcs: executedDbRpcs
+                executed_db_rpcs: executedDbRpcs,
+                cognitive_memory_docs: cognitiveMemoryDocs.length,
+                memory_write_events: memoryWriteEvents,
             }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
