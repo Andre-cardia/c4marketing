@@ -30,6 +30,13 @@ function isInvalidJwtMessage(message: string): boolean {
     return (message || '').toLowerCase().includes('invalid jwt');
 }
 
+type TokenDebug = {
+    ref: string | null;
+    role: string | null;
+    sub: string | null;
+    exp: number | null;
+};
+
 function getProjectRefFromSupabaseUrl(url?: string): string | null {
     if (!url) return null;
     try {
@@ -65,6 +72,21 @@ function getProjectRefFromJwt(token: string): string | null {
     return match?.[1] ?? null;
 }
 
+function getTokenDebug(token: string): TokenDebug {
+    const payload = decodeJwtPayload(token) || {};
+    return {
+        ref: getProjectRefFromJwt(token),
+        role: typeof payload.role === 'string' ? payload.role : null,
+        sub: typeof payload.sub === 'string' ? payload.sub : null,
+        exp: typeof payload.exp === 'number' ? payload.exp : null,
+    };
+}
+
+function isExpired(exp: number | null): boolean {
+    if (!exp) return false;
+    return exp <= Math.floor(Date.now() / 1000);
+}
+
 async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken: string): Promise<AskBrainResponse> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -98,13 +120,17 @@ async function callChatBrainDirect(payload: { query: string; session_id: string 
 async function getValidAccessToken(): Promise<string | null> {
     const { data: sessionData } = await supabase.auth.getSession();
     let session = sessionData.session;
+    if (!session?.access_token) return null;
 
-    const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+    const initialDebug = getTokenDebug(session.access_token);
+    const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
     const isNearExpiry = !!expiresAtMs && (expiresAtMs - Date.now()) < 60_000;
+    const hasSubMismatch = !!(session.user?.id && initialDebug.sub && session.user.id !== initialDebug.sub);
+    const shouldRefresh = isNearExpiry || hasSubMismatch || isExpired(initialDebug.exp);
 
-    if (!session || isNearExpiry) {
+    if (shouldRefresh) {
         const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshed.session) {
+        if (!refreshError && refreshed.session?.access_token) {
             session = refreshed.session;
         }
     }
@@ -180,10 +206,32 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
         };
     }
 
-    const tokenRef = getProjectRefFromJwt(token);
-    if (expectedRef && tokenRef && expectedRef !== tokenRef) {
+    const tokenInfo = getTokenDebug(token);
+    if (expectedRef && tokenInfo.ref && expectedRef !== tokenInfo.ref) {
         return {
-            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token de autenticação de outro projeto (token: ${tokenRef}, app: ${expectedRef}). Corrija VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY do frontend.`,
+            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token de autenticação de outro projeto (token: ${tokenInfo.ref}, app: ${expectedRef}). Corrija VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY do frontend.`,
+            documents: [],
+        };
+    }
+
+    if (tokenInfo.role === 'anon') {
+        return {
+            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: sessão atual está anônima (role=anon), não autenticada.',
+            documents: [],
+        };
+    }
+
+    if (isExpired(tokenInfo.exp)) {
+        return {
+            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: token expirado. Faça login novamente.',
+            documents: [],
+        };
+    }
+
+    const { error: userCheckError } = await supabase.auth.getUser(token);
+    if (userCheckError) {
+        return {
+            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token inválido no Auth (${userCheckError.message}).`,
             documents: [],
         };
     }
@@ -213,7 +261,7 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
                 }
             }
             return {
-                answer: `Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Projeto esperado: ${expectedRef || 'desconhecido'}; token: ${tokenRef || 'não identificado'}.`,
+                answer: `Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Projeto esperado: ${expectedRef || 'desconhecido'}; token: ${tokenInfo.ref || 'não identificado'}; role: ${tokenInfo.role || 'n/a'}; sub: ${tokenInfo.sub || 'n/a'}.`,
                 documents: [],
             };
         }
