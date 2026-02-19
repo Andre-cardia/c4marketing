@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { askBrain, addToBrain, BrainDocument } from '../lib/brain';
+import { askBrain, addToBrain, BrainDocument, createChatSession, addChatMessage } from '../lib/brain';
 import { Send, Bot, User, Loader2, FileText, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -11,6 +10,7 @@ interface Message {
 
 export function BrainChat({ onClose }: { onClose?: () => void }) {
     const [query, setQuery] = useState('');
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: 'Olá! Sou seu Segundo Cérebro Corporativo. Como posso ajudar com os dados da empresa hoje?' }
     ]);
@@ -29,20 +29,39 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
         e?.preventDefault();
         if (!query.trim() || loading) return;
 
+        let activeSessionId = sessionId;
+        if (!activeSessionId) {
+            try {
+                const session = await createChatSession('Widget Brain Chat');
+                activeSessionId = session.id;
+                setSessionId(session.id);
+            } catch (err) {
+                console.error('Failed to create widget chat session:', err);
+            }
+        }
+
         const userMessage = query;
         setQuery('');
         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setLoading(true);
 
+        if (activeSessionId) {
+            addChatMessage(activeSessionId, 'user', userMessage).catch(err => {
+                console.error('Failed to persist user message in widget session:', err);
+            });
+        }
+
         // Fire-and-forget: Save user message to Brain
         addToBrain(userMessage, {
             type: 'chat_log',
             role: 'user',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            status: 'active',
+            session_id: activeSessionId
         }).catch(err => console.error('Failed to save user chat log:', err));
 
         try {
-            const response = await askBrain(userMessage);
+            const response = await askBrain(userMessage, activeSessionId || undefined);
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -50,11 +69,19 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                 sources: response.documents
             }]);
 
+            if (activeSessionId) {
+                addChatMessage(activeSessionId, 'assistant', response.answer).catch(err => {
+                    console.error('Failed to persist assistant message in widget session:', err);
+                });
+            }
+
             // Fire-and-forget: Save assistant message to Brain
             addToBrain(response.answer, {
                 type: 'chat_log',
                 role: 'assistant',
                 timestamp: new Date().toISOString(),
+                status: 'active',
+                session_id: activeSessionId,
                 related_query: userMessage
             }).catch(err => console.error('Failed to save assistant chat log:', err));
 

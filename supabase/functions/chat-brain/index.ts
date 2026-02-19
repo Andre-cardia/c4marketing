@@ -66,6 +66,14 @@ Deno.serve(async (req) => {
             }
         }
 
+        const normalizeText = (value: string) =>
+            (value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+        const hasAny = (text: string, terms: string[]) => {
+            const normalized = normalizeText(text)
+            return terms.some((term) => normalized.includes(normalizeText(term)))
+        }
+
         // 1b. Carregar histórico da sessão (memória cognitiva)
         let sessionMessages: Array<{ role: string; content: string }> = []
 
@@ -83,6 +91,54 @@ Deno.serve(async (req) => {
                     }))
             }
         }
+
+        // 1c. Carregar memória recente do usuário em outras sessões
+        // Útil para perguntas como "você lembra o que conversamos nos últimos dias?"
+        let crossSessionMessages: Array<{
+            role: 'user' | 'assistant';
+            content: string;
+            created_at: string;
+            session_id: string;
+        }> = []
+
+        if (userId !== 'anon_user') {
+            const { data: recentHistory, error: recentHistoryError } = await supabaseAdmin
+                .rpc('get_user_recent_history', {
+                    p_user_id: userId,
+                    p_limit: 16,
+                    p_exclude_session_id: session_id ?? null,
+                })
+
+            if (recentHistoryError) {
+                console.error('get_user_recent_history error:', recentHistoryError)
+            } else if (recentHistory && recentHistory.length > 0) {
+                crossSessionMessages = recentHistory
+                    .reverse()
+                    .map((m: any) => ({
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content as string,
+                        created_at: m.created_at as string,
+                        session_id: m.session_id as string,
+                    }))
+            }
+        }
+
+        const isPastConversationIntent = hasAny(query, [
+            'lembra',
+            'lembrar',
+            'lembranca',
+            'conversamos',
+            'falamos',
+            'historico',
+            'histórico',
+            'ultimos dias',
+            'últimos dias',
+            'conversas passadas',
+            'conversa anterior',
+        ])
+
+        const shouldInjectCrossSessionMemory =
+            isPastConversationIntent || sessionMessages.length === 0
 
         // 2. Router Step
         const routerInput: RouterInput = {
@@ -393,11 +449,24 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Quando pedirem avaliação/opinião, entregue uma análise técnica baseada nos dados disponíveis.
 - Não se exima: traga conclusão objetiva, riscos e próxima ação recomendada.
 - Se faltar dado, diga exatamente o que falta e faça uma pergunta curta de esclarecimento.
+- Se houver histórico fornecido no prompt, use esse histórico. Não diga que não tem acesso ao histórico quando ele estiver disponível.
         `.trim()
 
         // Montar bloco de identidade
         const identityBlock = userProfile
             ? `\nIDENTIDADE DO USUÁRIO (quem está conversando com você):\n- Nome: ${userProfile.full_name || userProfile.name}\n- Email: ${userProfile.email}\n- Cargo: ${userProfile.role}\nVocê deve se dirigir ao usuário pelo nome e adaptar sua linguagem ao cargo dele.`
+            : ''
+
+        const crossSessionMemoryBlock = shouldInjectCrossSessionMemory
+            ? (crossSessionMessages.length > 0
+                ? `\nMEMÓRIA RECENTE DO USUÁRIO (outras sessões):\n${crossSessionMessages
+                    .map((m) => {
+                        const timestamp = new Date(m.created_at).toISOString()
+                        const compact = (m.content || '').replace(/\s+/g, ' ').trim().slice(0, 280)
+                        return `- [${timestamp}] (${m.role}) ${compact}`
+                    })
+                    .join('\n')}`
+                : `\nMEMÓRIA RECENTE DO USUÁRIO (outras sessões): nenhum registro recente encontrado.`)
             : ''
 
         const systemPrompt = `
@@ -410,6 +479,8 @@ FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no b
 
 CONTEXTO RECUPERADO:
 ${contextText || "Nenhum documento relevante encontrado."}
+
+${crossSessionMemoryBlock}
         `.trim()
 
         // Montar mensagens multi-turn (system + histórico + pergunta atual)

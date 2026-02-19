@@ -111,14 +111,19 @@ export default function BrainManager() {
         setIsLoading(true);
 
         try {
-            // 1. Save User Message to DB
-            await addChatMessage(sessionId, 'user', userMsgContent);
+            // 1. Persistência local de histórico (não bloqueia resposta da IA)
+            try {
+                await addChatMessage(sessionId, 'user', userMsgContent);
+            } catch (persistUserError) {
+                console.error('Falha ao salvar mensagem do usuário no histórico:', persistUserError);
+            }
 
             // 2. Save User Message to Brain (Memory)
             addToBrain(userMsgContent, {
                 type: 'chat_log',
                 role: 'user',
                 timestamp: new Date().toISOString(),
+                status: 'active',
                 session_id: sessionId
             }).catch(console.error);
 
@@ -126,24 +131,49 @@ export default function BrainManager() {
             const response = await askBrain(userMsgContent, sessionId);
             const aiMsgContent = response.answer;
 
-            // 4. Save AI Message to DB
-            await addChatMessage(sessionId, 'assistant', aiMsgContent);
+            // 4. Save AI Message to DB (não bloqueia)
+            let assistantPersisted = false;
+            try {
+                await addChatMessage(sessionId, 'assistant', aiMsgContent);
+                assistantPersisted = true;
+            } catch (persistAssistantError) {
+                console.error('Falha ao salvar resposta da IA no histórico:', persistAssistantError);
+            }
 
             // 5. Save AI Message to Brain (Memory)
             addToBrain(aiMsgContent, {
                 type: 'chat_log',
                 role: 'assistant',
                 timestamp: new Date().toISOString(),
+                status: 'active',
                 session_id: sessionId,
                 related_query: userMsgContent
             }).catch(console.error);
 
-            // Refresh messages to get real IDs (or just update state)
-            loadMessages(sessionId);
+            // Refresh messages to get real IDs; fallback otimista se persistência falhar
+            if (assistantPersisted) {
+                loadMessages(sessionId);
+            } else {
+                const fallbackAiMsg: ChatMessage = {
+                    id: 'temp-ai-' + Date.now(),
+                    session_id: sessionId,
+                    role: 'assistant',
+                    content: aiMsgContent,
+                    created_at: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, fallbackAiMsg]);
+            }
 
         } catch (error) {
             console.error('Failed to send message:', error);
-            // Revert or show error
+            const errorMsg: ChatMessage = {
+                id: 'temp-error-' + Date.now(),
+                session_id: sessionId,
+                role: 'assistant',
+                content: 'Não consegui responder agora por um erro de integração. Tente novamente em alguns segundos.',
+                created_at: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMsg]);
         } finally {
             setIsLoading(false);
         }
