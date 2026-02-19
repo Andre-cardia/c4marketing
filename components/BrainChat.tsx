@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askBrain, addToBrain, BrainDocument, createChatSession, addChatMessage } from '../lib/brain';
 import { Send, Bot, User, Loader2, FileText, X } from 'lucide-react';
+import { useUserRole } from '../lib/UserRoleContext';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -9,6 +10,7 @@ interface Message {
 }
 
 export function BrainChat({ onClose }: { onClose?: () => void }) {
+    const { avatarUrl } = useUserRole();
     const [query, setQuery] = useState('');
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([
@@ -183,8 +185,12 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                         </div>
 
                         {msg.role === 'user' && (
-                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-slate-300" />
+                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
+                                ) : (
+                                    <User className="w-4 h-4 text-slate-300" />
+                                )}
                             </div>
                         )}
                     </div>
