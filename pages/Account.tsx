@@ -16,6 +16,7 @@ interface Task {
     description: string;
     assignee: string;
     attachment_url?: string;
+    attachments?: { name: string; url: string }[];
     project_name?: string;
 }
 

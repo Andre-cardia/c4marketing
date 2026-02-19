@@ -12,7 +12,7 @@ interface Task {
     priority: 'low' | 'medium' | 'high';
     assignee?: string;
     due_date: string;
-    attachment_url?: string;
+    attachments?: { name: string; url: string }[];
 }
 
 interface UserSummary {
@@ -40,7 +40,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         priority: 'medium',
         assignee: '',
         due_date: '',
-        attachment_url: ''
+        attachments: []
     });
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -73,7 +73,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             setFormData({
                 ...task,
                 due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
-                attachment_url: task.attachment_url || ''
+                attachments: task.attachments || (task as any).attachment_url ? [{ name: 'Anexo Antigo', url: (task as any).attachment_url }] : []
             });
         } else {
             // Reset for new task
@@ -85,62 +85,76 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                 priority: 'medium',
                 assignee: '',
                 due_date: '',
-                attachment_url: ''
+                attachments: []
             });
         }
     }, [task, projectId, isOpen]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         try {
-            const file = event.target.files?.[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
 
-            // 1MB limit check
-            if (file.size > 1024 * 1024) {
-                alert('O arquivo deve ter no máximo 1MB.');
+            const currentAttachments = formData.attachments || [];
+
+            // Check total files limit (max 6)
+            if (currentAttachments.length + files.length > 6) {
+                alert('Você pode anexar no máximo 6 arquivos.');
                 return;
             }
 
             setUploading(true);
+            const newAttachments = [...currentAttachments];
 
-            // Create unique filename
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${projectId}/${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
 
-            // Upload to Supabase Storage 'task-attachments' bucket
-            const { error: uploadError } = await supabase.storage
-                .from('task-attachments')
-                .upload(filePath, file);
+                // 1MB limit check per file
+                if (file.size > 1024 * 1024) {
+                    alert(`O arquivo "${file.name}" excede o limite de 1MB e não será enviado.`);
+                    continue;
+                }
 
-            if (uploadError) {
-                console.error('Storage error:', uploadError);
-                throw uploadError;
+                // Create unique filename
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${projectId}/${Date.now()}_${i}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                // Upload to Supabase Storage 'task-attachments' bucket
+                const { error: uploadError } = await supabase.storage
+                    .from('task-attachments')
+                    .upload(filePath, file);
+
+                if (uploadError) {
+                    console.error('Storage error:', uploadError);
+                    alert(`Erro ao enviar "${file.name}".`);
+                    continue;
+                }
+
+                // Get Public URL
+                const { data: { publicUrl } } = supabase.storage
+                    .from('task-attachments')
+                    .getPublicUrl(filePath);
+
+                newAttachments.push({ name: file.name, url: publicUrl });
             }
 
-            // Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('task-attachments')
-                .getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, attachment_url: publicUrl }));
-            alert('Arquivo anexado com sucesso!');
+            setFormData(prev => ({ ...prev, attachments: newAttachments }));
 
         } catch (error: any) {
             console.error('Upload Error:', error);
-            if (error.message && error.message.includes('Bucket not found')) {
-                alert('Erro: Bucket de armazenamento "task-attachments" não encontrado. Contate o administrador.');
-            } else {
-                alert('Erro ao fazer upload do arquivo.');
-            }
+            alert('Erro ao processar uploads.');
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
-    const handleRemoveAttachment = () => {
-        setFormData(prev => ({ ...prev, attachment_url: '' }));
+    const handleRemoveAttachment = (indexToRemove: number) => {
+        setFormData(prev => ({
+            ...prev,
+            attachments: prev.attachments?.filter((_, index) => index !== indexToRemove) || []
+        }));
     };
 
     const handleDelete = async () => {
@@ -187,10 +201,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             // Exclude project_name (UI only) from data sent to DB
             const { project_name, ...cleanData } = formData as any;
 
+            // Ensure backward compatibility or clean up old field if needed. 
+            // Ideally we just send 'attachments' JSONB.
+            // For now, we update both if we wanted to support old app versions, but let's stick to new schema.
+            // We map attachments to JSONB.
+
             const dataToSave = {
                 ...cleanData,
-                due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null
+                due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+                attachments: formData.attachments // Send JSONB array
             };
+
+            // Remove legacy field if it exists in cleanData
+            delete dataToSave.attachment_url;
 
             if (task?.id) {
                 // Update
@@ -370,33 +393,43 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             />
                         </div>
 
-                        {/* File Upload */}
-                        <div className="space-y-2">
+                        {/* File Upload - Multi-file */}
+                        <div className="space-y-4">
                             <input
                                 type="file"
                                 ref={fileInputRef}
                                 className="hidden"
                                 onChange={handleFileUpload}
+                                multiple // Allow multiple files
                                 accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
                             />
 
-                            {formData.attachment_url ? (
-                                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-800">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <Paperclip size={18} className="text-brand-coral flex-shrink-0" />
-                                        <a href={formData.attachment_url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 dark:text-slate-200 truncate hover:underline">
-                                            {formData.attachment_url.split('/').pop()}
-                                        </a>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleRemoveAttachment}
-                                        className="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full text-red-500"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                            {/* Render uploaded files list */}
+                            {formData.attachments && formData.attachments.length > 0 && (
+                                <div className="space-y-2">
+                                    {formData.attachments.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-800">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <Paperclip size={18} className="text-brand-coral flex-shrink-0" />
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 dark:text-slate-200 truncate hover:underline" title={file.name}>
+                                                    {file.name}
+                                                </a>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveAttachment(index)}
+                                                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full text-red-500"
+                                                title="Remover anexo"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                            ) : (
+                            )}
+
+                            {/* Upload Button - Hidden if limit reached */}
+                            {(!formData.attachments || formData.attachments.length < 6) && (
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
                                     className={`border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
@@ -404,12 +437,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                     {uploading ? (
                                         <>
                                             <Loader2 size={20} className="animate-spin" />
-                                            <span>Enviando arquivo... (Máx 1MB)</span>
+                                            <span>Enviando arquivos...</span>
                                         </>
                                     ) : (
                                         <>
                                             <Paperclip size={20} />
-                                            <span>Anexar arquivo (Máx 1MB)...</span>
+                                            <span>Anexar arquivos (Máx 6, 1MB cada)...</span>
                                         </>
                                     )}
                                 </div>
@@ -433,6 +466,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 </button>
                             )}
                         </div>
+
                         <div className="flex gap-3">
                             <button
                                 type="button"

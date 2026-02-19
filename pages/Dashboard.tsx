@@ -56,6 +56,7 @@ interface Task {
     description?: string;
     assignee?: string;
     attachment_url?: string;
+    attachments?: { name: string; url: string }[];
     // Enriched field
     project_name?: string;
 }
