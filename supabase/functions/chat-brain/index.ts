@@ -310,25 +310,41 @@ Deno.serve(async (req) => {
         ])
 
         const extractMemoryFactText = (text: string) => {
-            const normalized = (text || '').trim()
-            if (!normalized) return ''
+            let raw = (text || '').replace(/\s+/g, ' ').trim()
+            if (!raw) return ''
+            const original = raw
 
-            const markers = [
-                /(?:guarde|grave|salve|registre|memorize|anote)\s+(?:isso|esta informação|essa informação|isto)?\s*(?:para o futuro)?[:\-]?\s*/i,
-                /(?:lembre que)\s*/i,
-            ]
-
-            for (const marker of markers) {
-                if (marker.test(normalized)) {
-                    let stripped = normalized.replace(marker, '').trim()
-                    stripped = stripped
-                        .replace(/^(?:essa|esta)\s+informa(?:c|ç)[aã]o(?:\s+para\s+o\s+futuro)?[:\-]?\s*/i, '')
-                        .trim()
-                    if (stripped.length >= 8) return stripped
+            // Caso exista ":" após comando de memória, tudo após ":" é o fato.
+            const colonIdx = raw.indexOf(':')
+            if (colonIdx >= 0) {
+                const beforeColon = normalizeText(raw.slice(0, colonIdx))
+                const hasMemoryCommand = /(guarde|grave|salve|registre|memorize|anote|fixe|lembre|futuro|informacao)/i.test(beforeColon)
+                if (hasMemoryCommand) {
+                    const afterColon = raw.slice(colonIdx + 1).trim()
+                    if (afterColon.length >= 8) raw = afterColon
                 }
             }
 
-            return normalized.length >= 8 ? normalized : ''
+            const cleanupPatterns = [
+                /^(?:por favor[, ]*)?(?:guarde|grave|salve|registre|memorize|anote|fixe)\s*/i,
+                /^(?:lembre(?:-me)?(?:\s+que)?|lembre\s+disso)\s*/i,
+                /^(?:isso|isto)\s*/i,
+                /^(?:essa|esta)\s+informa(?:c|ç)[aã]o\s*/i,
+                /^(?:para\s+o\s+futuro)\s*/i,
+                /^[:\-–—]\s*/,
+                /^(?:que)\s*/i,
+            ]
+
+            let prev = ''
+            while (raw !== prev) {
+                prev = raw
+                for (const pattern of cleanupPatterns) {
+                    raw = raw.replace(pattern, '').trim()
+                }
+            }
+
+            raw = raw.replace(/^["'“”]+|["'“”]+$/g, '').trim()
+            return raw.length >= 8 ? raw : (original.length >= 8 ? original : '')
         }
 
         const persistExplicitMemoryFact = async (factText: string) => {

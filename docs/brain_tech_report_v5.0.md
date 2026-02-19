@@ -8,6 +8,7 @@ O v5.0 introduz duas mudanças estruturais:
 
 - **Autenticação resiliente** no `chat-brain` (com fallback seguro por claims JWT e validação de projeto).
 - **Execução multi-RPC por mensagem** para consultas compostas (tarefas + usuários + projetos etc.) em um único ciclo de resposta.
+- **Memória explícita persistente**: comandos de “salvar/guardar para o futuro” agora gravam no banco vetorial (`brain.documents`) com metadados estruturados.
 
 ---
 
@@ -123,6 +124,25 @@ Foram adicionadas regras explícitas no prompt de geração:
 - Se a fonte for SQL direta, o modelo não pode responder "preciso saber qual sistema/banco".
 - Perguntas com múltiplas partes devem ser respondidas em blocos correspondentes.
 - Resultado vazio permanece explícito como `consulta realizada com sucesso, mas sem registros`.
+- Em perguntas de liderança/cargo (CEO, presidente etc.), o sistema consulta SQL + memória vetorial e prioriza fatos explícitos salvos pelo usuário.
+
+---
+
+## 5.1 Regra de Memória Explícita
+
+Quando o usuário envia instruções como:
+
+- "guarde isso para o futuro..."
+- "salve essa informação..."
+- "lembre que..."
+
+o `chat-brain`:
+
+- Extrai o fato da frase.
+- Gera embedding (`text-embedding-3-small`).
+- Persiste no vetor via `insert_brain_document`.
+- Marca metadados como `source_table = user_facts`, `source = explicit_user_memory`, `fact_kind = user_asserted`.
+- Retorna confirmação determinística de gravação.
 
 ---
 
@@ -210,4 +230,3 @@ O v5.0 fecha o ciclo de estabilização do Segundo Cérebro em produção:
 Próximo passo natural:
 
 - Adicionar métricas estruturadas por `rpc_name` (latência, taxa de erro, cardinalidade de resposta) para observabilidade contínua do agente em produção.
-
