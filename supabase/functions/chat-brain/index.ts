@@ -419,24 +419,29 @@ Escolha UMA ferramenta e seus parâmetros.`
         } else {
             // === RAG (busca semântica) ===
             console.log(`[Tool] rag_search → top_k: ${decision.top_k}`)
-            const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
 
-            retrievedDocs = await matchBrainDocuments({
-                supabase: supabaseAdmin,
-                queryText: query,
-                filters: decision.filters,
-                options: {
-                    topK: decision.top_k,
-                    policy: decision.retrieval_policy
-                },
-                embedder
-            })
+                retrievedDocs = await matchBrainDocuments({
+                    supabase: supabaseAdmin,
+                    queryText: query,
+                    filters: decision.filters,
+                    options: {
+                        topK: decision.top_k,
+                        policy: decision.retrieval_policy
+                    },
+                    embedder
+                })
 
-            contextText = retrievedDocs.map(d => {
-                const meta = d.metadata || {};
-                const source = meta.source_table || meta.title || 'Unknown Source';
-                return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
-            }).join('\n\n')
+                contextText = retrievedDocs.map(d => {
+                    const meta = d.metadata || {};
+                    const source = meta.source_table || meta.title || 'Unknown Source';
+                    return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
+                }).join('\n\n')
+            } catch (ragError: any) {
+                console.error('RAG retrieval failed:', ragError)
+                contextText = `Falha ao recuperar contexto semântico no momento: ${ragError?.message || ragError}. Responda ao usuário de forma útil e peça uma reformulação curta se necessário.`
+            }
         }
 
         // 4. Generation Step — com identidade do usuário e histórico
@@ -518,10 +523,14 @@ ${crossSessionMemoryBlock}
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error in chat-brain:", error)
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
+        const errorMessage = error?.message || String(error)
+        return new Response(JSON.stringify({
+            answer: `Estou com uma falha temporária de integração, mas continuo disponível. Detalhes técnicos: ${errorMessage}`,
+            documents: [],
+            meta: { error: errorMessage }
+        }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
     }

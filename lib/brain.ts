@@ -43,7 +43,22 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
 
     if (error) {
         console.error('Error asking brain:', error);
-        throw error;
+        let details = error.message || 'Falha desconhecida ao consultar chat-brain';
+
+        if (typeof error === 'object' && error !== null && 'context' in error) {
+            try {
+                const body = await (error as any).context.json();
+                if (body?.error) details = body.error;
+                else if (body?.message) details = body.message;
+            } catch {
+                // keep fallback details
+            }
+        }
+
+        return {
+            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${details}`,
+            documents: [],
+        };
     }
 
     return data;
