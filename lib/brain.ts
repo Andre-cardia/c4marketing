@@ -30,7 +30,7 @@ function isInvalidJwtMessage(message: string): boolean {
     return (message || '').toLowerCase().includes('invalid jwt');
 }
 
-async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken?: string): Promise<AskBrainResponse> {
+async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken: string): Promise<AskBrainResponse> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -38,13 +38,12 @@ async function callChatBrainDirect(payload: { query: string; session_id: string 
         throw new Error('Supabase env ausente no frontend (URL/ANON_KEY).');
     }
 
-    const authToken = bearerToken || anonKey;
     const res = await fetch(`${supabaseUrl}/functions/v1/chat-brain`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             apikey: anonKey,
-            Authorization: `Bearer ${authToken}`,
+            Authorization: `Bearer ${bearerToken}`,
         },
         body: JSON.stringify(payload),
     });
@@ -130,9 +129,23 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
 export async function askBrain(query: string, sessionId?: string): Promise<AskBrainResponse> {
     const payload = { query, session_id: sessionId || null };
 
-    const token = await getValidAccessToken();
+    let token = await getValidAccessToken();
+    if (!token) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (!refreshError && refreshed.session?.access_token) {
+            token = refreshed.session.access_token;
+        }
+    }
+
+    if (!token) {
+        return {
+            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão expirada. Faça login novamente.',
+            documents: [],
+        };
+    }
+
     try {
-        return await callChatBrainDirect(payload, token || undefined);
+        return await callChatBrainDirect(payload, token);
     } catch (firstError: any) {
         const firstMessage = firstError?.message || String(firstError);
         console.error('askBrain first attempt failed:', firstMessage);
@@ -155,18 +168,10 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
                     }
                 }
             }
-
-            // Último fallback: usa anon key como bearer para evitar bloqueio total.
-            try {
-                return await callChatBrainDirect(payload);
-            } catch (anonError: any) {
-                const anonMessage = anonError?.message || String(anonError);
-                console.error('askBrain fallback with anon bearer failed:', anonMessage);
-                return {
-                    answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${anonMessage}`,
-                    documents: [],
-                };
-            }
+            return {
+                answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Faça login novamente.',
+                documents: [],
+            };
         }
 
         return {

@@ -66,6 +66,17 @@ Deno.serve(async (req) => {
             }
         }
 
+        // O chat do /brain deve operar autenticado para preservar identidade/memória por usuário.
+        if (userId === 'anon_user') {
+            return new Response(JSON.stringify({
+                answer: 'Sessão inválida ou expirada. Faça login novamente para restaurar identidade e memória do agente.',
+                documents: [],
+                meta: { auth: 'missing_or_invalid' }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+        }
+
         const normalizeText = (value: string) =>
             (value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
@@ -139,6 +150,20 @@ Deno.serve(async (req) => {
 
         const shouldInjectCrossSessionMemory =
             isPastConversationIntent || sessionMessages.length === 0
+
+        // Resposta determinística para pergunta de memória sem histórico disponível.
+        // Evita o modelo responder que "não tem acesso" ao histórico.
+        if (isPastConversationIntent && sessionMessages.length === 0 && crossSessionMessages.length === 0) {
+            return new Response(JSON.stringify({
+                answer: 'Não encontrei registros recentes de conversas anteriores para recuperar agora. Se quiser, posso continuar deste ponto e manter o contexto nas próximas mensagens.',
+                documents: [],
+                meta: {
+                    memory_lookup: 'empty',
+                }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+        }
 
         // 2. Router Step
         const routerInput: RouterInput = {
@@ -509,7 +534,33 @@ ${crossSessionMemoryBlock}
             temperature: 0.1
         })
 
-        const answer = chatResponse.choices[0].message.content
+        let answer = chatResponse.choices[0].message.content || ''
+
+        // Pós-processamento para bloquear frase proibida sobre "não ter acesso ao histórico".
+        // Quando houver histórico, reformulamos para resumo do que está disponível.
+        const deniedHistoryPatterns = [
+            /não tenho acesso ao histórico/i,
+            /não tenho acesso ao histórico de conversas/i,
+            /não tenho acesso a conversas anteriores/i,
+        ]
+        const deniedHistoryDetected = deniedHistoryPatterns.some((p) => p.test(answer))
+        if (isPastConversationIntent && deniedHistoryDetected) {
+            const compact = (text: string) => (text || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+            const snippets: string[] = []
+
+            for (const m of sessionMessages.slice(-4)) {
+                snippets.push(`- ${m.role === 'user' ? 'Você' : 'Assistente'}: ${compact(m.content)}`)
+            }
+            for (const m of crossSessionMessages.slice(-4)) {
+                snippets.push(`- ${m.role === 'user' ? 'Você' : 'Assistente'}: ${compact(m.content)}`)
+            }
+
+            if (snippets.length === 0) {
+                answer = 'Não encontrei registros recentes de conversas anteriores para recuperar agora.'
+            } else {
+                answer = `Lembro do contexto disponível. Resumo rápido:\n${snippets.join('\n')}`
+            }
+        }
 
         // 5. Return
         return new Response(JSON.stringify({
