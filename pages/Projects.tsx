@@ -18,7 +18,7 @@ interface Project {
     slug: string;
 }
 
-type SortKey = 'company_name' | 'created_at';
+type SortKey = 'company_name' | 'created_at' | 'responsible_name';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -139,6 +139,10 @@ const Projects: React.FC = () => {
                 return sortConfig.direction === 'asc'
                     ? a.company_name.localeCompare(b.company_name)
                     : b.company_name.localeCompare(a.company_name);
+            } else if (sortConfig.key === 'responsible_name') {
+                return sortConfig.direction === 'asc'
+                    ? a.responsible_name.localeCompare(b.responsible_name)
+                    : b.responsible_name.localeCompare(a.responsible_name);
             } else {
                 return sortConfig.direction === 'asc'
                     ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -269,7 +273,15 @@ const Projects: React.FC = () => {
                                                 {getSortIcon('company_name')}
                                             </div>
                                         </th>
-                                        <th className="p-5 font-bold hidden md:table-cell">Responsável</th>
+                                        <th
+                                            className="p-5 font-bold hidden md:table-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSort('responsible_name')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Responsável
+                                                {getSortIcon('responsible_name')}
+                                            </div>
+                                        </th>
                                         <th
                                             className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
                                             onClick={() => handleSort('created_at')}

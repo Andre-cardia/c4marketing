@@ -109,9 +109,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
-                // 1MB limit check per file
-                if (file.size > 1024 * 1024) {
-                    alert(`O arquivo "${file.name}" excede o limite de 1MB e não será enviado.`);
+                // 2MB limit check per file
+                if (file.size > 2 * 1024 * 1024) {
+                    alert(`O arquivo "${file.name}" excede o limite de 2MB e não será enviado.`);
                     continue;
                 }
 
@@ -442,7 +442,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                     ) : (
                                         <>
                                             <Paperclip size={20} />
-                                            <span>Anexar arquivos (Máx 6, 1MB cada)...</span>
+                                            <span>Anexar arquivos (Máx 6, 2MB cada)...</span>
                                         </>
                                     )}
                                 </div>

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building, Calendar, Link as LinkIcon, ExternalLink, Trash2, Plus, Moon, Sun, FileText } from 'lucide-react';
+import { Users, Building, Calendar, Link as LinkIcon, ExternalLink, Trash2, Plus, Moon, Sun, FileText, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 
 interface Proposal {
@@ -13,6 +13,20 @@ interface Proposal {
     created_at: string;
     contract_duration: number;
     services?: { id: string; price: number }[];
+}
+
+type SortKeyProposal = 'created_at' | 'company_name' | 'responsible_name';
+type SortKeyAcceptance = 'timestamp' | 'name' | 'company_name' | 'status' | 'expiration_date';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfigProposal {
+    key: SortKeyProposal;
+    direction: SortDirection;
+}
+
+interface SortConfigAcceptance {
+    key: SortKeyAcceptance;
+    direction: SortDirection;
 }
 
 const Proposals: React.FC = () => {
@@ -29,6 +43,11 @@ const Proposals: React.FC = () => {
     });
 
     const [acceptances, setAcceptances] = useState<any[]>([]);
+
+    // Filter & Sort State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortProposals, setSortProposals] = useState<SortConfigProposal>({ key: 'created_at', direction: 'desc' });
+    const [sortAcceptances, setSortAcceptances] = useState<SortConfigAcceptance>({ key: 'timestamp', direction: 'desc' });
 
     useEffect(() => {
         if (darkMode) {
@@ -219,23 +238,129 @@ const Proposals: React.FC = () => {
         alert('Link copiado para a área de transferência!');
     };
 
+    const handleSortProposals = (key: SortKeyProposal) => {
+        setSortProposals(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const handleSortAcceptances = (key: SortKeyAcceptance) => {
+        setSortAcceptances(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const filteredProposals = useMemo(() => {
+        let sorted = [...proposals];
+
+        if (searchTerm) {
+            const lowerTerm = searchTerm.toLowerCase();
+            sorted = sorted.filter(p =>
+                p.company_name.toLowerCase().includes(lowerTerm) ||
+                p.responsible_name.toLowerCase().includes(lowerTerm)
+            );
+        }
+
+        sorted.sort((a, b) => {
+            if (sortProposals.key === 'company_name') {
+                return sortProposals.direction === 'asc'
+                    ? a.company_name.localeCompare(b.company_name)
+                    : b.company_name.localeCompare(a.company_name);
+            } else if (sortProposals.key === 'responsible_name') {
+                return sortProposals.direction === 'asc'
+                    ? a.responsible_name.localeCompare(b.responsible_name)
+                    : b.responsible_name.localeCompare(a.responsible_name);
+            } else {
+                return sortProposals.direction === 'asc'
+                    ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                    : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            }
+        });
+
+        return sorted;
+    }, [proposals, sortProposals, searchTerm]);
+
+    const filteredAcceptances = useMemo(() => {
+        let sorted = [...acceptances];
+
+        if (searchTerm) {
+            const lowerTerm = searchTerm.toLowerCase();
+            sorted = sorted.filter(a =>
+                a.company_name.toLowerCase().includes(lowerTerm) ||
+                a.name.toLowerCase().includes(lowerTerm)
+            );
+        }
+
+        sorted.sort((a, b) => {
+            if (sortAcceptances.key === 'company_name') {
+                return sortAcceptances.direction === 'asc'
+                    ? a.company_name.localeCompare(b.company_name)
+                    : b.company_name.localeCompare(a.company_name);
+            } else if (sortAcceptances.key === 'name') {
+                return sortAcceptances.direction === 'asc'
+                    ? a.name.localeCompare(b.name)
+                    : b.name.localeCompare(a.name);
+            } else if (sortAcceptances.key === 'status') {
+                const statusA = a.status || '';
+                const statusB = b.status || '';
+                return sortAcceptances.direction === 'asc'
+                    ? statusA.localeCompare(statusB)
+                    : statusB.localeCompare(statusA);
+            } else if (sortAcceptances.key === 'expiration_date') {
+                const dateA = a.expiration_date ? new Date(a.expiration_date).getTime() : 0;
+                const dateB = b.expiration_date ? new Date(b.expiration_date).getTime() : 0;
+                return sortAcceptances.direction === 'asc' ? dateA - dateB : dateB - dateA;
+            } else {
+                return sortAcceptances.direction === 'asc'
+                    ? new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                    : new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+            }
+        });
+
+        return sorted;
+    }, [acceptances, sortAcceptances, searchTerm]);
+
+    const getSortIconProposal = (key: SortKeyProposal) => {
+        if (sortProposals.key !== key) return <ArrowUpDown className="w-4 h-4 opacity-30" />;
+        return sortProposals.direction === 'asc' ? <ArrowUp className="w-4 h-4 text-brand-coral" /> : <ArrowDown className="w-4 h-4 text-brand-coral" />;
+    };
+
+    const getSortIconAcceptance = (key: SortKeyAcceptance) => {
+        if (sortAcceptances.key !== key) return <ArrowUpDown className="w-4 h-4 opacity-30" />;
+        return sortAcceptances.direction === 'asc' ? <ArrowUp className="w-4 h-4 text-brand-coral" /> : <ArrowDown className="w-4 h-4 text-brand-coral" />;
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
             <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex justify-between items-end mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Gerenciar Propostas</h2>
                         <p className="text-slate-500 dark:text-slate-400 text-sm">Crie, edite e acompanhe suas propostas comerciais.</p>
                     </div>
-                    <button
-                        onClick={() => navigate('/proposals/new')}
-                        className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-brand-coral/10 flex items-center gap-2"
-                    >
-                        <Plus size={20} />
-                        Nova Proposta
-                    </button>
+                    <div className="flex gap-4">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar propostas..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
+                            />
+                        </div>
+                        <button
+                            onClick={() => navigate('/proposals/new')}
+                            className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-6 py-2 rounded-xl font-bold transition-all shadow-lg shadow-brand-coral/10 flex items-center gap-2"
+                        >
+                            <Plus size={20} />
+                            <span className="hidden sm:inline">Nova Proposta</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="mb-12 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
@@ -257,15 +382,39 @@ const Proposals: React.FC = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
-                                        <th className="p-5 font-bold">Data</th>
-                                        <th className="p-5 font-bold">Empresa</th>
-                                        <th className="p-5 font-bold">Responsável</th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortProposals('created_at')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Data
+                                                {getSortIconProposal('created_at')}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortProposals('company_name')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Empresa
+                                                {getSortIconProposal('company_name')}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortProposals('responsible_name')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Responsável
+                                                {getSortIconProposal('responsible_name')}
+                                            </div>
+                                        </th>
                                         <th className="p-5 font-bold">Link</th>
                                         <th className="p-5 font-bold text-right">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    {proposals
+                                    {filteredProposals
                                         .filter(proposal => !acceptances.some(acc => acc.proposal_id === proposal.id))
                                         .map((proposal) => (
                                             <tr key={proposal.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -340,17 +489,57 @@ const Proposals: React.FC = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
-                                        <th className="p-5 font-bold">Data</th>
-                                        <th className="p-5 font-bold">Cliente</th>
-                                        <th className="p-5 font-bold">Empresa (CNPJ)</th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortAcceptances('timestamp')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Data
+                                                {getSortIconAcceptance('timestamp')}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortAcceptances('name')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Cliente
+                                                {getSortIconAcceptance('name')}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortAcceptances('company_name')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Empresa (CNPJ)
+                                                {getSortIconAcceptance('company_name')}
+                                            </div>
+                                        </th>
                                         <th className="p-5 font-bold">Contrato</th>
-                                        <th className="p-5 font-bold">Validade</th>
-                                        <th className="p-5 font-bold">Status</th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortAcceptances('expiration_date')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Validade
+                                                {getSortIconAcceptance('expiration_date')}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                            onClick={() => handleSortAcceptances('status')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Status
+                                                {getSortIconAcceptance('status')}
+                                            </div>
+                                        </th>
                                         <th className="p-5 font-bold text-right">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    {acceptances.map((acc) => (
+                                    {filteredAcceptances.map((acc) => (
                                         <tr key={acc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                             <td className="p-5">
                                                 <div className="flex items-center gap-2">
