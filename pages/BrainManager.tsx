@@ -127,8 +127,14 @@ export default function BrainManager() {
                 session_id: sessionId
             }).catch(console.error);
 
-            // 3. Ask Brain (RAG) — com session_id para memória de sessão
-            const response = await askBrain(userMsgContent, sessionId);
+            // 3. Ask Brain (RAG) — com fallback automático sem session_id se a primeira tentativa falhar
+            let response;
+            try {
+                response = await askBrain(userMsgContent, sessionId);
+            } catch (primaryAskError: any) {
+                console.error('Falha ao chamar chat-brain com session_id, tentando fallback sem session_id:', primaryAskError);
+                response = await askBrain(userMsgContent);
+            }
             const aiMsgContent = response.answer;
 
             // 4. Save AI Message to DB (não bloqueia)
@@ -164,13 +170,24 @@ export default function BrainManager() {
                 setMessages(prev => [...prev, fallbackAiMsg]);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to send message:', error);
+            let debugMessage = '';
+            if (error && typeof error === 'object' && 'context' in error) {
+                try {
+                    const body = await error.context.json();
+                    debugMessage = body?.error ? ` Detalhes: ${body.error}` : '';
+                } catch {
+                    debugMessage = '';
+                }
+            } else if (error?.message) {
+                debugMessage = ` Detalhes: ${error.message}`;
+            }
             const errorMsg: ChatMessage = {
                 id: 'temp-error-' + Date.now(),
                 session_id: sessionId,
                 role: 'assistant',
-                content: 'Não consegui responder agora por um erro de integração. Tente novamente em alguns segundos.',
+                content: `Não consegui responder agora por um erro de integração. Tente novamente em alguns segundos.${debugMessage}`,
                 created_at: new Date().toISOString()
             };
             setMessages(prev => [...prev, errorMsg]);
