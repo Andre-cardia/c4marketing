@@ -48,6 +48,16 @@ Deno.serve(async (req) => {
             if (user) {
                 userId = user.id
                 userRole = user.role ?? 'authenticated'
+                const fallbackName =
+                    user.user_metadata?.full_name
+                    || user.user_metadata?.name
+                    || (user.email ? user.email.split('@')[0] : 'Usuário')
+                userProfile = {
+                    name: fallbackName,
+                    full_name: user.user_metadata?.full_name || fallbackName,
+                    email: user.email || null,
+                    role: userRole,
+                }
 
                 // Buscar perfil completo do usuário (por email, pois app_users.id ≠ auth.users.id)
                 const userEmail = user.email
@@ -55,8 +65,9 @@ Deno.serve(async (req) => {
                     const { data: profile } = await supabaseAdmin
                         .from('app_users')
                         .select('name, email, role, full_name')
-                        .eq('email', userEmail)
-                        .single()
+                        .ilike('email', userEmail)
+                        .limit(1)
+                        .maybeSingle()
 
                     if (profile) {
                         userProfile = profile
@@ -84,6 +95,120 @@ Deno.serve(async (req) => {
             const normalized = normalizeText(text)
             return terms.some((term) => normalized.includes(normalizeText(term)))
         }
+
+        type DbQueryCall = {
+            rpc_name: string
+            params: Record<string, any>
+        }
+
+        const dbRpcNames = new Set([
+            'query_all_proposals',
+            'query_all_clients',
+            'query_all_projects',
+            'query_all_users',
+            'query_all_tasks',
+            'query_access_summary',
+            'query_survey_responses',
+        ])
+
+        const cleanRpcParams = (params: Record<string, any>) => {
+            const cleaned: Record<string, any> = {}
+            for (const [k, v] of Object.entries(params || {})) {
+                if (v !== null && v !== undefined && v !== 'null') cleaned[k] = v
+            }
+            return cleaned
+        }
+
+        const callKey = (call: DbQueryCall) => {
+            const clean = cleanRpcParams(call.params)
+            const sorted = Object.fromEntries(
+                Object.entries(clean).sort(([a], [b]) => a.localeCompare(b))
+            )
+            return `${call.rpc_name}:${JSON.stringify(sorted)}`
+        }
+
+        const dedupeDbCalls = (calls: DbQueryCall[]) => {
+            const seen = new Set<string>()
+            const unique: DbQueryCall[] = []
+            for (const call of calls) {
+                const key = callKey(call)
+                if (seen.has(key)) continue
+                seen.add(key)
+                unique.push({ rpc_name: call.rpc_name, params: cleanRpcParams(call.params) })
+            }
+            return unique
+        }
+
+        const inferSupplementalDbCalls = (text: string): DbQueryCall[] => {
+            const calls: DbQueryCall[] = []
+
+            const mentionsTasks = hasAny(text, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'pendente', 'pendentes'])
+            const mentionsUsers = hasAny(text, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            const mentionsAccess = hasAny(text, ['acesso', 'acessos', 'acessou', 'logou', 'login', 'entrou'])
+            const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
+            const mentionsClients = hasAny(text, ['cliente', 'clientes'])
+            const mentionsProposals = hasAny(text, ['proposta', 'propostas', 'orcamento', 'orçamento'])
+
+            if (mentionsTasks) {
+                let p_status: string | null = null
+                if (hasAny(text, ['pendente', 'pendentes', 'a fazer', 'em aberto'])) p_status = 'todo'
+                else if (hasAny(text, ['em andamento', 'andamento'])) p_status = 'in_progress'
+                else if (hasAny(text, ['concluida', 'concluído', 'concluido', 'finalizada', 'finalizado'])) p_status = 'done'
+                calls.push({ rpc_name: 'query_all_tasks', params: p_status ? { p_status } : {} })
+            }
+
+            if (mentionsUsers && mentionsAccess) {
+                calls.push({ rpc_name: 'query_access_summary', params: {} })
+            } else if (mentionsUsers) {
+                calls.push({ rpc_name: 'query_all_users', params: {} })
+            } else if (mentionsAccess) {
+                calls.push({ rpc_name: 'query_access_summary', params: {} })
+            }
+
+            if (mentionsProjects) {
+                const params: Record<string, any> = {}
+                if (hasAny(text, ['trafego', 'tráfego', 'traffic', 'gestao de trafego', 'gestão de tráfego'])) {
+                    params.p_service_type = 'traffic'
+                } else if (hasAny(text, ['site', 'website'])) {
+                    params.p_service_type = 'website'
+                } else if (hasAny(text, ['landing', 'lp', 'pagina de captura', 'página de captura'])) {
+                    params.p_service_type = 'landing_page'
+                }
+
+                if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                    params.p_status_filter = 'Ativo'
+                } else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) {
+                    params.p_status_filter = 'Inativo'
+                }
+
+                calls.push({ rpc_name: 'query_all_projects', params })
+            }
+
+            if (mentionsClients) {
+                const params: Record<string, any> = {}
+                if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                    params.p_status = 'Ativo'
+                } else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) {
+                    params.p_status = 'Inativo'
+                }
+                calls.push({ rpc_name: 'query_all_clients', params })
+            }
+
+            if (mentionsProposals) {
+                let p_status_filter: 'all' | 'open' | 'accepted' = 'all'
+                if (hasAny(text, ['aberta', 'aberto', 'em aberto', 'pendente', 'pendentes', 'nao aceita', 'não aceita', 'sem aceite'])) {
+                    p_status_filter = 'open'
+                } else if (hasAny(text, ['aceita', 'aceitas', 'aprovada', 'aprovadas', 'fechada', 'fechadas', 'aceite'])) {
+                    p_status_filter = 'accepted'
+                }
+                calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
+            }
+
+            return dedupeDbCalls(calls).slice(0, 5)
+        }
+
+        const mergeDbCalls = (primary: DbQueryCall[], supplemental: DbQueryCall[]) =>
+            dedupeDbCalls([...(primary || []), ...(supplemental || [])]).slice(0, 5)
 
         // 1b. Carregar histórico da sessão (memória cognitiva)
         let sessionMessages: Array<{ role: string; content: string }> = []
@@ -168,7 +293,7 @@ Deno.serve(async (req) => {
         // 2. Router Step
         const routerInput: RouterInput = {
             tenant_id: userId,
-            session_id: session_id,
+            session_id: session_id ?? '',
             user_role: userRole,
             user_message: query,
         }
@@ -328,19 +453,29 @@ Exemplos:
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
 - "mostre as respostas do formulário de tráfego" → query_survey_responses(p_project_type: "traffic")
-Escolha UMA ferramenta e seus parâmetros.`
+Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
+Retorne apenas function calls (sem texto livre).`
                     },
                     { role: 'user', content: input.user_message }
                 ]
             })
 
-            const toolCall = completion.choices[0].message.tool_calls?.[0]
+            const rawToolCalls = completion.choices[0].message.tool_calls ?? []
 
-            if (toolCall) {
-                const funcName = toolCall.function.name
-                const funcArgs = JSON.parse(toolCall.function.arguments || '{}')
-
-                console.log(`[LLM Router] Chose: ${funcName}(${JSON.stringify(funcArgs)})`)
+            if (rawToolCalls.length > 0) {
+                const parsedCalls: Array<{ name: string; args: Record<string, any> }> = []
+                for (const toolCall of rawToolCalls) {
+                    const funcName = toolCall.function.name
+                    let funcArgs: Record<string, any> = {}
+                    try {
+                        const raw = toolCall.function.arguments || '{}'
+                        const parsed = JSON.parse(raw)
+                        funcArgs = parsed && typeof parsed === 'object' ? parsed : {}
+                    } catch (parseError) {
+                        console.warn('[LLM Router] Invalid tool args JSON, using empty args:', parseError)
+                    }
+                    parsedCalls.push({ name: funcName, args: funcArgs })
+                }
 
                 // Mapear função para agente e configuração
                 const funcToAgent: Record<string, { agent: string; artifact_kind: string }> = {
@@ -354,34 +489,83 @@ Escolha UMA ferramenta e seus parâmetros.`
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                 }
 
-                const config = funcToAgent[funcName] || funcToAgent['rag_search']
-                const isDbQuery = funcName !== 'rag_search'
+                const llmDbCalls: DbQueryCall[] = parsedCalls
+                    .filter((call) => call.name !== 'rag_search')
+                    .filter((call) => dbRpcNames.has(call.name))
+                    .map((call) => ({ rpc_name: call.name, params: call.args || {} }))
 
-                return {
-                    artifact_kind: config.artifact_kind,
-                    task_kind: 'factual_lookup',
-                    risk_level: 'low',
-                    agent: config.agent,
-                    retrieval_policy: 'STRICT_DOCS_ONLY',
-                    filters: {
-                        tenant_id: input.tenant_id,
-                        type_allowlist: ['official_doc', 'session_summary'],
-                        type_blocklist: ['chat_log'],
+                // Complementa consultas em perguntas compostas para evitar respostas parciais.
+                const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
+                const dbCalls = mergeDbCalls(llmDbCalls, supplementalDbCalls)
+
+                if (dbCalls.length > 0) {
+                    const primary = dbCalls[0]
+                    const config = funcToAgent[primary.rpc_name] || funcToAgent['query_all_projects']
+                    const isBatch = dbCalls.length > 1
+                    const dbQueryParams = isBatch
+                        ? {
+                            rpc_name: '__batch__',
+                            calls: dbCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                        }
+                        : { rpc_name: primary.rpc_name, ...primary.params }
+
+                    console.log(`[LLM Router] Chose DB call(s): ${JSON.stringify(dbQueryParams)}`)
+
+                    return {
                         artifact_kind: config.artifact_kind,
-                        source_table: null,
-                        client_id: null,
-                        project_id: null,
-                        source_id: null,
-                        status: 'active',
-                        time_window_minutes: null,
-                    },
-                    top_k: isDbQuery ? 0 : 10,
-                    tools_allowed: ['rag_search', 'db_read'],
-                    tool_hint: isDbQuery ? 'db_query' : 'rag_search',
-                    db_query_params: isDbQuery ? { rpc_name: funcName, ...funcArgs } : undefined,
-                    confidence: 0.95,
-                    reason: `LLM Router: ${funcName}(${JSON.stringify(funcArgs)})`,
-                } as RouteDecision
+                        task_kind: 'factual_lookup',
+                        risk_level: 'low',
+                        agent: config.agent,
+                        retrieval_policy: 'STRICT_DOCS_ONLY',
+                        filters: {
+                            tenant_id: input.tenant_id,
+                            type_allowlist: ['official_doc', 'session_summary'],
+                            type_blocklist: ['chat_log'],
+                            artifact_kind: config.artifact_kind,
+                            source_table: null,
+                            client_id: null,
+                            project_id: null,
+                            source_id: null,
+                            status: 'active',
+                            time_window_minutes: null,
+                        },
+                        top_k: 0,
+                        tools_allowed: ['rag_search', 'db_read'],
+                        tool_hint: 'db_query',
+                        db_query_params: dbQueryParams,
+                        confidence: 0.95,
+                        reason: isBatch
+                            ? `LLM Router batch DB (${dbCalls.map((c) => c.rpc_name).join(', ')})`
+                            : `LLM Router DB (${primary.rpc_name})`,
+                    } as RouteDecision
+                }
+
+                if (parsedCalls.some((call) => call.name === 'rag_search')) {
+                    return {
+                        artifact_kind: 'unknown',
+                        task_kind: 'factual_lookup',
+                        risk_level: 'low',
+                        agent: 'Agent_Projects',
+                        retrieval_policy: 'STRICT_DOCS_ONLY',
+                        filters: {
+                            tenant_id: input.tenant_id,
+                            type_allowlist: ['official_doc', 'session_summary'],
+                            type_blocklist: ['chat_log'],
+                            artifact_kind: null,
+                            source_table: null,
+                            client_id: null,
+                            project_id: null,
+                            source_id: null,
+                            status: 'active',
+                            time_window_minutes: null,
+                        },
+                        top_k: 10,
+                        tools_allowed: ['rag_search'],
+                        tool_hint: 'rag_search',
+                        confidence: 0.85,
+                        reason: 'LLM Router selected rag_search',
+                    } as RouteDecision
+                }
             }
 
             // Fallback se LLM não escolheu tool
@@ -418,28 +602,66 @@ Escolha UMA ferramenta e seus parâmetros.`
         // 3. Retrieval Step (Hybrid: RAG ou SQL direto)
         let contextText = ''
         let retrievedDocs: any[] = []
+        let executedDbRpcs: string[] = []
 
-        if (decision.tool_hint === 'db_query' && decision.db_query_params) {
-            // === SQL DIRETO (listagens, contagens, filtros exatos) ===
-            console.log(`[Tool] db_query → ${decision.db_query_params.rpc_name}`)
-            const { rpc_name, ...rpcParams } = decision.db_query_params
-            // Limpar valores null/undefined dos parâmetros (RPCs usam DEFAULT NULL)
-            const cleanParams: Record<string, any> = {}
-            for (const [k, v] of Object.entries(rpcParams)) {
-                if (v !== null && v !== undefined && v !== 'null') cleanParams[k] = v
-            }
+        const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
+            const cleanParams = cleanRpcParams(rpcParams)
+            console.log(`[Tool] db_query → ${rpc_name}`)
             console.log(`[Tool] db_query params:`, JSON.stringify(cleanParams))
+
             const { data, error: rpcError } = await supabaseAdmin.rpc(rpc_name, cleanParams)
 
             if (rpcError) {
                 console.error('RPC error:', rpcError)
-                contextText = `Erro ao consultar banco de dados: ${rpcError.message}`
-            } else if (!data || (Array.isArray(data) && data.length === 0) || data === '[]') {
-                contextText = `CONSULTA REALIZADA COM SUCESSO via ${rpc_name}, mas NENHUM registro foi encontrado. Informe ao usuário que a consulta foi feita no banco de dados e não há registros correspondentes no momento.`
+                return `CONSULTA SQL FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`
+            }
+
+            let normalizedData: any = data
+            if (typeof normalizedData === 'string') {
+                try {
+                    normalizedData = JSON.parse(normalizedData)
+                } catch {
+                    // mantém string original se não for JSON válido
+                }
+            }
+
+            if (!normalizedData || (Array.isArray(normalizedData) && normalizedData.length === 0) || normalizedData === '[]') {
+                return `CONSULTA REALIZADA COM SUCESSO via ${rpc_name}, mas NENHUM registro foi encontrado. Informe ao usuário que a consulta foi feita no banco de dados e não há registros correspondentes no momento.`
+            }
+
+            const records = Array.isArray(normalizedData) ? normalizedData : [normalizedData]
+            return `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`
+        }
+
+        if (decision.tool_hint === 'db_query' && decision.db_query_params) {
+            // === SQL DIRETO (listagens, contagens, filtros exatos) ===
+            const plannedCalls: DbQueryCall[] = []
+
+            if (decision.db_query_params.rpc_name === '__batch__' && Array.isArray(decision.db_query_params.calls)) {
+                for (const rawCall of decision.db_query_params.calls) {
+                    if (!rawCall || typeof rawCall !== 'object') continue
+                    const { rpc_name, ...rpcParams } = rawCall
+                    if (typeof rpc_name !== 'string' || !dbRpcNames.has(rpc_name)) continue
+                    plannedCalls.push({ rpc_name, params: rpcParams })
+                }
             } else {
-                const records = Array.isArray(data) ? data : [data]
-                contextText = `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n`
-                contextText += JSON.stringify(records, null, 2)
+                const { rpc_name, ...rpcParams } = decision.db_query_params
+                if (typeof rpc_name === 'string' && dbRpcNames.has(rpc_name)) {
+                    plannedCalls.push({ rpc_name, params: rpcParams })
+                }
+            }
+
+            const finalCalls = dedupeDbCalls(plannedCalls)
+            if (finalCalls.length === 0) {
+                contextText = 'Nenhuma consulta SQL válida foi selecionada para esta pergunta.'
+            } else {
+                const sections: string[] = []
+                for (const call of finalCalls) {
+                    executedDbRpcs.push(call.rpc_name)
+                    const section = await executeDbRpc(call.rpc_name, call.params)
+                    sections.push(section)
+                }
+                contextText = sections.join('\n\n')
             }
         } else {
             // === RAG (busca semântica) ===
@@ -480,11 +702,13 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Não se exima: traga conclusão objetiva, riscos e próxima ação recomendada.
 - Se faltar dado, diga exatamente o que falta e faça uma pergunta curta de esclarecimento.
 - Se houver histórico fornecido no prompt, use esse histórico. Não diga que não tem acesso ao histórico quando ele estiver disponível.
+- Se a FONTE DOS DADOS for SQL direta, nunca diga que precisa "acessar outro sistema" ou "confirmar qual banco". As consultas SQL já foram executadas.
+- Se a pergunta tiver mais de uma parte (ex: tarefas + usuários + projetos), responda em blocos separados cobrindo cada parte.
         `.trim()
 
         // Montar bloco de identidade
         const identityBlock = userProfile
-            ? `\nIDENTIDADE DO USUÁRIO (quem está conversando com você):\n- Nome: ${userProfile.full_name || userProfile.name}\n- Email: ${userProfile.email}\n- Cargo: ${userProfile.role}\nVocê deve se dirigir ao usuário pelo nome e adaptar sua linguagem ao cargo dele.`
+            ? `\nIDENTIDADE DO USUÁRIO (quem está conversando com você):\n- Nome: ${userProfile.full_name || userProfile.name}\n- Email: ${userProfile.email}\n- Cargo: ${userProfile.role}\n- Auth User ID: ${userId}\nVocê deve se dirigir ao usuário pelo nome e adaptar sua linguagem ao cargo dele.`
             : ''
 
         const crossSessionMemoryBlock = shouldInjectCrossSessionMemory
@@ -568,7 +792,8 @@ ${crossSessionMemoryBlock}
             documents: retrievedDocs,
             meta: {
                 decision: decision,
-                agent: agentConfig.name
+                agent: agentConfig.name,
+                executed_db_rpcs: executedDbRpcs
             }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

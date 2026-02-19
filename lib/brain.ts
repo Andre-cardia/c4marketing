@@ -230,10 +230,7 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
 
     const { error: userCheckError } = await supabase.auth.getUser(token);
     if (userCheckError) {
-        return {
-            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token inválido no Auth (${userCheckError.message}).`,
-            documents: [],
-        };
+        console.warn('askBrain auth precheck warning (continuing to edge function validation):', userCheckError.message);
     }
 
     try {
