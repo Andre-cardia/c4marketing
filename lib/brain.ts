@@ -30,6 +30,41 @@ function isInvalidJwtMessage(message: string): boolean {
     return (message || '').toLowerCase().includes('invalid jwt');
 }
 
+function getProjectRefFromSupabaseUrl(url?: string): string | null {
+    if (!url) return null;
+    try {
+        const host = new URL(url).hostname; // <ref>.supabase.co
+        return host.split('.')[0] || null;
+    } catch {
+        return null;
+    }
+}
+
+function decodeJwtPayload(token: string): Record<string, any> | null {
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+        const json = atob(padded);
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
+function getProjectRefFromJwt(token: string): string | null {
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
+
+    const fromRef = typeof payload.ref === 'string' ? payload.ref : null;
+    if (fromRef) return fromRef;
+
+    const iss = typeof payload.iss === 'string' ? payload.iss : '';
+    const match = iss.match(/https:\/\/([a-z0-9]+)\.supabase\.co\/auth\/v1/i);
+    return match?.[1] ?? null;
+}
+
 async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken: string): Promise<AskBrainResponse> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -128,6 +163,7 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
 
 export async function askBrain(query: string, sessionId?: string): Promise<AskBrainResponse> {
     const payload = { query, session_id: sessionId || null };
+    const expectedRef = getProjectRefFromSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 
     let token = await getValidAccessToken();
     if (!token) {
@@ -140,6 +176,14 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
     if (!token) {
         return {
             answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão expirada. Faça login novamente.',
+            documents: [],
+        };
+    }
+
+    const tokenRef = getProjectRefFromJwt(token);
+    if (expectedRef && tokenRef && expectedRef !== tokenRef) {
+        return {
+            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token de autenticação de outro projeto (token: ${tokenRef}, app: ${expectedRef}). Corrija VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY do frontend.`,
             documents: [],
         };
     }
@@ -169,7 +213,7 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
                 }
             }
             return {
-                answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Faça login novamente.',
+                answer: `Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Projeto esperado: ${expectedRef || 'desconhecido'}; token: ${tokenRef || 'não identificado'}.`,
                 documents: [],
             };
         }
