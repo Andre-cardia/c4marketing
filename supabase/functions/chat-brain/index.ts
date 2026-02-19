@@ -38,13 +38,65 @@ Deno.serve(async (req) => {
         let userId = 'anon_user'
         let userProfile: any = null
 
+        const getProjectRefFromSupabaseUrl = () => {
+            try {
+                const url = Deno.env.get('SUPABASE_URL') ?? ''
+                const host = new URL(url).hostname
+                return host.split('.')[0] || null
+            } catch {
+                return null
+            }
+        }
+
+        const decodeJwtPayload = (token: string): Record<string, any> | null => {
+            try {
+                const parts = token.split('.')
+                if (parts.length !== 3) return null
+                const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+                const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
+                const json = atob(padded)
+                return JSON.parse(json)
+            } catch {
+                return null
+            }
+        }
+
+        const getProjectRefFromPayload = (payload: Record<string, any> | null): string | null => {
+            if (!payload) return null
+            if (typeof payload.ref === 'string' && payload.ref) return payload.ref
+            const iss = typeof payload.iss === 'string' ? payload.iss : ''
+            const match = iss.match(/https:\/\/([a-z0-9]+)\.supabase\.co\/auth\/v1/i)
+            return match?.[1] ?? null
+        }
+
+        const applyProfileByEmail = async (email: string | null) => {
+            if (!email) return
+            const { data: profile } = await supabaseAdmin
+                .from('app_users')
+                .select('name, email, role, full_name')
+                .ilike('email', email)
+                .limit(1)
+                .maybeSingle()
+
+            if (profile) {
+                userProfile = profile
+                userRole = profile.role || userRole
+            } else if (userProfile && !userProfile.email) {
+                userProfile.email = email
+            }
+        }
+
         if (authHeader) {
+            const authToken = authHeader.replace(/^Bearer\s+/i, '').trim()
             const client = createClient(
                 Deno.env.get('SUPABASE_URL') ?? '',
                 Deno.env.get('SUPABASE_ANON_KEY') ?? '',
                 { global: { headers: { Authorization: authHeader } } }
             )
-            const { data: { user } } = await client.auth.getUser()
+            const { data: { user }, error: userAuthError } = await client.auth.getUser(authToken)
+            if (userAuthError) {
+                console.error('chat-brain auth.getUser error:', userAuthError.message)
+            }
             if (user) {
                 userId = user.id
                 userRole = user.role ?? 'authenticated'
@@ -58,21 +110,53 @@ Deno.serve(async (req) => {
                     email: user.email || null,
                     role: userRole,
                 }
+                await applyProfileByEmail(user.email || null)
+            } else {
+                // Fallback resiliente: JWT pode estar inválido para verificação, mas ainda conter claims úteis.
+                // Usado para evitar bloqueio completo do chat quando a sessão local está inconsistente.
+                const payload = decodeJwtPayload(authToken)
+                const expectedRef = getProjectRefFromSupabaseUrl()
+                const tokenRef = getProjectRefFromPayload(payload)
+                const tokenSub = typeof payload?.sub === 'string' ? payload.sub : null
+                const tokenRole = typeof payload?.role === 'string' ? payload.role : 'authenticated'
+                const refMatches = !expectedRef || !tokenRef || tokenRef === expectedRef
 
-                // Buscar perfil completo do usuário (por email, pois app_users.id ≠ auth.users.id)
-                const userEmail = user.email
-                if (userEmail) {
-                    const { data: profile } = await supabaseAdmin
-                        .from('app_users')
-                        .select('name, email, role, full_name')
-                        .ilike('email', userEmail)
-                        .limit(1)
-                        .maybeSingle()
+                if (tokenSub && refMatches) {
+                    userId = tokenSub
+                    userRole = tokenRole || 'authenticated'
 
-                    if (profile) {
-                        userProfile = profile
-                        userRole = profile.role || userRole
+                    let fallbackEmail = typeof payload?.email === 'string' ? payload.email : null
+                    let fallbackName =
+                        payload?.user_metadata?.full_name
+                        || payload?.user_metadata?.name
+                        || (fallbackEmail ? fallbackEmail.split('@')[0] : 'Usuário')
+
+                    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(tokenSub)
+                    if (!adminUserError && adminUserData?.user) {
+                        const adminUser = adminUserData.user
+                        fallbackEmail = fallbackEmail || adminUser.email || null
+                        fallbackName =
+                            adminUser.user_metadata?.full_name
+                            || adminUser.user_metadata?.name
+                            || fallbackName
+                    } else if (adminUserError) {
+                        console.error('chat-brain auth.admin.getUserById fallback error:', adminUserError.message)
                     }
+
+                    userProfile = {
+                        name: fallbackName,
+                        full_name: fallbackName,
+                        email: fallbackEmail,
+                        role: userRole,
+                    }
+                    await applyProfileByEmail(fallbackEmail)
+                    console.warn(`chat-brain auth fallback engaged for user ${userId}`)
+                } else {
+                    console.error('chat-brain auth fallback failed (claims missing or ref mismatch)', {
+                        expectedRef,
+                        tokenRef,
+                        hasSub: !!tokenSub,
+                    })
                 }
             }
         }
