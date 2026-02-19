@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, CheckCircle2, Clock, CheckCircle, File, LayoutTemplate, MessageSquare, Settings, TrendingUp } from 'lucide-react';
+import { Globe, Code, PenTool, Search, Layout, AppWindow } from 'lucide-react';
 
 interface WebsiteProjectViewProps {
     project: any;
@@ -8,131 +8,104 @@ interface WebsiteProjectViewProps {
 
 export const WebsiteProjectView: React.FC<WebsiteProjectViewProps> = ({ project, websites }) => {
 
-    const STATUS_FLOW = [
-        { id: 'content_received', label: 'Recebimento de Conteúdos', icon: File },
-        { id: 'design', label: 'Design e Template', icon: LayoutTemplate },
-        { id: 'approval', label: 'Aprovação', icon: MessageSquare },
-        { id: 'adjustments', label: 'Ajustes', icon: Settings },
-        { id: 'delivered', label: 'Entrega', icon: CheckCircle }
-    ];
-
-    const getStatusIndex = (status: string) => STATUS_FLOW.findIndex(s => s.id === status);
+    // Example status mapping - adapt as needed
+    const getStatusInfo = (status: string) => {
+        switch (status) {
+            case 'completed': return { label: 'Concluído', color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' };
+            case 'in_progress': return { label: 'Em Desenvolvimento', color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' };
+            default: return { label: 'Pendente', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/20' };
+        }
+    };
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all">
-                    <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <CheckCircle2 size={80} className="text-cyan-500 transform translate-x-4 -translate-y-4" />
-                    </div>
-                    <div className="relative z-10">
-                        <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider">Status do Projeto</p>
-                        <div className="text-2xl font-bold text-white flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                                <CheckCircle2 className="text-cyan-500 w-4 h-4" />
-                            </div>
-                            {project.briefing_status === 'completed' ? 'Em Desenvolvimento' : 'Aguardando Briefing'}
-                        </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-slate-800/50 text-[10px] text-slate-500 flex items-center gap-1 font-medium">
-                        <TrendingUp size={12} className="text-cyan-500" />
-                        <span>Progresso na linha do tempo</span>
-                    </div>
-                </div>
+        <div className="bg-white dark:bg-[#0B1221] border border-slate-200 dark:border-[#1E293B] rounded-2xl p-6 md:p-8 shadow-xl dark:shadow-2xl relative overflow-hidden group transition-colors duration-300">
+            {/* Decorative Background Element */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#F06C6C]/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all">
-                    <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <Globe size={80} className="text-cyan-500 transform translate-x-4 -translate-y-4" />
-                    </div>
-                    <div className="relative z-10">
-                        <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider">Sites em Produção</p>
-                        <div className="text-2xl font-bold text-white flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                                <Globe className="text-cyan-500 w-4 h-4" />
-                            </div>
-                            {websites.length}
-                        </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-slate-800/50 text-[10px] text-slate-500 flex items-center gap-1 font-medium">
-                        <TrendingUp size={12} className="text-cyan-500" />
-                        <span>Web Sites</span>
-                    </div>
+            <div className="flex items-center gap-3 mb-8 relative z-10">
+                <div className="p-2 bg-[#F06C6C]/10 rounded-lg border border-[#F06C6C]/20">
+                    <Globe className="text-[#F06C6C] w-6 h-6" />
                 </div>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white font-montserrat">Desenvolvimento de Sites</h2>
             </div>
 
-            {/* Sites List */}
-            <div>
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold flex items-center gap-3 text-white">
-                        <Globe className="text-cyan-500 w-5 h-5" />
-                        Gestão de Web Sites
-                    </h2>
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-10">
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-[#1E293B] p-5 rounded-xl relative overflow-hidden group hover:border-[#334155] transition-all">
+                        <div className="absolute top-0 right-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Code size={80} className="text-[#F06C6C] transform translate-x-4 -translate-y-4" />
+                        </div>
+                        <div className="relative z-10">
+                            <p className="text-slate-500 text-xs font-bold mb-2 uppercase tracking-wider font-montserrat">Semanas de Desenvolvimento</p>
+                            <div className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[#F06C6C]/10 flex items-center justify-center">
+                                    <Code className="text-[#F06C6C] w-4 h-4" />
+                                </div>
+                                {Math.floor((Date.now() - new Date(project.created_at).getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1}
+                            </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-[#1E293B] text-[10px] text-slate-500 flex items-center gap-1 font-medium">
+                            <AppWindow size={12} className="text-[#F06C6C]" />
+                            <span>Progresso contínuo</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="space-y-6">
-                    {websites.length === 0 ? (
-                        <div className="p-12 border border-dashed border-slate-800 rounded-3xl text-center bg-slate-900/30">
-                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Globe className="text-slate-600" size={32} />
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-2">Nenhum Site encontrado</h3>
-                            <p className="text-slate-500">Estamos preparando seus sites. Em breve aparecerão aqui.</p>
-                        </div>
-                    ) : (
-                        websites.map(site => (
-                            <div key={site.id} className="bg-slate-900 border border-slate-800 p-0 rounded-2xl shadow-lg relative overflow-hidden">
-                                {/* Page Header */}
-                                <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
-                                    <div className="flex items-center gap-3">
-                                        <span className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">
-                                            <Globe size={20} />
-                                        </span>
-                                        <h3 className="text-lg font-bold text-white">{site.name}</h3>
-                                    </div>
-                                    <span className="text-xs font-mono text-slate-500">{new Date(site.created_at).toLocaleDateString()}</span>
+                {/* Websites List */}
+                <div>
+                    <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest font-montserrat px-1">Projetos Web</h3>
+                    <div className="space-y-6">
+                        {websites.length === 0 ? (
+                            <div className="p-12 border border-dashed border-slate-300 dark:border-[#1E293B] rounded-xl text-center bg-slate-50 dark:bg-[#0F172A]/50">
+                                <div className="w-16 h-16 bg-slate-200 dark:bg-[#1E293B] rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Globe className="text-slate-500 dark:text-slate-600" size={32} />
                                 </div>
-
-                                {/* Status Flow */}
-                                <div className="p-6">
-                                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                                        {STATUS_FLOW.map((step, idx) => {
-                                            const currentIndex = getStatusIndex(site.status);
-                                            const isCompleted = idx <= currentIndex;
-                                            const isCurrent = idx === currentIndex;
-
-                                            return (
-                                                <div
-                                                    key={step.id}
-                                                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all group relative overflow-hidden
-                                                        ${isCurrent
-                                                            ? 'border-brand-coral/50 bg-brand-coral/10'
-                                                            : isCompleted
-                                                                ? 'border-emerald-500/20 bg-emerald-500/5'
-                                                                : 'border-slate-800 bg-slate-900/50 opacity-60'
-                                                        }
-                                                    `}
-                                                >
-                                                    <div className={`mb-3 transition-transform 
-                                                        ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-emerald-400' : 'text-slate-500'}
-                                                    `}>
-                                                        <step.icon size={28} />
-                                                    </div>
-                                                    <span className={`text-sm font-bold text-center
-                                                        ${isCurrent ? 'text-brand-coral' : isCompleted ? 'text-emerald-400' : 'text-slate-500'}
-                                                    `}>
-                                                        {step.label}
-                                                    </span>
-
-                                                    {isCurrent && <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-coral"></div>}
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 font-montserrat">Nenhum site em desenvolvimento</h3>
+                                <p className="text-slate-500">Seus projetos de website aparecerão aqui assim que iniciados.</p>
+                            </div>
+                        ) : (
+                            websites.map((site) => {
+                                const status = getStatusInfo(site.status || 'in_progress');
+                                return (
+                                    <div key={site.id} className="bg-slate-50 dark:bg-[#0F172A] border border-slate-200 dark:border-[#1E293B] p-6 rounded-xl hover:border-slate-300 dark:hover:border-[#334155] transition-all">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-white dark:bg-[#1E293B] rounded-xl flex items-center justify-center border border-slate-200 dark:border-[#334155]">
+                                                    <Globe className="text-[#F06C6C] w-6 h-6" />
                                                 </div>
-                                            );
-                                        })}
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white font-montserrat">{site.domain || 'Dominio Pendente'}</h3>
+                                                    <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[#F06C6C] hover:underline flex items-center gap-1 mt-1">
+                                                        Acessar site <Search size={10} />
+                                                    </a>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full md:w-auto">
+                                                <div className="flex flex-col items-center p-3 bg-white dark:bg-[#1E293B]/50 rounded-lg border border-slate-200 dark:border-[#1E293B]">
+                                                    <span className="text-xs text-slate-500 font-bold uppercase mb-1">Design</span>
+                                                    <PenTool size={16} className="text-[#F06C6C]" />
+                                                </div>
+                                                <div className="flex flex-col items-center p-3 bg-white dark:bg-[#1E293B]/50 rounded-lg border border-slate-200 dark:border-[#1E293B]">
+                                                    <span className="text-xs text-slate-500 font-bold uppercase mb-1">Conteúdo</span>
+                                                    <Layout size={16} className="text-[#F06C6C]" />
+                                                </div>
+                                                <div className="flex flex-col items-center p-3 bg-white dark:bg-[#1E293B]/50 rounded-lg border border-slate-200 dark:border-[#1E293B]">
+                                                    <span className="text-xs text-slate-500 font-bold uppercase mb-1">Dev</span>
+                                                    <Code size={16} className="text-[#F06C6C]" />
+                                                </div>
+                                                <div className={`flex flex-col items-center p-3 rounded-lg border ${status.bg} ${status.border}`}>
+                                                    <span className="text-xs text-slate-500 font-bold uppercase mb-1">Status</span>
+                                                    <span className={`text-xs font-bold ${status.color}`}>{status.label}</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
+                                )
+                            })
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

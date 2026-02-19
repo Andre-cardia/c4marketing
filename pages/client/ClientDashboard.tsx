@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
-import { LogOut, LayoutDashboard, BarChart3, Wallet, AlertCircle, Eye, Menu, X, Clock } from 'lucide-react';
+import { useTheme } from '../../lib/ThemeContext';
+import { LogOut, LayoutDashboard, BarChart3, Wallet, AlertCircle, Eye, Menu, X, Clock, Sun, Moon } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TrafficProjectView } from './components/TrafficProjectView';
 import { LandingPageProjectView } from './components/LandingPageProjectView';
 import { WebsiteProjectView } from './components/WebsiteProjectView';
+
+// Import logo directly if possible, or use absolute path if in public
+const LOGO_URL = '/logo-c4-prancheta-7.png';
 
 interface ProjectSummary {
     id: string; // Project ID
@@ -18,6 +22,7 @@ interface ProjectSummary {
 const ClientDashboard: React.FC = () => {
     const { acceptanceId } = useParams<{ acceptanceId?: string }>();
     const { email, fullName, userRole } = useUserRole();
+    const { darkMode, setDarkMode } = useTheme();
     const navigate = useNavigate();
 
     // State
@@ -211,25 +216,25 @@ const ClientDashboard: React.FC = () => {
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
     if (loading) {
-        return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 animate-pulse">Carregando escritório virtual...</div>;
+        return <div className="min-h-screen bg-slate-50 dark:bg-[#0F172A] flex items-center justify-center text-slate-500 animate-pulse transition-colors duration-300">Carregando escritório virtual...</div>;
     }
 
     if (allProjects.length === 0) {
         return (
-            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6">
-                <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 shadow-2xl border border-slate-800">
-                    <AlertCircle className="w-10 h-10 text-amber-500" />
+            <div className="min-h-screen bg-slate-50 dark:bg-[#0F172A] flex flex-col items-center justify-center text-slate-900 dark:text-white p-6 transition-colors duration-300">
+                <div className="w-20 h-20 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center mb-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+                    <AlertCircle className="w-10 h-10 text-[#F06C6C]" />
                 </div>
-                <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Projeto não localizado</h1>
-                <p className="text-slate-400 text-center max-w-md mb-8 leading-relaxed">
+                <h1 className="text-3xl font-extrabold mb-3 text-slate-900 dark:text-transparent dark:bg-gradient-to-r dark:from-white dark:to-slate-400 dark:bg-clip-text font-montserrat">Projeto não localizado</h1>
+                <p className="text-slate-500 dark:text-slate-400 text-center max-w-md mb-8 leading-relaxed">
                     {isPreviewMode
                         ? 'Este ID de aceitação não possui projetos vinculados (Tráfego, LP ou Site).'
-                        : <>Não encontramos nenhum projeto ativo vinculado ao email <span className="text-white font-medium">{email}</span>.</>
+                        : <>Não encontramos nenhum projeto ativo vinculado ao email <span className="font-bold text-slate-900 dark:text-white">{email}</span>.</>
                     }
                 </p>
                 <button
                     onClick={() => isPreviewMode ? navigate(-1) : handleLogout()}
-                    className="px-8 py-3 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 rounded-xl transition-all border border-slate-600 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                    className="px-8 py-3 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition-all border border-slate-200 dark:border-slate-600 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-slate-700 dark:text-white"
                 >
                     {isPreviewMode ? 'Voltar para Propostas' : 'Encerrar Sessão'}
                 </button>
@@ -242,7 +247,7 @@ const ClientDashboard: React.FC = () => {
     const clientName = firstProject.acceptance?.company_name || firstProject.acceptance?.name || 'Cliente';
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white font-sans flex relative overflow-hidden">
+        <div className="min-h-screen bg-slate-50 dark:bg-[#0F172A] text-slate-900 dark:text-white font-sans flex relative overflow-hidden transition-colors duration-300">
             {/* Preview Banner */}
             {isPreviewMode && (
                 <div className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 px-4 shadow-lg flex items-center justify-between text-xs md:text-sm font-medium">
@@ -270,72 +275,79 @@ const ClientDashboard: React.FC = () => {
 
             {/* Sidebar Navigation */}
             <aside className={`
-                fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 
-                transform transition-transform duration-300 ease-in-out md:translate-x-0 flex flex-col shadow-2xl md:shadow-none
+                fixed md:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-[#0B1221] border-r border-slate-200 dark:border-[#1E293B] 
+                transform transition-all duration-300 ease-in-out md:translate-x-0 flex flex-col shadow-2xl md:shadow-none
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 ${isPreviewMode ? 'pt-16 md:pt-0' : ''}
             `}>
-                <div className="p-6 flex items-center justify-between">
-                    <div>
-                        <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                            <div className="w-8 h-8 bg-brand-coral rounded-lg flex items-center justify-center text-slate-900">C4</div>
-                            Marketing
-                        </h2>
+                <div className="p-6 flex items-center justify-between border-b border-slate-200 dark:border-[#1E293B]">
+                    <div className="w-full flex justify-center md:justify-start">
+                        <img src={LOGO_URL} alt="C4 Marketing" className="h-20 w-auto object-contain brightness-0 dark:invert" />
                     </div>
-                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-white transition-colors">
+                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
                         <X size={24} />
                     </button>
                 </div>
 
-                <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
+                <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
                     <button
                         onClick={() => { setActiveTab('overview'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'overview'
-                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${activeTab === 'overview'
+                            ? 'bg-[#F06C6C]/10 text-[#F06C6C] border border-[#F06C6C]/20'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <LayoutDashboard size={18} className={`transition-transform duration-300 ${activeTab === 'overview' ? '' : 'group-hover:scale-105'}`} />
-                        <span className="font-semibold text-sm">Visão Geral</span>
+                        <LayoutDashboard size={20} className={`transition-transform duration-300 ${activeTab === 'overview' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm font-montserrat">Visão Geral</span>
                     </button>
 
                     <button
                         onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'reports'
-                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${activeTab === 'reports'
+                            ? 'bg-[#F06C6C]/10 text-[#F06C6C] border border-[#F06C6C]/20'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <BarChart3 size={18} className={`transition-transform duration-300 ${activeTab === 'reports' ? '' : 'group-hover:scale-105'}`} />
-                        <span className="font-semibold text-sm">Relatórios</span>
+                        <BarChart3 size={20} className={`transition-transform duration-300 ${activeTab === 'reports' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm font-montserrat">Relatórios</span>
                     </button>
 
                     <button
                         onClick={() => { setActiveTab('finance'); setIsSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all group ${activeTab === 'finance'
-                            ? 'bg-slate-800 text-brand-coral border border-slate-700'
-                            : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 border border-transparent'
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${activeTab === 'finance'
+                            ? 'bg-[#F06C6C]/10 text-[#F06C6C] border border-[#F06C6C]/20'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent'
                             }`}
                     >
-                        <Wallet size={18} className={`transition-transform duration-300 ${activeTab === 'finance' ? '' : 'group-hover:scale-105'}`} />
-                        <span className="font-semibold text-sm">Financeiro</span>
+                        <Wallet size={20} className={`transition-transform duration-300 ${activeTab === 'finance' ? '' : 'group-hover:scale-105'}`} />
+                        <span className="font-semibold text-sm font-montserrat">Financeiro</span>
                     </button>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800 bg-slate-900">
-                    <div className="flex items-center gap-3 px-3 py-2 mb-2 bg-slate-800 rounded-lg border border-slate-700">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white border border-slate-600">
+                <div className="px-3 pb-2">
+                    <button
+                        onClick={() => setDarkMode(!darkMode)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent transition-all"
+                    >
+                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                        <span className="font-semibold text-sm font-montserrat">{darkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
+                    </button>
+                </div>
+
+                <div className="p-4 border-t border-slate-200 dark:border-[#1E293B] bg-slate-50 dark:bg-[#0B1221]">
+                    <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700/50 shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-white border border-slate-200 dark:border-slate-600">
                             {(isPreviewMode ? firstProject.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-xs font-bold truncate text-white">{isPreviewMode ? firstProject.acceptance?.name : (fullName || 'Cliente')}</p>
-                            <p className="text-slate-500 text-[10px] truncate">{isPreviewMode ? firstProject.acceptance?.email : email}</p>
+                            <p className="text-sm font-bold truncate text-slate-900 dark:text-white">{isPreviewMode ? firstProject.acceptance?.name : (fullName || 'Cliente')}</p>
+                            <p className="text-slate-500 text-xs truncate">{isPreviewMode ? firstProject.acceptance?.email : email}</p>
                         </div>
                     </div>
                     {!isPreviewMode && (
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all border border-transparent hover:border-red-500/20"
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all border border-transparent hover:border-red-200 dark:hover:border-red-500/20"
                         >
                             <LogOut size={14} />
                             Encerrar Sessão
@@ -345,21 +357,21 @@ const ClientDashboard: React.FC = () => {
             </aside>
 
             {/* Main Content Area */}
-            <main className={`flex-1 overflow-y-auto bg-slate-950 relative w-full ${isPreviewMode ? 'pt-14 md:pt-0' : ''}`}>
+            <main className={`flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0F172A] relative w-full ${isPreviewMode ? 'pt-14 md:pt-0' : ''} transition-colors duration-300`}>
 
                 {/* Mobile Header */}
-                <div className="md:hidden sticky top-0 z-30 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+                <div className="md:hidden sticky top-0 z-30 bg-slate-50/90 dark:bg-[#0F172A]/90 backdrop-blur-md border-b border-slate-200 dark:border-[#1E293B] px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={toggleSidebar}
-                            className="p-2 bg-slate-900 rounded-lg text-brand-coral border border-slate-800 active:scale-95 transition-transform"
+                            className="p-2 bg-white dark:bg-[#1E293B] rounded-lg text-[#F06C6C] border border-slate-200 dark:border-slate-700 active:scale-95 transition-transform shadow-sm"
                         >
                             <Menu size={24} />
                         </button>
-                        <span className="font-bold text-lg tracking-tight">C4 Marketing</span>
+                        <img src={LOGO_URL} alt="C4 Marketing" className="h-8 w-auto object-contain brightness-0 dark:invert" />
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
-                        <span className="text-xs font-bold text-brand-coral">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center">
+                        <span className="text-xs font-bold text-[#F06C6C]">
                             {(isPreviewMode ? firstProject.acceptance?.name : fullName)?.charAt(0) || '?'}
                         </span>
                     </div>
@@ -368,31 +380,40 @@ const ClientDashboard: React.FC = () => {
                 <div className="p-6 md:p-10 max-w-7xl mx-auto">
 
                     {/* Header Section */}
-                    <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-800/50">
+                    <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-200 dark:border-[#1E293B]">
                         <div>
                             <div className="flex items-center gap-3 mb-2">
-                                <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
+                                <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight font-montserrat">
                                     {activeTab === 'overview' && clientName}
                                     {activeTab === 'reports' && 'Relatórios de Performance'}
                                     {activeTab === 'finance' && 'Painel Financeiro'}
                                 </h1>
                             </div>
-                            <p className="text-slate-400 flex items-center gap-2 text-sm md:text-base">
-                                <span className={`w-2.5 h-2.5 rounded-full ${activeTab === 'overview' ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`}></span>
+                            <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2 text-sm md:text-base">
+                                <span className={`w-2.5 h-2.5 rounded-full ${activeTab === 'overview' ? 'bg-[#F06C6C] animate-pulse' : 'bg-slate-400 dark:bg-slate-600'}`}></span>
                                 {activeTab === 'overview' ? `Projeto Ativo` : 'Dados atualizados em tempo real'}
                             </p>
                         </div>
                         {activeTab === 'overview' && (
-                            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-400">
-                                <Clock size={14} className="text-brand-coral" />
-                                <span>Próxima atualização: {timeUntilUpdate}</span>
+                            <div className="hidden md:flex items-center gap-2">
+                                <button
+                                    onClick={() => setDarkMode(!darkMode)}
+                                    className="p-2 resize-none bg-white dark:bg-[#1E293B] rounded-lg border border-slate-200 dark:border-[#334155] text-slate-500 dark:text-slate-400 hover:text-[#F06C6C] dark:hover:text-[#F06C6C] transition-colors shadow-sm"
+                                    title={darkMode ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}
+                                >
+                                    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                                </button>
+                                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#1E293B] rounded-lg border border-slate-200 dark:border-[#334155] text-xs text-slate-500 dark:text-slate-400 shadow-sm">
+                                    <Clock size={14} className="text-[#F06C6C]" />
+                                    <span>Atualiza em: {timeUntilUpdate}</span>
+                                </div>
                             </div>
                         )}
                     </header>
 
                     {/* Content Switcher */}
                     {activeTab === 'overview' && (
-                        <div className="space-y-12">
+                        <div className="space-y-8">
                             {allProjects.map(project => (
                                 <div key={project.id} className="animate-in fade-in slide-in-from-bottom-8 duration-700">
                                     {project.type === 'traffic' && (
@@ -404,47 +425,42 @@ const ClientDashboard: React.FC = () => {
                                     {project.type === 'website' && (
                                         <WebsiteProjectView project={project.data} websites={project.subItems} />
                                     )}
-
-                                    {/* Horizontal Divider between projects if there are multiple */}
-                                    {allProjects.length > 1 && allProjects[allProjects.length - 1].id !== project.id && (
-                                        <div className="h-px bg-slate-800/50 my-12" />
-                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
                     {activeTab === 'reports' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px] flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30 p-12 text-center">
-                            <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-700/50">
-                                <BarChart3 className="text-brand-coral/50" size={48} />
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px] flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-[#1E293B] rounded-3xl bg-white/50 dark:bg-[#0F172A]/50 p-12 text-center">
+                            <div className="w-24 h-24 bg-slate-100 dark:bg-[#1E293B] rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-200 dark:border-[#334155]">
+                                <BarChart3 className="text-[#F06C6C]/50" size={48} />
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Relatórios em Construção</h2>
-                            <p className="text-slate-400 max-w-md mx-auto mb-8">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-montserrat">Relatórios em Construção</h2>
+                            <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-8">
                                 Estamos processando os dados das suas campanhas para gerar insights valiosos. Em breve você terá acesso a métricas detalhadas aqui.
                             </p>
-                            <button onClick={() => setActiveTab('overview')} className="text-brand-coral font-bold hover:text-red-400 hover:underline">
+                            <button onClick={() => setActiveTab('overview')} className="text-[#F06C6C] font-bold hover:text-slate-900 dark:hover:text-white hover:underline transition-colors">
                                 Voltar para Visão Geral
                             </button>
                         </div>
                     )}
 
                     {activeTab === 'finance' && (
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px] flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/30 p-12 text-center">
-                            <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-700/50">
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[400px] flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-[#1E293B] rounded-3xl bg-white/50 dark:bg-[#0F172A]/50 p-12 text-center">
+                            <div className="w-24 h-24 bg-slate-100 dark:bg-[#1E293B] rounded-full flex items-center justify-center mb-6 shadow-xl border border-slate-200 dark:border-[#334155]">
                                 <Wallet className="text-blue-500/50" size={48} />
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Painel Financeiro</h2>
-                            <p className="text-slate-400 max-w-md mx-auto mb-8">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 font-montserrat">Painel Financeiro</h2>
+                            <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-8">
                                 O histórico de faturas e pagamentos estará disponível nesta seção em breve.
                             </p>
-                            <button onClick={() => setActiveTab('overview')} className="text-brand-coral font-bold hover:text-red-400 hover:underline">
+                            <button onClick={() => setActiveTab('overview')} className="text-[#F06C6C] font-bold hover:text-slate-900 dark:hover:text-white hover:underline transition-colors">
                                 Voltar para Visão Geral
                             </button>
                         </div>
                     )}
 
-                    <footer className="mt-20 border-t border-slate-800 pt-8 text-center text-slate-600 text-sm">
+                    <footer className="mt-20 border-t border-slate-200 dark:border-[#1E293B] pt-8 text-center text-slate-500 text-sm">
                         <p>© {new Date().getFullYear()} C4 Marketing. Todos os direitos reservados.</p>
                         <p className="mt-2 text-xs">Precisa de ajuda? Entre em contato com seu gerente de conta.</p>
                     </footer>

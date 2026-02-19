@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .env
+
+# Large files
+assets/C4*.pdf
