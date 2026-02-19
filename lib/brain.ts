@@ -26,6 +26,41 @@ export interface ChatMessage {
     created_at: string;
 }
 
+function isInvalidJwtMessage(message: string): boolean {
+    return (message || '').toLowerCase().includes('invalid jwt');
+}
+
+async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken?: string): Promise<AskBrainResponse> {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+    if (!supabaseUrl || !anonKey) {
+        throw new Error('Supabase env ausente no frontend (URL/ANON_KEY).');
+    }
+
+    const authToken = bearerToken || anonKey;
+    const res = await fetch(`${supabaseUrl}/functions/v1/chat-brain`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const details = body?.error || body?.message || `HTTP ${res.status}`;
+        throw new Error(details);
+    }
+
+    return {
+        answer: body?.answer || 'Não consegui gerar resposta neste momento. Tente novamente.',
+        documents: Array.isArray(body?.documents) ? body.documents : [],
+    };
+}
+
 async function getValidAccessToken(): Promise<string | null> {
     const { data: sessionData } = await supabase.auth.getSession();
     let session = sessionData.session;
@@ -96,52 +131,49 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
     const payload = { query, session_id: sessionId || null };
 
     const token = await getValidAccessToken();
-    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+    try {
+        return await callChatBrainDirect(payload, token || undefined);
+    } catch (firstError: any) {
+        const firstMessage = firstError?.message || String(firstError);
+        console.error('askBrain first attempt failed:', firstMessage);
 
-    let { data, error } = await supabase.functions.invoke('chat-brain', {
-        body: payload,
-        headers,
-    });
-
-    if (error) {
-        const firstDetails = await parseInvokeError(error, 'Falha ao consultar chat-brain');
-        if (firstDetails.toLowerCase().includes('invalid jwt')) {
+        // Se o JWT do usuário estiver inválido, tenta com sessão renovada.
+        if (isInvalidJwtMessage(firstMessage)) {
             const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
             const retryToken = refreshed?.session?.access_token;
-
             if (!refreshError && retryToken) {
-                const retry = await supabase.functions.invoke('chat-brain', {
-                    body: payload,
-                    headers: { Authorization: `Bearer ${retryToken}` },
-                });
-                data = retry.data;
-                error = retry.error;
+                try {
+                    return await callChatBrainDirect(payload, retryToken);
+                } catch (secondError: any) {
+                    const secondMessage = secondError?.message || String(secondError);
+                    console.error('askBrain second attempt (refreshed token) failed:', secondMessage);
+                    if (!isInvalidJwtMessage(secondMessage)) {
+                        return {
+                            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${secondMessage}`,
+                            documents: [],
+                        };
+                    }
+                }
+            }
+
+            // Último fallback: usa anon key como bearer para evitar bloqueio total.
+            try {
+                return await callChatBrainDirect(payload);
+            } catch (anonError: any) {
+                const anonMessage = anonError?.message || String(anonError);
+                console.error('askBrain fallback with anon bearer failed:', anonMessage);
+                return {
+                    answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${anonMessage}`,
+                    documents: [],
+                };
             }
         }
-    }
-
-    if (error) {
-        console.error('Error asking brain:', error);
-        const details = await parseInvokeError(error, 'Falha ao consultar chat-brain');
-
-        const friendly = details.toLowerCase().includes('invalid jwt')
-            ? 'Sessao invalida (JWT). Faça logout e login novamente para renovar a autenticacao.'
-            : details;
 
         return {
-            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${friendly}`,
+            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${firstMessage}`,
             documents: [],
         };
     }
-
-    if (!data?.answer) {
-        return {
-            answer: 'Não consegui gerar resposta neste momento. Tente novamente.',
-            documents: [],
-        };
-    }
-
-    return data;
 }
 
 export async function createChatSession(title: string = 'Nova Conversa'): Promise<ChatSession> {
