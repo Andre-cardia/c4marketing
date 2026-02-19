@@ -227,7 +227,12 @@ Deno.serve(async (req) => {
             const calls: DbQueryCall[] = []
 
             const mentionsTasks = hasAny(text, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'pendente', 'pendentes'])
-            const mentionsUsers = hasAny(text, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            const mentionsUsers = hasAny(text, [
+                'usuario', 'usuário', 'usuarios', 'usuários',
+                'colaborador', 'colaboradores', 'equipe', 'time',
+                'ceo', 'cargo', 'funcao', 'função', 'papel',
+                'presidente', 'fundador', 'dono', 'diretor executivo'
+            ])
             const mentionsAccess = hasAny(text, ['acesso', 'acessos', 'acessou', 'logou', 'login', 'entrou'])
             const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
             const mentionsClients = hasAny(text, ['cliente', 'clientes'])
@@ -293,6 +298,73 @@ Deno.serve(async (req) => {
 
         const mergeDbCalls = (primary: DbQueryCall[], supplemental: DbQueryCall[]) =>
             dedupeDbCalls([...(primary || []), ...(supplemental || [])]).slice(0, 5)
+
+        const isExplicitMemorySaveIntent = (text: string) => hasAny(text, [
+            'guarde isso', 'guarde esta informacao', 'guarde essa informacao',
+            'grave isso', 'grave essa informacao', 'grave esta informacao',
+            'salve isso', 'salve essa informacao', 'salve esta informacao',
+            'registre isso', 'registre essa informacao', 'registre esta informacao',
+            'lembre disso', 'lembre que', 'para o futuro', 'memorize',
+            'anote isso', 'fixe isso', 'salvar no cerebro', 'salvar no cérebro',
+            'guardar no cerebro', 'guardar no cérebro'
+        ])
+
+        const extractMemoryFactText = (text: string) => {
+            const normalized = (text || '').trim()
+            if (!normalized) return ''
+
+            const markers = [
+                /(?:guarde|grave|salve|registre|memorize|anote)\s+(?:isso|esta informação|essa informação|isto)?\s*(?:para o futuro)?[:\-]?\s*/i,
+                /(?:lembre que)\s*/i,
+            ]
+
+            for (const marker of markers) {
+                if (marker.test(normalized)) {
+                    let stripped = normalized.replace(marker, '').trim()
+                    stripped = stripped
+                        .replace(/^(?:essa|esta)\s+informa(?:c|ç)[aã]o(?:\s+para\s+o\s+futuro)?[:\-]?\s*/i, '')
+                        .trim()
+                    if (stripped.length >= 8) return stripped
+                }
+            }
+
+            return normalized.length >= 8 ? normalized : ''
+        }
+
+        const persistExplicitMemoryFact = async (factText: string) => {
+            const memoryContent = `FATO EXPLÍCITO INFORMADO PELO USUÁRIO (${new Date().toISOString()}): ${factText}`
+            const embeddingResponse = await openai.embeddings.create({
+                model: 'text-embedding-3-small',
+                input: memoryContent,
+            })
+
+            const embedding = embeddingResponse.data[0].embedding
+            const memoryMetadata = {
+                type: 'session_summary',
+                status: 'active',
+                artifact_kind: 'unknown',
+                source_table: 'user_facts',
+                source: 'explicit_user_memory',
+                tenant_id: userId,
+                user_id: userId,
+                session_id: session_id ?? null,
+                fact_kind: 'user_asserted',
+                created_by: 'chat-brain',
+                saved_at: new Date().toISOString(),
+            }
+
+            const { data: savedId, error: saveError } = await supabaseAdmin.rpc('insert_brain_document', {
+                content: memoryContent,
+                metadata: memoryMetadata,
+                embedding,
+            })
+
+            if (saveError) {
+                throw new Error(`Falha ao salvar memória explícita: ${saveError.message}`)
+            }
+
+            return savedId
+        }
 
         // 1b. Carregar histórico da sessão (memória cognitiva)
         let sessionMessages: Array<{ role: string; content: string }> = []
@@ -372,6 +444,40 @@ Deno.serve(async (req) => {
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             })
+        }
+
+        // Regra de memória explícita: quando o usuário pedir para salvar uma informação para o futuro,
+        // persistimos no banco vetorial com metadados estruturados.
+        if (isExplicitMemorySaveIntent(query)) {
+            const factText = extractMemoryFactText(query)
+            if (factText && factText.length >= 8) {
+                try {
+                    const memoryId = await persistExplicitMemoryFact(factText)
+                    return new Response(JSON.stringify({
+                        answer: `Memória registrada com sucesso no Segundo Cérebro. Vou considerar essa informação em consultas futuras.\n\nResumo salvo: "${factText}"`,
+                        documents: [],
+                        meta: {
+                            memory_saved: true,
+                            memory_id: memoryId,
+                            memory_scope: 'vector_db',
+                        }
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    })
+                } catch (memorySaveError: any) {
+                    console.error('explicit memory save failed:', memorySaveError)
+                    return new Response(JSON.stringify({
+                        answer: `Entendi o pedido para salvar essa informação, mas houve falha ao gravar no cérebro agora. Detalhes: ${memorySaveError?.message || memorySaveError}.`,
+                        documents: [],
+                        meta: {
+                            memory_saved: false,
+                            error: memorySaveError?.message || String(memorySaveError),
+                        }
+                    }), {
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    })
+                }
+            }
         }
 
         // 2. Router Step
@@ -537,6 +643,9 @@ Exemplos:
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
 - "mostre as respostas do formulário de tráfego" → query_survey_responses(p_project_type: "traffic")
+- "quem é o CEO da C4?" → query_all_users()
+- "qual é o cargo do André Cardia?" → query_all_users()
+Quando a pergunta for sobre pessoas, cargos, funções, CEO, fundador ou papéis internos, priorize query_all_users.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -687,6 +796,11 @@ Retorne apenas function calls (sem texto livre).`
         let contextText = ''
         let retrievedDocs: any[] = []
         let executedDbRpcs: string[] = []
+        const isLeadershipQuery = hasAny(query, [
+            'ceo', 'cargo', 'funcao', 'função', 'papel',
+            'presidente', 'fundador', 'dono', 'diretor executivo'
+        ])
+        let explicitLeadershipFact: string | null = null
 
         const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
             const cleanParams = cleanRpcParams(rpcParams)
@@ -717,6 +831,61 @@ Retorne apenas function calls (sem texto livre).`
             return `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`
         }
 
+        const runVectorRetrieval = async (opts?: {
+            topK?: number
+            overrideFilters?: Record<string, any>
+            retrievalLabel?: string
+        }) => {
+            const topKToUse = typeof opts?.topK === 'number' ? opts.topK : decision.top_k
+            console.log(`[Tool] rag_search → top_k: ${topKToUse}`)
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const filtersToUse = {
+                    ...decision.filters,
+                    ...(opts?.overrideFilters || {}),
+                }
+                const label = opts?.retrievalLabel || 'base vetorial'
+
+                retrievedDocs = await matchBrainDocuments({
+                    supabase: supabaseAdmin,
+                    queryText: query,
+                    filters: filtersToUse as any,
+                    options: {
+                        topK: topKToUse,
+                        policy: decision.retrieval_policy
+                    },
+                    embedder
+                })
+
+                if (!retrievedDocs.length) {
+                    return `CONSULTA REALIZADA NA ${label.toUpperCase()}, mas nenhum documento relevante foi encontrado para esta pergunta.`
+                }
+
+                const explicitFactDoc = retrievedDocs.find((d: any) => {
+                    const meta = d?.metadata || {}
+                    const sourceTable = String(meta.source_table || '').toLowerCase()
+                    const source = String(meta.source || '').toLowerCase()
+                    const content = String(d?.content || '')
+                    const isUserFact = sourceTable === 'user_facts' || source === 'explicit_user_memory'
+                    const hasLeadershipHint = /(ceo|presidente|diretor executivo|fundador|dono)/i.test(content)
+                    return isUserFact && hasLeadershipHint
+                })
+
+                if (explicitFactDoc) {
+                    explicitLeadershipFact = String(explicitFactDoc.content || '').trim()
+                }
+
+                return retrievedDocs.map(d => {
+                    const meta = d.metadata || {};
+                    const source = meta.source_table || meta.title || 'Unknown Source';
+                    return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
+                }).join('\n\n')
+            } catch (ragError: any) {
+                console.error('RAG retrieval failed:', ragError)
+                return `Falha ao recuperar contexto semântico no momento: ${ragError?.message || ragError}. Responda ao usuário de forma útil e peça uma reformulação curta se necessário.`
+            }
+        }
+
         if (decision.tool_hint === 'db_query' && decision.db_query_params) {
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
             const plannedCalls: DbQueryCall[] = []
@@ -737,7 +906,8 @@ Retorne apenas function calls (sem texto livre).`
 
             const finalCalls = dedupeDbCalls(plannedCalls)
             if (finalCalls.length === 0) {
-                contextText = 'Nenhuma consulta SQL válida foi selecionada para esta pergunta.'
+                // Guardrail: sempre consultar alguma base antes de responder
+                contextText = await runVectorRetrieval()
             } else {
                 const sections: string[] = []
                 for (const call of finalCalls) {
@@ -745,34 +915,29 @@ Retorne apenas function calls (sem texto livre).`
                     const section = await executeDbRpc(call.rpc_name, call.params)
                     sections.push(section)
                 }
+
+                // Guardrail adicional para perguntas de liderança/cargo:
+                // consultar memória vetorial explícita além do SQL.
+                if (isLeadershipQuery) {
+                    const leadershipVectorContext = await runVectorRetrieval({
+                        topK: 8,
+                        overrideFilters: {
+                            artifact_kind: null,
+                            source_table: 'user_facts',
+                            type_allowlist: ['official_doc', 'database_record', 'session_summary'],
+                            type_blocklist: ['chat_log'],
+                            status: 'active',
+                        },
+                        retrievalLabel: 'base vetorial de memória',
+                    })
+                    sections.push(`CONSULTA COMPLEMENTAR (MEMÓRIA VETORIAL):\n${leadershipVectorContext}`)
+                }
+
                 contextText = sections.join('\n\n')
             }
         } else {
             // === RAG (busca semântica) ===
-            console.log(`[Tool] rag_search → top_k: ${decision.top_k}`)
-            try {
-                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
-
-                retrievedDocs = await matchBrainDocuments({
-                    supabase: supabaseAdmin,
-                    queryText: query,
-                    filters: decision.filters,
-                    options: {
-                        topK: decision.top_k,
-                        policy: decision.retrieval_policy
-                    },
-                    embedder
-                })
-
-                contextText = retrievedDocs.map(d => {
-                    const meta = d.metadata || {};
-                    const source = meta.source_table || meta.title || 'Unknown Source';
-                    return `[ID: ${d.id} | Source: ${source} | Type: ${meta.type}]: ${d.content}`;
-                }).join('\n\n')
-            } catch (ragError: any) {
-                console.error('RAG retrieval failed:', ragError)
-                contextText = `Falha ao recuperar contexto semântico no momento: ${ragError?.message || ragError}. Responda ao usuário de forma útil e peça uma reformulação curta se necessário.`
-            }
+            contextText = await runVectorRetrieval()
         }
 
         // 4. Generation Step — com identidade do usuário e histórico
@@ -788,6 +953,9 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se houver histórico fornecido no prompt, use esse histórico. Não diga que não tem acesso ao histórico quando ele estiver disponível.
 - Se a FONTE DOS DADOS for SQL direta, nunca diga que precisa "acessar outro sistema" ou "confirmar qual banco". As consultas SQL já foram executadas.
 - Se a pergunta tiver mais de uma parte (ex: tarefas + usuários + projetos), responda em blocos separados cobrindo cada parte.
+- Nunca invente nomes de pessoas, cargos, números ou fatos.
+- Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
+- Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
         `.trim()
 
         // Montar bloco de identidade
@@ -807,6 +975,10 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
                 : `\nMEMÓRIA RECENTE DO USUÁRIO (outras sessões): nenhum registro recente encontrado.`)
             : ''
 
+        const explicitLeadershipFactBlock = explicitLeadershipFact
+            ? `\nFATO EXPLÍCITO PRIORITÁRIO (informado e salvo pelo usuário):\n${explicitLeadershipFact}`
+            : ''
+
         const systemPrompt = `
 ${agentConfig.getSystemPrompt()}
 ${identityBlock}
@@ -817,6 +989,8 @@ FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no b
 
 CONTEXTO RECUPERADO:
 ${contextText || "Nenhum documento relevante encontrado."}
+
+${explicitLeadershipFactBlock}
 
 ${crossSessionMemoryBlock}
         `.trim()

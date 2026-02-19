@@ -464,7 +464,13 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
     }
 
     // Users / Access
-    if (hasAny(msg, ["usuário", "usuario", "usuários", "usuarios", "equipe", "time", "colaborador", "acesso", "acessos", "quem acessou"])) {
+    if (hasAny(msg, [
+        "usuário", "usuario", "usuários", "usuarios",
+        "equipe", "time", "colaborador",
+        "acesso", "acessos", "quem acessou",
+        "ceo", "cargo", "função", "funcao", "papel",
+        "presidente", "fundador", "dono", "diretor executivo"
+    ])) {
         const isAccessQuery = hasAny(msg, ["acesso", "acessos", "acessou", "logou", "entrou"]);
 
         return makeDecision(input, {
