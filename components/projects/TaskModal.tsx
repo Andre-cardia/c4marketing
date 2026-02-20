@@ -13,6 +13,7 @@ interface Task {
     assignee?: string;
     due_date: string;
     attachments?: { name: string; url: string }[];
+    created_at?: string;
 }
 
 interface UserSummary {
@@ -306,6 +307,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 placeholder="Título da tarefa..."
                             />
                         </div>
+
+                        {/* Creation Date (Read-only) */}
+                        {task?.created_at && (
+                            <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                <Calendar size={12} />
+                                <span>Criado em: {new Date(task.created_at).toLocaleDateString('pt-BR')} às {new Date(task.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                        )}
 
                         {/* Meta Fields Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

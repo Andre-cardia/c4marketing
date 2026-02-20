@@ -19,6 +19,7 @@ interface Task {
     priority: 'low' | 'medium' | 'high';
     assignee: string;
     due_date: string;
+    created_at: string;
 }
 
 interface KanbanBoardModalProps {
