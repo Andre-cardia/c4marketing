@@ -3,11 +3,12 @@ import { useUserRole } from '../lib/UserRoleContext';
 import { BrainChat } from './BrainChat';
 
 export const BrainWidgetWrapper: React.FC = () => {
-    const { userRole } = useUserRole();
+    const { userRole, loading } = useUserRole();
     const [isBrainOpen, setIsBrainOpen] = useState(false);
+    const allowedRoles = ['admin', 'gestor', 'comercial', 'operacional', 'leitor'];
 
-    // Only render for 'gestor' role
-    if (userRole !== 'gestor') {
+    // Hide for unauthenticated/loading users and for client-only access.
+    if (loading || !userRole || !allowedRoles.includes(userRole)) {
         return null;
     }
 

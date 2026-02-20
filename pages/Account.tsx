@@ -4,7 +4,7 @@ import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeO
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import TaskModal from '../components/projects/TaskModal';
-import { getLatestFeedback, markFeedbackRead, generateUserFeedback, AiFeedback } from '../lib/ai-agent';
+import { getLatestFeedback, markFeedbackRead, generateUserFeedback, getSmartUserFeedback, AiFeedback } from '../lib/ai-agent';
 
 interface Task {
     id: string;
@@ -67,6 +67,7 @@ const Account: React.FC = () => {
     // AI Agent State
     const [aiMessage, setAiMessage] = useState<AiFeedback | null>(null);
     const [loadingAiMessage, setLoadingAiMessage] = useState(false);
+    const [isPersistent, setIsPersistent] = useState(false);
 
     useEffect(() => {
         fetchMyBookings();
@@ -131,25 +132,23 @@ const Account: React.FC = () => {
 
         setLoadingAiMessage(true);
         try {
-            // 1. Try to get existing unread feedback
-            // If forcing new (e.g. task completed), skip fetching existing unless we want to mark it read first separately.
-            // But here logic is: get existing. If none, generate.
-
-            let existing = await getLatestFeedback(email);
-
-            if (existing && shouldForceNew) {
-                // Mark existing read so we generate a new one
-                await markFeedbackRead(existing.id);
-                existing = null;
+            if (shouldForceNew) {
+                // Generate new feedback first
+                await generateUserFeedback(email, contextFullName);
             }
 
-            if (existing) {
-                setAiMessage(existing);
-            } else {
-                // 2. If none (or forced refresh cleared it), generate new one
-                const newFeedback = await generateUserFeedback(email, contextFullName);
-                setAiMessage(newFeedback);
+            // Fetch smart feedback (gets latest relevant)
+            let result = await getSmartUserFeedback(email, contextFullName);
+
+            if (!result.feedback && !shouldForceNew) {
+                // If initial load returned nothing, generate one (unless we just did)
+                await generateUserFeedback(email, contextFullName);
+                result = await getSmartUserFeedback(email, contextFullName);
             }
+
+            setAiMessage(result.feedback);
+            setIsPersistent(result.isPersistent);
+
         } catch (error) {
             console.error('Error with AI Agent:', error);
         } finally {
@@ -166,8 +165,14 @@ const Account: React.FC = () => {
     const handleMarkRead = async () => {
         if (!aiMessage) return;
         try {
-            setAiMessage(null); // Optimistic update
             await markFeedbackRead(aiMessage.id);
+            if (!isPersistent) {
+                setAiMessage(null); // Hide if dismissible
+            } else {
+                // Keep showing but update state
+                // We create a new object to trigger re-render if needed, though react state update is enough
+                setAiMessage({ ...aiMessage, is_read: true });
+            }
         } catch (error) {
             console.error('Error marking read:', error);
         }
@@ -225,13 +230,7 @@ const Account: React.FC = () => {
 
                 const userTasks = tasksData.filter((t: any) => {
                     const assigneeName = normalizeString(t.assignee);
-
-                    // Robust matching: 
-                    // 1. Exact match (normalized)
-                    // 2. Assignee contains User Name (e.g. "Andre Cardia" contains "Andre")
-                    // 3. User Name contains Assignee (e.g. "Andre Cardia" contains "Andre")
                     if (!assigneeName || !targetName) return false;
-
                     return assigneeName === targetName ||
                         assigneeName.includes(targetName) ||
                         targetName.includes(assigneeName);
@@ -661,16 +660,29 @@ const Account: React.FC = () => {
                                             </div>
                                         ) : aiMessage ? (
                                             <div className="mt-2">
-                                                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-slate-200 leading-relaxed font-medium shadow-sm">
+                                                <div className={`bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-slate-200 leading-relaxed font-medium shadow-sm ${isPersistent ? 'border-l-4 border-l-red-500 bg-red-500/10' : ''}`}>
                                                     "{aiMessage.message}"
                                                 </div>
                                                 <div className="mt-3 flex justify-end">
                                                     <button
                                                         onClick={handleMarkRead}
-                                                        className="flex items-center gap-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral px-3 py-1.5 rounded-lg border border-brand-coral/20"
+                                                        disabled={aiMessage.is_read}
+                                                        className={`flex items-center gap-2 text-xs font-bold transition-colors px-3 py-1.5 rounded-lg border ${aiMessage.is_read
+                                                                ? 'text-slate-500 bg-slate-800/50 border-slate-700 cursor-default'
+                                                                : 'text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border-brand-coral/20'
+                                                            }`}
                                                     >
-                                                        <CheckCircle size={14} />
-                                                        Confirmar Leitura
+                                                        {aiMessage.is_read ? (
+                                                            <>
+                                                                <CheckCircle size={14} />
+                                                                {isPersistent ? 'Ciente (Pendências Ativas)' : 'Lido'}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CheckCircle size={14} />
+                                                                Confirmar Leitura
+                                                            </>
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>

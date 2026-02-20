@@ -40,8 +40,8 @@ async function fetchSystemContext() {
     const { data: tasks, error: taskError } = await supabase
         .from('project_tasks')
         .select('*')
-        .or(`created_at.gte.${sevenDaysAgo},status.eq.todo,status.eq.doing`)
-        .limit(20);
+        .in('status', ['backlog', 'in_progress', 'approval'])
+        .limit(50);
 
     if (taskError) console.error('Error fetching tasks:', taskError);
 
@@ -286,37 +286,7 @@ export async function generateUserFeedback(userEmail: string, userName: string):
     }
 
     try {
-        // 1. Fetch User Tasks (Replicating logic from Account.tsx)
-        const normalizeString = (str: string | undefined | null) => {
-            if (!str) return '';
-            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        };
-
-        const { data: tasksData } = await supabase
-            .from('project_tasks')
-            .select('*')
-            .neq('status', 'done')
-            .order('due_date', { ascending: true });
-
-        let userTasks: any[] = [];
-
-        if (tasksData) {
-            const targetName = normalizeString(userName);
-            userTasks = tasksData.filter((t: any) => {
-                const assigneeName = normalizeString(t.assignee);
-                if (!assigneeName || !targetName) return false;
-                return assigneeName === targetName ||
-                    assigneeName.includes(targetName) ||
-                    targetName.includes(assigneeName);
-            });
-        }
-
-        // 2. Analyzes Context
-        const activeTasks = userTasks.filter(t => ['backlog', 'in_progress'].includes(t.status));
-        const approvalTasks = userTasks.filter(t => t.status === 'approval');
-
-        const overdueTasks = activeTasks.filter(t => new Date(t.due_date) < new Date());
-        const highPriority = activeTasks.filter(t => t.priority === 'high');
+        const { activeTasks, approvalTasks, overdueTasks, highPriority } = await getUserTaskStats(userName);
 
         const systemPrompt = `
         Você é um Gerente de Projetos de IA experiente e mentor.
@@ -332,7 +302,7 @@ export async function generateUserFeedback(userEmail: string, userName: string):
         - Se houver tarefas atrasadas (active + overdue), cobre de forma firme mas profissional.
         - Se houver tarefas em aprovação, mencione que estão sendo revisadas (positivo).
         - Se não houver tarefas atrasadas e o backlog estiver limpo, parabenize e motive.
-        - Use emojis profissionais.
+        - Use emojis profissionais e encorajadores.
         - Não use markdown, apenas texto puro.
         `;
 
@@ -380,5 +350,104 @@ export async function generateUserFeedback(userEmail: string, userName: string):
     } catch (error) {
         console.error('Error generating user feedback:', error);
         throw error;
+    }
+}
+
+// Helper to get stats (shared)
+async function getUserTaskStats(userName: string) {
+    const normalizeString = (str: string | undefined | null) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    };
+
+    const { data: tasksData } = await supabase
+        .from('project_tasks')
+        .select('*')
+        .neq('status', 'done')
+        .order('due_date', { ascending: true });
+
+    let userTasks: any[] = [];
+
+    if (tasksData) {
+        const targetName = normalizeString(userName);
+        userTasks = tasksData.filter((t: any) => {
+            const assigneeName = normalizeString(t.assignee);
+            if (!assigneeName || !targetName) return false;
+            return assigneeName === targetName ||
+                assigneeName.includes(targetName) ||
+                targetName.includes(assigneeName);
+        });
+    }
+
+    const activeTasks = userTasks.filter(t => ['backlog', 'in_progress'].includes(t.status));
+    const approvalTasks = userTasks.filter(t => t.status === 'approval');
+
+    // Normalize "today" to start of day local
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Helper for local date parsing
+    const parseDate = (d: string) => {
+        if (!d) return new Date(0); // far past
+        const clean = d.split('T')[0];
+        const [y, m, day] = clean.split('-').map(Number);
+        return new Date(y, m - 1, day);
+    };
+
+    const overdueTasks = activeTasks.filter(t => t.due_date && parseDate(t.due_date) < today);
+    const highPriority = activeTasks.filter(t => t.priority === 'high');
+
+    return { activeTasks, approvalTasks, overdueTasks, highPriority };
+}
+
+export interface SmartFeedback {
+    feedback: AiFeedback | null;
+    isPersistent: boolean;
+}
+
+/**
+ * Gets feedback intelligently.
+ * If user has OVERDUE tasks, returns the latest feedback (even if read) and marks as persistent.
+ * If user has NO overdue tasks, returns latest UNREAD feedback (standard behavior).
+ */
+export async function getSmartUserFeedback(userEmail: string, userName: string): Promise<SmartFeedback> {
+    const { overdueTasks } = await getUserTaskStats(userName);
+    const hasOverdue = overdueTasks.length > 0;
+
+    // 1. Fetch latest feedback (read or unread)
+    const { data: latestAny, error } = await supabase
+        .from('ai_feedback')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error) throw error;
+
+    const latest = latestAny?.[0] as AiFeedback | undefined;
+
+    // 2. Logic
+    if (hasOverdue) {
+        // If overdue, we want to show the latest feedback IF it exists.
+        // If it's old (e.g. > 24h), maybe we want to generate new?
+        // For now, let's just use the latest if it matches the "overdue" context generally.
+        // Or simplified: if overdue, ALWAYS show latest feedback.
+
+        if (latest) {
+            return { feedback: latest, isPersistent: true };
+        } else {
+            // Generate new because we have overdue but no message
+            const newFeedback = await generateUserFeedback(userEmail, userName);
+            return { feedback: newFeedback, isPersistent: true };
+        }
+    } else {
+        // No overdue. Only show if unread.
+        if (latest && !latest.is_read) {
+            return { feedback: latest, isPersistent: false };
+        }
+
+        // If everything read, maybe generate positive reinforcement if long time?
+        // For now, return null to show "All good" default message in UI.
+        return { feedback: null, isPersistent: false };
     }
 }
