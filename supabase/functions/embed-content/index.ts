@@ -39,13 +39,52 @@ Deno.serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // Call RPC function to insert into brain.documents
-        const { error } = await supabaseClient
-            .rpc('insert_brain_document', {
+        const isTruthyFlag = (value: string | null | undefined) =>
+            ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
+
+        const versionedPublishEnabled = isTruthyFlag(
+            Deno.env.get('BRAIN_VERSIONED_PUBLISH_ENABLED')
+        )
+
+        const normalizedMetadata = {
+            ...(metadata || {}),
+            effective_from: metadata?.effective_from || new Date().toISOString(),
+        }
+
+        let error: any = null
+
+        if (versionedPublishEnabled) {
+            const publish = await supabaseClient.rpc('publish_brain_document_version', {
+                p_content: content,
+                p_metadata: normalizedMetadata,
+                p_embedding: embedding,
+                p_replace_current: true,
+            })
+            error = publish.error
+
+            if (error) {
+                const msg = String(error?.message || '')
+                const publishMissing =
+                    /publish_brain_document_version/i.test(msg) &&
+                    /(does not exist|not found|function)/i.test(msg)
+
+                if (publishMissing) {
+                    const fallback = await supabaseClient.rpc('insert_brain_document', {
+                        content,
+                        metadata: normalizedMetadata,
+                        embedding,
+                    })
+                    error = fallback.error
+                }
+            }
+        } else {
+            const inserted = await supabaseClient.rpc('insert_brain_document', {
                 content,
-                metadata,
+                metadata: normalizedMetadata,
                 embedding,
             })
+            error = inserted.error
+        }
 
         if (error) {
             console.error('Supabase error:', error)

@@ -36,6 +36,46 @@ Deno.serve(async (req) => {
 
         const results = []
 
+        const upsertVersionedBrainDocument = async (
+            docContent: string,
+            docMetadata: Record<string, any>,
+            embedding: number[]
+        ) => {
+            const normalizedMetadata = {
+                ...docMetadata,
+                document_key: docMetadata?.document_key || `${docMetadata?.source_table || 'unknown'}:${docMetadata?.source_id || 'unknown'}`,
+                authority_type: docMetadata?.authority_type || 'policy',
+                authority_rank: typeof docMetadata?.authority_rank === 'number' ? docMetadata.authority_rank : 100,
+                is_current: docMetadata?.is_current ?? true,
+                searchable: docMetadata?.searchable ?? true,
+                effective_from: docMetadata?.effective_from || new Date().toISOString(),
+            }
+
+            const { error: publishError } = await supabase.rpc('publish_brain_document_version', {
+                p_content: docContent,
+                p_metadata: normalizedMetadata,
+                p_embedding: embedding,
+                p_replace_current: true,
+            })
+
+            if (!publishError) return
+
+            const publishMsg = String(publishError?.message || '')
+            const publishMissing =
+                /publish_brain_document_version/i.test(publishMsg) &&
+                /(does not exist|not found|function)/i.test(publishMsg)
+
+            if (!publishMissing) throw publishError
+
+            console.warn('publish_brain_document_version indisponível, fallback para insert_brain_document')
+            const { error: insertError } = await supabase.rpc('insert_brain_document', {
+                content: docContent,
+                metadata: normalizedMetadata,
+                embedding: embedding
+            })
+            if (insertError) throw insertError
+        }
+
         // 2. Processar cada item
         for (const item of pendingItems) {
             try {
@@ -72,7 +112,8 @@ Deno.serve(async (req) => {
                             title: `Projeto Site: ${proj.acceptances?.company_name || 'N/A'}`,
                             source_table: 'website_projects',
                             source_id: item.source_id,
-                            status: 'active'
+                            status: 'active',
+                            authority_type: 'policy',
                         }
 
                         // === LANDING PAGE PROJECTS ===
@@ -97,7 +138,8 @@ Deno.serve(async (req) => {
                             title: `Projeto LP: ${proj.acceptances?.company_name || 'N/A'}`,
                             source_table: 'landing_page_projects',
                             source_id: item.source_id,
-                            status: 'active'
+                            status: 'active',
+                            authority_type: 'policy',
                         }
 
                         // === TRAFFIC PROJECTS ===
@@ -125,7 +167,8 @@ Deno.serve(async (req) => {
                             title: `Projeto Tráfego: ${clientName}`,
                             source_table: 'traffic_projects',
                             source_id: item.source_id,
-                            status: 'active'
+                            status: 'active',
+                            authority_type: 'policy',
                         }
 
                     } else {
@@ -147,15 +190,7 @@ Deno.serve(async (req) => {
                     })
                     const embedding = embeddingResponse.data[0].embedding
 
-                    // Inserir no Brain via RPC (com dedup automática)
-                    const { error: insertError } = await supabase
-                        .rpc('insert_brain_document', {
-                            content: docContent,
-                            metadata: docMetadata,
-                            embedding: embedding
-                        })
-
-                    if (insertError) throw insertError
+                    await upsertVersionedBrainDocument(docContent, docMetadata, embedding)
                 }
 
                 // Marcar como concluído

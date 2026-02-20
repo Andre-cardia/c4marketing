@@ -1,6 +1,7 @@
 
 export type RetrievalPolicy =
   | "STRICT_DOCS_ONLY"
+  | "NORMATIVE_FIRST"
   | "DOCS_PLUS_RECENT_CHAT"
   | "CHAT_ONLY"
   | "OPS_ONLY";
@@ -63,6 +64,12 @@ export interface MatchFilters {
   // optional: security tier and authority gating
   security_tier_allowlist?: string[];
   authority_allowlist?: string[];
+
+  // normative governance (optional, rollout-safe)
+  normative_mode?: boolean;
+  require_current?: boolean;
+  require_searchable?: boolean;
+  authority_rank_min?: number | null;
 }
 
 export interface RetrievedDoc {

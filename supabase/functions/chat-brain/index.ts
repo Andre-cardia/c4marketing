@@ -5,7 +5,7 @@ import { OpenAI } from 'https://esm.sh/openai@4'
 import { matchBrainDocuments, makeOpenAIEmbedder } from '../_shared/brain-retrieval.ts'
 import { routeRequestHybrid } from '../_shared/agents/router.ts'
 import { AGENTS } from '../_shared/agents/specialists.ts'
-import { RouterInput, RouteDecision } from '../_shared/brain-types.ts'
+import { RouterInput, RouteDecision, RetrievalPolicy } from '../_shared/brain-types.ts'
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -179,6 +179,14 @@ Deno.serve(async (req) => {
             const normalized = normalizeText(text)
             return terms.some((term) => normalized.includes(normalizeText(term)))
         }
+
+        const isTruthyFlag = (value: string | null | undefined) =>
+            ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
+
+        // Rollout-safe: enabled only when explicitly configured in Supabase secrets.
+        const normativeGovernanceEnabled = isTruthyFlag(
+            Deno.env.get('BRAIN_NORMATIVE_GOVERNANCE_ENABLED')
+        )
 
         type DbQueryCall = {
             rpc_name: string
@@ -366,6 +374,10 @@ Deno.serve(async (req) => {
                 user_id: userId,
                 session_id: session_id ?? null,
                 fact_kind: 'user_asserted',
+                authority_type: 'memo',
+                authority_rank: 60,
+                is_current: true,
+                searchable: true,
                 created_by: 'chat-brain',
                 saved_at: new Date().toISOString(),
             }
@@ -410,6 +422,9 @@ Deno.serve(async (req) => {
                 user_id: userId,
                 session_id: session_id ?? null,
                 role,
+                authority_type: 'conversation',
+                authority_rank: 20,
+                searchable: true,
                 created_by: 'chat-brain',
                 saved_at: new Date().toISOString(),
             }
@@ -936,27 +951,64 @@ Retorne apenas function calls (sem texto livre).`
             topK?: number
             overrideFilters?: Record<string, any>
             retrievalLabel?: string
+            forcedPolicy?: RetrievalPolicy
         }) => {
             const topKToUse = typeof opts?.topK === 'number' ? opts.topK : decision.top_k
             console.log(`[Tool] rag_search → top_k: ${topKToUse}`)
             try {
                 const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
-                const filtersToUse = {
+                const baseFilters = {
                     ...decision.filters,
                     ...(opts?.overrideFilters || {}),
                 }
                 const label = opts?.retrievalLabel || 'base vetorial'
+                const hasForcedPolicy = !!opts?.forcedPolicy
+                const canUseNormative =
+                    normativeGovernanceEnabled &&
+                    !hasForcedPolicy &&
+                    decision.retrieval_policy === 'STRICT_DOCS_ONLY'
 
-                retrievedDocs = await matchBrainDocuments({
+                const primaryPolicy: RetrievalPolicy = opts?.forcedPolicy
+                    ? opts.forcedPolicy
+                    : (canUseNormative ? 'NORMATIVE_FIRST' : decision.retrieval_policy)
+
+                const primaryFilters = (primaryPolicy === 'NORMATIVE_FIRST')
+                    ? {
+                        ...baseFilters,
+                        normative_mode: true,
+                        require_current: true,
+                        require_searchable: true,
+                        authority_rank_min: 50,
+                    }
+                    : baseFilters
+
+                let docs = await matchBrainDocuments({
                     supabase: supabaseAdmin,
                     queryText: query,
-                    filters: filtersToUse as any,
+                    filters: primaryFilters as any,
                     options: {
                         topK: topKToUse,
-                        policy: decision.retrieval_policy
+                        policy: primaryPolicy
                     },
                     embedder
                 })
+
+                // Fail-open: if normative mode returns empty, fallback to legacy policy.
+                if (!hasForcedPolicy && canUseNormative && docs.length === 0) {
+                    console.warn('[RAG] NORMATIVE_FIRST returned empty, falling back to STRICT_DOCS_ONLY')
+                    docs = await matchBrainDocuments({
+                        supabase: supabaseAdmin,
+                        queryText: query,
+                        filters: baseFilters as any,
+                        options: {
+                            topK: topKToUse,
+                            policy: decision.retrieval_policy
+                        },
+                        embedder
+                    })
+                }
+
+                retrievedDocs = docs
 
                 if (!retrievedDocs.length) {
                     return `CONSULTA REALIZADA NA ${label.toUpperCase()}, mas nenhum documento relevante foi encontrado para esta pergunta.`
@@ -1003,7 +1055,7 @@ Retorne apenas function calls (sem texto livre).`
                     } as any,
                     options: {
                         topK: 8,
-                        policy: 'STRICT_DOCS_ONLY'
+                        policy: 'CHAT_ONLY'
                     },
                     embedder
                 })
@@ -1113,6 +1165,7 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se a pergunta tiver mais de uma parte (ex: tarefas + usuários + projetos), responda em blocos separados cobrindo cada parte.
 - O sistema possui memória cognitiva ativa. Não diga que "não consegue armazenar informações" ou que "não tem memória" quando houver registro no contexto.
 - Sempre considere os blocos "MEMÓRIA COGNITIVA RELEVANTE" e "FATOS EXPLÍCITOS SALVOS PELO USUÁRIO" antes de concluir.
+- Em caso de conflito entre fontes, priorize a hierarquia normativa: policy > procedure/contract > memo > conversa, sempre com versão vigente.
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
@@ -1225,6 +1278,7 @@ ${crossSessionMemoryBlock}
                 agent: agentConfig.name,
                 executed_db_rpcs: executedDbRpcs,
                 cognitive_memory_docs: cognitiveMemoryDocs.length,
+                normative_governance_enabled: normativeGovernanceEnabled,
                 memory_write_events: memoryWriteEvents,
             }
         }), {

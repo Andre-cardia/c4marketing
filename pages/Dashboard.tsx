@@ -223,38 +223,7 @@ const Dashboard: React.FC = () => {
         setMyPriorityTasks(tasksData.filter(t => t.priority === 'high' && t.status !== 'done'));
     };
 
-    const getProjectProgress = (projectId: number) => {
-        const projectTasks = tasks.filter(t => t.project_id === projectId);
-        if (projectTasks.length === 0) return 0;
-        const done = projectTasks.filter(t => t.status === 'done').length;
-        return Math.round((done / projectTasks.length) * 100);
-    };
 
-    const getProjectServices = (acceptance: Acceptance) => {
-        if (!acceptance.contract_snapshot?.proposal?.services) return ['Consultoria Geral'];
-        return acceptance.contract_snapshot.proposal.services.map((s: any) => {
-            // Map IDs to readable names if needed, or use existing naming convention
-            // Assuming services have a 'name' or we derive from ID
-            // If service object structure is { id: 'traffic_management', price: ... }
-            const serviceMap: { [key: string]: string } = {
-                'traffic_management': 'Tráfego Pago',
-                'landing_page': 'Landing Page',
-                'social_media': 'Social Media',
-                'consulting': 'Consultoria',
-                'web_design': 'Website',
-                'crm_setup': 'Imp. CRM'
-            };
-            return serviceMap[s.id] || s.id || 'Serviço';
-        });
-    };
-
-    const getNextDeadline = (projectId: number) => {
-        const projectTasks = tasks.filter(t => t.project_id === projectId && t.status !== 'done' && t.due_date);
-        if (projectTasks.length === 0) return null;
-        // Sort by date
-        const sorted = [...projectTasks].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-        return sorted[0].due_date;
-    };
 
     const fetchProposals = async () => {
         const { data } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
@@ -567,22 +536,21 @@ const Dashboard: React.FC = () => {
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <LayoutDashboard className="w-5 h-5 text-brand-coral" />
-                                    Acompanhamento de Serviços
+                                    Acompanhamento de Tarefas
                                 </h3>
                                 <button onClick={() => navigate('/projects')} className="text-xs text-brand-coral font-bold hover:underline">Ver Todos os Projetos</button>
                             </div>
 
                             {acceptances.filter(a => a.status === 'Ativo').length === 0 ? (
-                                <p className="text-slate-400 text-center py-8">Nenhum projeto ativo com serviços rastreados.</p>
+                                <p className="text-slate-400 text-center py-8">Nenhum projeto ativo.</p>
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
                                             <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
                                                 <th className="py-3 pl-2">Cliente</th>
-                                                <th className="py-3">Serviço</th>
-                                                <th className="py-3 w-1/4">Progresso Geral</th>
-                                                <th className="py-3">Próximo Prazo</th>
+                                                <th className="py-3">Tarefas Ativas</th>
+                                                <th className="py-3">Alerta de Prazo</th>
                                                 <th className="py-3 text-right pr-2">Ação</th>
                                             </tr>
                                         </thead>
@@ -591,54 +559,61 @@ const Dashboard: React.FC = () => {
                                                 .filter(a => a.status === 'Ativo')
                                                 .slice(0, 5)
                                                 .map((project) => {
-                                                    const services = getProjectServices(project);
-                                                    const progress = getProjectProgress(project.id);
-                                                    const nextDeadline = getNextDeadline(project.id);
+                                                    // Calculate Stats inline or call a helper
+                                                    const projectTasks = tasks.filter(t => t.project_id === project.id && t.status !== 'done');
+                                                    const activeCount = projectTasks.length;
 
-                                                    return services.map((service, index) => (
-                                                        <tr key={`${project.id}-${index}`} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                    let alertStatus: 'green' | 'yellow' | 'red' = 'green';
+                                                    let alertText = 'Em dia';
+                                                    const now = new Date();
+                                                    const threeDaysFromNow = new Date();
+                                                    threeDaysFromNow.setDate(now.getDate() + 3);
+
+                                                    // Check for overdue or near due
+                                                    const overdueTasks = projectTasks.filter(t => t.due_date && new Date(t.due_date) < now);
+                                                    const nearDueTasks = projectTasks.filter(t => t.due_date && new Date(t.due_date) >= now && new Date(t.due_date) <= threeDaysFromNow);
+
+                                                    if (overdueTasks.length > 0) {
+                                                        alertStatus = 'red';
+                                                        alertText = `${overdueTasks.length} Atrasada${overdueTasks.length > 1 ? 's' : ''}`;
+                                                    } else if (nearDueTasks.length > 0) {
+                                                        alertStatus = 'yellow';
+                                                        alertText = 'Prazo Próximo';
+                                                    }
+
+                                                    return (
+                                                        <tr key={project.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                                             <td className="py-4 pl-2 font-bold text-slate-800 dark:text-white">
-                                                                {/* Show project name only on first service or repeat? Let's repeat for clarity but maybe lighter if subsequent? No, repeat is safer for now. */}
                                                                 {project.company_name}
                                                             </td>
                                                             <td className="py-4">
-                                                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-md border border-slate-200 dark:border-slate-700">
-                                                                    {service}
+                                                                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-full border border-slate-200 dark:border-slate-700">
+                                                                    {activeCount} tarefas
                                                                 </span>
                                                             </td>
-                                                            <td className="py-4 pr-4">
-                                                                <div className="flex items-center gap-2">
-                                                                    <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                                        <div
-                                                                            className={`h-full rounded-full ${progress === 100 ? 'bg-green-500' : 'bg-brand-coral'}`}
-                                                                            style={{ width: `${progress}%` }}
-                                                                        ></div>
-                                                                    </div>
-                                                                    <span className="text-xs font-bold text-slate-500 w-8 text-right">{progress}%</span>
-                                                                </div>
-                                                            </td>
                                                             <td className="py-4">
-                                                                {nextDeadline ? (
-                                                                    <div className="flex items-center gap-1.5 text-xs">
-                                                                        <Clock size={12} className={new Date(nextDeadline) < new Date() ? 'text-red-500' : 'text-slate-400'} />
-                                                                        <span className={new Date(nextDeadline) < new Date() ? 'text-red-500 font-bold' : 'text-slate-600 dark:text-slate-300'}>
-                                                                            {new Date(nextDeadline).toLocaleDateString()}
-                                                                        </span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="text-xs text-slate-400">-</span>
-                                                                )}
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className={`w-2.5 h-2.5 rounded-full ${alertStatus === 'green' ? 'bg-emerald-500' :
+                                                                        alertStatus === 'yellow' ? 'bg-amber-500' : 'bg-red-500'
+                                                                        }`}></div>
+                                                                    <span className={`text-xs font-bold ${alertStatus === 'green' ? 'text-emerald-600 dark:text-emerald-400' :
+                                                                        alertStatus === 'yellow' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500'
+                                                                        }`}>
+                                                                        {alertText}
+                                                                    </span>
+                                                                </div>
                                                             </td>
                                                             <td className="py-4 text-right pr-2">
                                                                 <button
-                                                                    onClick={() => navigate('/projects')}
-                                                                    className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors"
+                                                                    onClick={() => navigate(`/projects?kanban=${project.id}`)}
+                                                                    className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors group"
+                                                                    title="Ver Kanban"
                                                                 >
-                                                                    <ArrowRight size={14} />
+                                                                    <LayoutDashboard size={16} className="text-brand-coral group-hover:scale-110 transition-transform" />
                                                                 </button>
                                                             </td>
                                                         </tr>
-                                                    ));
+                                                    );
                                                 })}
                                         </tbody>
                                     </table>

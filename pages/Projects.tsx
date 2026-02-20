@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
@@ -28,6 +28,7 @@ interface SortConfig {
 
 const Projects: React.FC = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { userRole, loading: roleLoading } = useUserRole();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -115,6 +116,26 @@ const Projects: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Check for Kanban query param
+    useEffect(() => {
+        const kanbanProjectId = searchParams.get('kanban');
+
+        if (kanbanProjectId && !loading && projects.length > 0) {
+            console.log('Attempting to open Kanban for project:', kanbanProjectId);
+            // Loose equality to handle string/number differences if any
+            const project = projects.find(p => p.id == Number(kanbanProjectId));
+
+            if (project) {
+                console.log('Project found, opening modal:', project.company_name);
+                setSelectedProjectForKanban(project);
+                // Optional: Clear the param so it doesn't reopen on refresh?
+                // navigate('/projects', { replace: true });
+            } else {
+                console.warn('Project not found for ID:', kanbanProjectId);
+            }
+        }
+    }, [searchParams, projects, loading]);
 
     const handleSort = (key: SortKey) => {
         setSortConfig(current => ({

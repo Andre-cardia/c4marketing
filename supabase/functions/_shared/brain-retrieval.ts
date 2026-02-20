@@ -86,6 +86,20 @@ function applyPolicy(filters: MatchFilters, policy: RetrievalPolicy): MatchFilte
             break;
         }
 
+        case "NORMATIVE_FIRST": {
+            // Same base as STRICT_DOCS_ONLY, plus governance filters.
+            ensureAllow("official_doc", "database_record", "session_summary");
+            ensureBlock("chat_log");
+            f.time_window_minutes = null;
+            f.status = "active";
+            f.normative_mode = true;
+            f.require_current = true;
+            f.require_searchable = true;
+            // Prevent low-authority conversational artifacts from overriding corporate docs.
+            f.authority_rank_min = f.authority_rank_min ?? 50;
+            break;
+        }
+
         case "DOCS_PLUS_RECENT_CHAT": {
             ensureAllow("official_doc", "database_record", "session_summary");
             // allow chat logs ONLY when time window is set

@@ -69,6 +69,18 @@ function applyPolicyToFilters(filters: RouteFilters, policy: RetrievalPolicy): R
             f.time_window_minutes = null;
             break;
 
+        case "NORMATIVE_FIRST":
+            allow.add("official_doc");
+            allow.add("session_summary");
+            block.add("chat_log");
+            f.time_window_minutes = null;
+            f.status = "active";
+            f.normative_mode = true;
+            f.require_current = true;
+            f.require_searchable = true;
+            f.authority_rank_min = f.authority_rank_min ?? 50;
+            break;
+
         case "DOCS_PLUS_RECENT_CHAT":
             allow.add("official_doc");
             allow.add("session_summary");
@@ -468,7 +480,8 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
         "usuário", "usuario", "usuários", "usuarios",
         "equipe", "time", "colaborador",
         "acesso", "acessos", "quem acessou",
-        "ceo", "cargo", "função", "funcao", "papel",
+        "ceo", "cto", "cfo", "coo", "cmo", "cio",
+        "cargo", "função", "funcao", "papel",
         "presidente", "fundador", "dono", "diretor executivo"
     ])) {
         const isAccessQuery = hasAny(msg, ["acesso", "acessos", "acessou", "logou", "entrou"]);
