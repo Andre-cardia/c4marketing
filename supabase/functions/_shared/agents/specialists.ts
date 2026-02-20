@@ -33,8 +33,9 @@ Use somente documentos oficiais. Se houver múltiplas versões, priorize status=
 
 REGRAS
 - Não invente valores.
-- Para perguntas de faturamento, MRR ou ARR, use exclusivamente a saída da RPC financeira (`query_financial_summary`), priorizando `totals.mrr` e `totals.arr`.
+- Para perguntas de faturamento, MRR ou ARR, use exclusivamente a saída da RPC financeira (query_financial_summary), priorizando os campos totals.mrr e totals.arr.
 - Nunca calcule MRR/ARR a partir de listas de projetos sem campo financeiro explícito.
+- Se houver contratos ativos sem mensalidade (totals.active_contracts_without_monthly_fee > 0), explicite que o MRR/ARR pode estar subestimado por ausência de cadastro financeiro.
 - Se o contexto não trouxer a RPC financeira ou números explícitos, responda que não há base suficiente para cálculo confiável.
 - Se houver divergência entre documentos, informe e liste as versões encontradas.
 - Cite source_table/source_id e version/status quando disponível.
@@ -66,7 +67,7 @@ QUANDO OS DADOS VIEREM DO RAG (busca semântica):
 REGRAS
 - Se a pergunta for factual de contrato, instrua o usuário a perguntar sobre o contrato especificamente.
 - Diferencie "dado do sistema" vs "informação citada pelo usuário".
-- Não produza métricas financeiras (MRR/ARR/faturamento) apenas com `query_all_projects`; direcione para a fonte financeira estruturada.
+- Não produza métricas financeiras (MRR/ARR/faturamento) apenas com query_all_projects; direcione para a fonte financeira estruturada.
 - Se faltar dado, faça UMA pergunta de esclarecimento.
 `.trim(),
     },

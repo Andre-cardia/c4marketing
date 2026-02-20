@@ -46,8 +46,8 @@ const Header: React.FC = () => {
             <div className="relative group">
               <button
                 className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${location.pathname === '/ai-agent' || location.pathname === '/brain'
-                    ? 'text-brand-coral'
-                    : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  ? 'text-brand-coral'
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                   }`}
               >
                 <div className="p-0.5 rounded bg-gradient-to-br from-indigo-500 to-purple-600 text-white w-5 h-5 flex items-center justify-center font-bold text-[10px]">AI</div>
@@ -90,7 +90,7 @@ const Header: React.FC = () => {
               <button
                 className={`text-sm font-medium transition-colors ${location.pathname.startsWith('/proposals') || location.pathname.startsWith('/commercial-dashboard') ? 'text-brand-coral' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
               >
-                Comercial
+                Gestão
               </button>
               <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 min-w-[180px]">
@@ -104,7 +104,7 @@ const Header: React.FC = () => {
                     onClick={() => navigate('/commercial-dashboard')}
                     className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-brand-coral transition-colors"
                   >
-                    Dashboard Comercial
+                    Dashboard Financeiro
                   </button>
                 </div>
               </div>

@@ -512,7 +512,7 @@ const CommercialDashboard: React.FC = () => {
                         </button>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             <BarChart3 className="w-8 h-8 text-brand-coral" />
-                            Dashboard Comercial
+                            Dashboard Financeiro
                         </h1>
                         <p className="text-slate-400 mt-1">
                             Métricas de evolução comercial — Exercício {selectedYear}
@@ -524,7 +524,7 @@ const CommercialDashboard: React.FC = () => {
                             onClick={async () => {
                                 if (!context) return;
                                 const content = `
-Relatório Comercial - ${selectedYear}
+Relatório Financeiro - ${selectedYear}
 MRR Atual: ${formatCompact(context.currentMRR)} (Crescimento: ${context.mrrGrowth}%)
 Receita Acumulada: ${formatCompact(context.accumulatedRevenue)}
 ARR (Run Rate): ${formatCompact(context.actualARR)}

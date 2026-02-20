@@ -193,6 +193,93 @@ Deno.serve(async (req) => {
             return terms.some((term) => normalized.includes(normalizeText(term)))
         }
 
+        const toIsoDate = (year: number, month: number, day: number): string | null => {
+            if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+            const dt = new Date(Date.UTC(year, month - 1, day))
+            if (
+                dt.getUTCFullYear() !== year ||
+                dt.getUTCMonth() + 1 !== month ||
+                dt.getUTCDate() !== day
+            ) {
+                return null
+            }
+            return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        }
+
+        const getEndOfMonthDay = (year: number, month: number) =>
+            new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+        const monthNameToNumber: Record<string, number> = {
+            janeiro: 1,
+            jan: 1,
+            fevereiro: 2,
+            fev: 2,
+            marco: 3,
+            mar: 3,
+            abril: 4,
+            abr: 4,
+            maio: 5,
+            mai: 5,
+            junho: 6,
+            jun: 6,
+            julho: 7,
+            jul: 7,
+            agosto: 8,
+            ago: 8,
+            setembro: 9,
+            set: 9,
+            outubro: 10,
+            out: 10,
+            novembro: 11,
+            nov: 11,
+            dezembro: 12,
+            dez: 12,
+        }
+
+        const extractReferenceDateFromText = (text: string): string | null => {
+            const raw = String(text || '').trim()
+            if (!raw) return null
+
+            const isoMatch = raw.match(/\b(20\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/)
+            if (isoMatch) {
+                const parsed = toIsoDate(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]))
+                if (parsed) return parsed
+            }
+
+            const brDateMatch = raw.match(/\b([0-2]?\d|3[01])\/(0?\d|1[0-2])\/(20\d{2})\b/)
+            if (brDateMatch) {
+                const parsed = toIsoDate(Number(brDateMatch[3]), Number(brDateMatch[2]), Number(brDateMatch[1]))
+                if (parsed) return parsed
+            }
+
+            const normalized = normalizeText(raw)
+            if (/\bhoje\b/.test(normalized)) {
+                return clientToday || runtimeToday
+            }
+
+            const currentYear = Number((clientToday || runtimeToday).slice(0, 4))
+            const monthYearMatch = normalized.match(/\b(0?[1-9]|1[0-2])\s*\/\s*(20\d{2})\b/)
+            if (monthYearMatch) {
+                const month = Number(monthYearMatch[1])
+                const year = Number(monthYearMatch[2])
+                return toIsoDate(year, month, getEndOfMonthDay(year, month))
+            }
+
+            const monthTokenMatch = normalized.match(/\b(janeiro|jan|fevereiro|fev|marco|mar|abril|abr|maio|mai|junho|jun|julho|jul|agosto|ago|setembro|set|outubro|out|novembro|nov|dezembro|dez)\b(?:\s*(?:de|\/|-)?\s*(20\d{2}))?/)
+            if (monthTokenMatch) {
+                const token = monthTokenMatch[1]
+                const month = monthNameToNumber[token]
+                if (month) {
+                    const year = monthTokenMatch[2] ? Number(monthTokenMatch[2]) : currentYear
+                    return toIsoDate(year, month, getEndOfMonthDay(year, month))
+                }
+            }
+
+            return null
+        }
+
+        const inferredReferenceDate = extractReferenceDateFromText(query)
+
         const isTruthyFlag = (value: string | null | undefined) =>
             ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
 
@@ -337,7 +424,7 @@ Deno.serve(async (req) => {
             }
 
             if (mentionsFinance) {
-                const params: Record<string, any> = { p_reference_date: clientToday || runtimeToday }
+                const params: Record<string, any> = { p_reference_date: inferredReferenceDate || clientToday || runtimeToday }
                 if (clientTimezone) params.p_reference_tz = clientTimezone
                 if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) params.p_status = 'Inativo'
                 else params.p_status = 'Ativo'
@@ -368,7 +455,7 @@ Deno.serve(async (req) => {
 
                 if (call.rpc_name === 'query_financial_summary') {
                     const enrichedFinancialParams: Record<string, any> = { ...params }
-                    if (!enrichedFinancialParams.p_reference_date) enrichedFinancialParams.p_reference_date = clientToday || runtimeToday
+                    if (!enrichedFinancialParams.p_reference_date) enrichedFinancialParams.p_reference_date = inferredReferenceDate || clientToday || runtimeToday
                     if (!enrichedFinancialParams.p_status) enrichedFinancialParams.p_status = 'Ativo'
                     if (!enrichedFinancialParams.p_reference_tz && clientTimezone) enrichedFinancialParams.p_reference_tz = clientTimezone
                     return { rpc_name: call.rpc_name, params: cleanRpcParams(enrichedFinancialParams) }
@@ -729,7 +816,7 @@ Deno.serve(async (req) => {
                         properties: {
                             p_reference_date: {
                                 type: "string",
-                                description: "Data de referência no formato YYYY-MM-DD para cálculo de contratos ativos e MRR."
+                                description: "Data de referência no formato YYYY-MM-DD para cálculo de contratos ativos e MRR. Quando a pergunta for por mês/ano, use o último dia desse mês."
                             },
                             p_status: {
                                 type: "string",
@@ -851,6 +938,7 @@ Exemplos:
 - "liste todos os projetos de tráfego" → query_all_projects(p_service_type: "traffic")
 - "qual o MRR e ARR dos contratos ativos?" → query_financial_summary(p_status: "Ativo")
 - "qual o faturamento recorrente atual?" → query_financial_summary(p_status: "Ativo")
+- "qual foi o faturamento de janeiro de 2026?" → query_financial_summary(p_status: "Ativo", p_reference_date: "2026-01-31")
 - "quem acessou o sistema hoje?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "backlog")
@@ -864,6 +952,7 @@ Exemplos:
 - "qual é o cargo do André Cardia?" → query_all_users()
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
+Quando a pergunta citar um mês/ano específico (ex: janeiro/2026, fev 2026), defina p_reference_date no último dia do mês citado.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -908,7 +997,25 @@ Retorne apenas function calls (sem texto livre).`
 
                 // Complementa consultas em perguntas compostas para evitar respostas parciais.
                 const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
-                const dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
+                let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
+
+                const hasFinancialIntent = hasAny(input.user_message, [
+                    'mrr', 'arr', 'faturamento', 'receita', 'run rate', 'recorrente', 'recorrencia', 'recorrência'
+                ])
+                const explicitlyMentionsProposals = hasAny(input.user_message, ['proposta', 'propostas', 'orcamento', 'orçamento'])
+                const explicitlyWantsProjectList = hasAny(input.user_message, [
+                    'liste os projetos', 'listar projetos', 'quais projetos', 'mostre os projetos',
+                    'nomes dos projetos', 'detalhar projetos', 'detalhe dos projetos'
+                ])
+                const hasFinancialSummaryCall = dbCalls.some((c) => c.rpc_name === 'query_financial_summary')
+                if (hasFinancialIntent && hasFinancialSummaryCall) {
+                    if (!explicitlyMentionsProposals) {
+                        dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_proposals')
+                    }
+                    if (!explicitlyWantsProjectList) {
+                        dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_projects')
+                    }
+                }
 
                 if (dbCalls.length > 0) {
                     const primary = dbCalls[0]
@@ -1283,6 +1390,7 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Em caso de conflito entre fontes, priorize a hierarquia normativa: policy > procedure/contract > memo > conversa, sempre com versão vigente.
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
 - Para perguntas de faturamento/MRR/ARR, use apenas números explícitos da consulta SQL financeira (query_financial_summary). Nunca derive valores financeiros de listas de projetos sem valor.
+- Se a consulta financeira indicar contratos ativos sem mensalidade cadastrada, destaque essa limitação e informe que o MRR/ARR pode estar subestimado.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
         `.trim()

@@ -190,6 +190,11 @@ function normalizeDecision(dec: RouteDecision, input: RouterInput): RouteDecisio
 // --- 1. Hard Gates ---
 
 export function hardGatePolicy(msg: string, input: RouterInput): RouteDecision | null {
+    const hasFinancialKpiIntent = hasAny(msg, [
+        "mrr", "arr", "faturamento", "receita",
+        "run rate", "recorrente", "recorrencia", "recorrência",
+    ]);
+
     const hasContractIntent = hasAny(msg, [
         "contrato", "cláusula", "clausula", "vigência", "vigencia", "validade",
         "assinatura", "aditivo", "rescisão", "rescisao", "multa", "foro", "prazo",
@@ -206,20 +211,25 @@ export function hardGatePolicy(msg: string, input: RouterInput): RouteDecision |
         "senha", "token", "chave", "api key",
     ]);
 
-    if (hasContractIntent) {
+    // Prioridade máxima para métricas financeiras: evita cair no gate contratual por conter "contrato(s)".
+    if (hasFinancialKpiIntent) {
         return makeDecision(input, {
-            artifact_kind: "contract",
+            artifact_kind: "proposal",
             task_kind: "factual_lookup",
             risk_level: "high",
-            agent: "Agent_Contracts",
+            agent: "Agent_Proposals",
             retrieval_policy: "STRICT_DOCS_ONLY",
-            top_k: 5,
+            top_k: 0,
             tools_allowed: ["rag_search", "db_read"],
-            confidence: 0.95,
-            reason: "Hard gate: contract/legal intent detected",
+            tool_hint: "db_query",
+            db_query_params: {
+                rpc_name: "query_financial_summary",
+            },
+            confidence: 0.96,
+            reason: "Hard gate: financial KPI intent detected -> SQL financeiro",
             filtersPatch: {
-                artifact_kind: "contract",
-                source_table: ["acceptances", "contracts", "addenda"],
+                artifact_kind: "proposal",
+                source_table: ["acceptances", "proposals", "traffic_projects", "website_projects", "landing_page_projects"],
             },
         });
     }
@@ -242,6 +252,24 @@ export function hardGatePolicy(msg: string, input: RouterInput): RouteDecision |
             filtersPatch: {
                 artifact_kind: "proposal",
                 source_table: ["acceptances", "proposals", "traffic_projects", "website_projects", "landing_page_projects"],
+            },
+        });
+    }
+
+    if (hasContractIntent) {
+        return makeDecision(input, {
+            artifact_kind: "contract",
+            task_kind: "factual_lookup",
+            risk_level: "high",
+            agent: "Agent_Contracts",
+            retrieval_policy: "STRICT_DOCS_ONLY",
+            top_k: 5,
+            tools_allowed: ["rag_search", "db_read"],
+            confidence: 0.95,
+            reason: "Hard gate: contract/legal intent detected",
+            filtersPatch: {
+                artifact_kind: "contract",
+                source_table: ["acceptances", "contracts", "addenda"],
             },
         });
     }
