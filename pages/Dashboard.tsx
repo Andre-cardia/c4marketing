@@ -579,9 +579,10 @@ const Dashboard: React.FC = () => {
                                                     const threeDaysFromNow = new Date(today);
                                                     threeDaysFromNow.setDate(today.getDate() + 3);
 
-                                                    // Helper to parse "YYYY-MM-DD" as local date (midnight)
+                                                    // Helper to parse "YYYY-MM-DD" or ISO string as local date (midnight)
                                                     const parseLocalDate = (dateStr: string) => {
-                                                        const [year, month, day] = dateStr.split('-').map(Number);
+                                                        const cleanDateStr = dateStr.split('T')[0]; // Handle ISO strings
+                                                        const [year, month, day] = cleanDateStr.split('-').map(Number);
                                                         return new Date(year, month - 1, day);
                                                     };
 
