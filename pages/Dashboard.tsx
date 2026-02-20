@@ -557,11 +557,17 @@ const Dashboard: React.FC = () => {
                                         <tbody className="text-sm">
                                             {acceptances
                                                 .filter(a => a.status === 'Ativo')
-                                                .slice(0, 5)
                                                 .map((project) => {
-                                                    // Calculate Stats inline or call a helper
-                                                    const projectTasks = tasks.filter(t => t.project_id === project.id && t.status !== 'done');
-                                                    const activeCount = projectTasks.length;
+                                                    // Filter for relevant tasks (excluding 'done' and 'paused') for the count and validity check
+                                                    const relevantTasks = tasks.filter(t =>
+                                                        t.project_id === project.id &&
+                                                        ['backlog', 'in_progress', 'approval'].includes(t.status)
+                                                    );
+
+                                                    // Only show project if it has relevant tasks
+                                                    if (relevantTasks.length === 0) return null;
+
+                                                    const activeCount = relevantTasks.length;
 
                                                     let alertStatus: 'green' | 'yellow' | 'red' = 'green';
                                                     let alertText = 'Em dia';
@@ -570,8 +576,8 @@ const Dashboard: React.FC = () => {
                                                     threeDaysFromNow.setDate(now.getDate() + 3);
 
                                                     // Check for overdue or near due
-                                                    const overdueTasks = projectTasks.filter(t => t.due_date && new Date(t.due_date) < now);
-                                                    const nearDueTasks = projectTasks.filter(t => t.due_date && new Date(t.due_date) >= now && new Date(t.due_date) <= threeDaysFromNow);
+                                                    const overdueTasks = relevantTasks.filter(t => t.due_date && new Date(t.due_date) < now);
+                                                    const nearDueTasks = relevantTasks.filter(t => t.due_date && new Date(t.due_date) >= now && new Date(t.due_date) <= threeDaysFromNow);
 
                                                     if (overdueTasks.length > 0) {
                                                         alertStatus = 'red';
