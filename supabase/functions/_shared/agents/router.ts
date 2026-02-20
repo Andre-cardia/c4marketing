@@ -198,6 +198,7 @@ export function hardGatePolicy(msg: string, input: RouterInput): RouteDecision |
     const hasMoneyIntent = hasAny(msg, [
         "valor", "preço", "preco", "orçamento", "orcamento", "budget",
         "mensalidade", "pagamento", "cobrança", "cobranca", "faturamento",
+        "receita", "mrr", "arr", "run rate", "recorrente", "recorrencia", "recorrência",
     ]);
 
     const hasSensitiveIntent = hasAny(msg, [
@@ -230,13 +231,17 @@ export function hardGatePolicy(msg: string, input: RouterInput): RouteDecision |
             risk_level: "high",
             agent: "Agent_Proposals",
             retrieval_policy: "STRICT_DOCS_ONLY",
-            top_k: 6,
+            top_k: 0,
             tools_allowed: ["rag_search", "db_read"],
-            confidence: 0.9,
-            reason: "Hard gate: monetary intent detected",
+            tool_hint: "db_query",
+            db_query_params: {
+                rpc_name: "query_financial_summary",
+            },
+            confidence: 0.95,
+            reason: "Hard gate: monetary intent detected -> SQL financeiro",
             filtersPatch: {
                 artifact_kind: "proposal",
-                source_table: ["proposals", "budgets", "proposal_versions", "pricing_tables"],
+                source_table: ["acceptances", "proposals", "traffic_projects", "website_projects", "landing_page_projects"],
             },
         });
     }

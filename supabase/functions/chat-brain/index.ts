@@ -18,7 +18,20 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { query, session_id } = await req.json()
+        const requestBody = await req.json()
+        const query = typeof requestBody?.query === 'string' ? requestBody.query : ''
+        const session_id = typeof requestBody?.session_id === 'string' ? requestBody.session_id : null
+        const rawClientToday = typeof requestBody?.client_today === 'string' ? requestBody.client_today.trim() : null
+        const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : null
+        const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+        const clientToday = rawClientToday && isIsoDate(rawClientToday) ? rawClientToday : null
+        const runtimeToday = (() => {
+            const now = new Date()
+            const y = String(now.getFullYear())
+            const m = String(now.getMonth() + 1).padStart(2, '0')
+            const d = String(now.getDate()).padStart(2, '0')
+            return `${y}-${m}-${d}`
+        })()
 
         if (!query) throw new Error('Query is required')
 
@@ -197,6 +210,7 @@ Deno.serve(async (req) => {
             'query_all_proposals',
             'query_all_clients',
             'query_all_projects',
+            'query_financial_summary',
             'query_all_users',
             'query_all_tasks',
             'query_access_summary',
@@ -250,6 +264,10 @@ Deno.serve(async (req) => {
             const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
             const mentionsClients = hasAny(text, ['cliente', 'clientes'])
             const mentionsProposals = hasAny(text, ['proposta', 'propostas', 'orcamento', 'orçamento'])
+            const mentionsFinance = hasAny(text, [
+                'mrr', 'arr', 'faturamento', 'receita', 'run rate',
+                'recorrente', 'recorrencia', 'recorrência', 'ticket medio', 'ticket médio'
+            ])
 
             if (mentionsTasks) {
                 const wantsOverdueTasks = hasAny(text, [
@@ -263,7 +281,11 @@ Deno.serve(async (req) => {
                 else if (hasAny(text, ['concluida', 'concluído', 'concluido', 'finalizada', 'finalizado'])) p_status = 'done'
                 const taskParams: Record<string, any> = {}
                 if (p_status) taskParams.p_status = p_status
-                if (wantsOverdueTasks) taskParams.p_overdue = true
+                if (wantsOverdueTasks) {
+                    taskParams.p_overdue = true
+                    taskParams.p_reference_date = clientToday || runtimeToday
+                    if (clientTimezone) taskParams.p_reference_tz = clientTimezone
+                }
                 calls.push({ rpc_name: 'query_all_tasks', params: taskParams })
             }
 
@@ -314,11 +336,46 @@ Deno.serve(async (req) => {
                 calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
             }
 
+            if (mentionsFinance) {
+                const params: Record<string, any> = { p_reference_date: clientToday || runtimeToday }
+                if (clientTimezone) params.p_reference_tz = clientTimezone
+                if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) params.p_status = 'Inativo'
+                else params.p_status = 'Ativo'
+                calls.push({ rpc_name: 'query_financial_summary', params })
+            }
+
             return dedupeDbCalls(calls).slice(0, 5)
         }
 
         const mergeDbCalls = (primary: DbQueryCall[], supplemental: DbQueryCall[]) =>
             dedupeDbCalls([...(primary || []), ...(supplemental || [])]).slice(0, 5)
+
+        const enrichDbCalls = (calls: DbQueryCall[]): DbQueryCall[] =>
+            calls.map((call) => {
+                const params = cleanRpcParams(call.params)
+
+                if (call.rpc_name === 'query_all_tasks') {
+                    const overdueFlag = params.p_overdue === true || params.p_overdue === 'true'
+                    if (!overdueFlag) {
+                        return { rpc_name: call.rpc_name, params }
+                    }
+
+                    const enrichedTaskParams: Record<string, any> = { ...params }
+                    if (!enrichedTaskParams.p_reference_date) enrichedTaskParams.p_reference_date = clientToday || runtimeToday
+                    if (!enrichedTaskParams.p_reference_tz && clientTimezone) enrichedTaskParams.p_reference_tz = clientTimezone
+                    return { rpc_name: call.rpc_name, params: cleanRpcParams(enrichedTaskParams) }
+                }
+
+                if (call.rpc_name === 'query_financial_summary') {
+                    const enrichedFinancialParams: Record<string, any> = { ...params }
+                    if (!enrichedFinancialParams.p_reference_date) enrichedFinancialParams.p_reference_date = clientToday || runtimeToday
+                    if (!enrichedFinancialParams.p_status) enrichedFinancialParams.p_status = 'Ativo'
+                    if (!enrichedFinancialParams.p_reference_tz && clientTimezone) enrichedFinancialParams.p_reference_tz = clientTimezone
+                    return { rpc_name: call.rpc_name, params: cleanRpcParams(enrichedFinancialParams) }
+                }
+
+                return { rpc_name: call.rpc_name, params }
+            })
 
         const isExplicitMemorySaveIntent = (text: string) => hasAny(text, [
             'guarde isso', 'guarde esta informacao', 'guarde essa informacao',
@@ -665,6 +722,35 @@ Deno.serve(async (req) => {
             {
                 type: "function" as const,
                 function: {
+                    name: "query_financial_summary",
+                    description: "Consultar resumo financeiro determinístico para faturamento recorrente. Use para perguntas de MRR, ARR, faturamento, receita recorrente e contratos ativos.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_reference_date: {
+                                type: "string",
+                                description: "Data de referência no formato YYYY-MM-DD para cálculo de contratos ativos e MRR."
+                            },
+                            p_status: {
+                                type: "string",
+                                enum: ["Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado"],
+                                description: "Filtro por status do cliente/contrato na tabela acceptances. Padrão recomendado para MRR/ARR: Ativo."
+                            },
+                            p_company_name: {
+                                type: "string",
+                                description: "Filtro opcional por nome da empresa (partial match)."
+                            },
+                            p_reference_tz: {
+                                type: "string",
+                                description: "Timezone IANA opcional (ex: America/Sao_Paulo) para rastreabilidade."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
                     name: "query_all_users",
                     description: "Consultar lista de usuários/colaboradores da equipe interna, com nome, email, cargo e último acesso.",
                     parameters: { type: "object", properties: {} }
@@ -690,6 +776,14 @@ Deno.serve(async (req) => {
                             p_overdue: {
                                 type: "boolean",
                                 description: "Quando true, retorna apenas tarefas atrasadas (due_date menor que hoje e status diferente de done)."
+                            },
+                            p_reference_date: {
+                                type: "string",
+                                description: "Data de referência no formato YYYY-MM-DD para calcular atraso (ex: data local do usuário)."
+                            },
+                            p_reference_tz: {
+                                type: "string",
+                                description: "Timezone IANA opcional do usuário (ex: America/Sao_Paulo) para rastreabilidade."
                             }
                         }
                     }
@@ -755,6 +849,8 @@ Exemplos:
 - "quais propostas estão em aberto?" → query_all_proposals(p_status_filter: "open")
 - "quem são nossos clientes ativos?" → query_all_clients(p_status: "Ativo")
 - "liste todos os projetos de tráfego" → query_all_projects(p_service_type: "traffic")
+- "qual o MRR e ARR dos contratos ativos?" → query_financial_summary(p_status: "Ativo")
+- "qual o faturamento recorrente atual?" → query_financial_summary(p_status: "Ativo")
 - "quem acessou o sistema hoje?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "backlog")
@@ -767,6 +863,7 @@ Exemplos:
 - "quem é o CTO da C4?" → query_all_users()
 - "qual é o cargo do André Cardia?" → query_all_users()
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
+Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -796,6 +893,7 @@ Retorne apenas function calls (sem texto livre).`
                     'query_all_proposals': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
                     'query_all_clients': { agent: 'Agent_Client360', artifact_kind: 'client' },
                     'query_all_projects': { agent: 'Agent_Projects', artifact_kind: 'project' },
+                    'query_financial_summary': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
                     'query_all_users': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
@@ -810,7 +908,7 @@ Retorne apenas function calls (sem texto livre).`
 
                 // Complementa consultas em perguntas compostas para evitar respostas parciais.
                 const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
-                const dbCalls = mergeDbCalls(llmDbCalls, supplementalDbCalls)
+                const dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
 
                 if (dbCalls.length > 0) {
                     const primary = dbCalls[0]
@@ -1128,7 +1226,7 @@ Retorne apenas function calls (sem texto livre).`
                 }
             }
 
-            const finalCalls = dedupeDbCalls(plannedCalls)
+            const finalCalls = dedupeDbCalls(enrichDbCalls(dedupeDbCalls(plannedCalls)))
             if (finalCalls.length === 0) {
                 // Guardrail: sempre consultar alguma base antes de responder
                 contextText = await runVectorRetrieval()
@@ -1184,6 +1282,7 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Sempre considere os blocos "MEMÓRIA COGNITIVA RELEVANTE" e "FATOS EXPLÍCITOS SALVOS PELO USUÁRIO" antes de concluir.
 - Em caso de conflito entre fontes, priorize a hierarquia normativa: policy > procedure/contract > memo > conversa, sempre com versão vigente.
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
+- Para perguntas de faturamento/MRR/ARR, use apenas números explícitos da consulta SQL financeira (query_financial_summary). Nunca derive valores financeiros de listas de projetos sem valor.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
         `.trim()

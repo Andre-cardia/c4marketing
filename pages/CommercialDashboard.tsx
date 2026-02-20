@@ -85,12 +85,12 @@ const MRRLineChart: React.FC<{ months: MonthlyMetrics[]; comparisonMonths?: Mont
             <path d={makeAreaPath(months)} fill="url(#mrrGrad)" />
 
             {/* Main line */}
-            <path d={makePath(months)} fill="none" stroke="#f97316" strokeWidth={2.5} strokeLinejoin="round" />
+            <path d={makePath(months)} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinejoin="round" />
 
             {/* Data points */}
             {months.map((m, i) => (
                 <g key={i}>
-                    <circle cx={getX(i)} cy={getY(m.mrr)} r={4} fill="#f97316" stroke="#1e293b" strokeWidth={2} />
+                    <circle cx={getX(i)} cy={getY(m.mrr)} r={4} fill="#10b981" stroke="#1e293b" strokeWidth={2} />
                     <title>{`${m.monthLabel}: ${formatCurrency(m.mrr)}`}</title>
                 </g>
             ))}
@@ -141,7 +141,7 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
                     <g key={i}>
                         {/* Recorrente (bottom) */}
                         <rect x={x} y={padding.top + chartH - mrrHeight} width={barWidth} height={mrrHeight}
-                            rx={3} fill="#f97316" opacity={0.9}>
+                            rx={3} fill="#10b981" opacity={0.9}>
                             <title>{`${m.monthLabel} - Recorrente: ${formatCurrency(m.mrr)}`}</title>
                         </rect>
                         {/* Setup (top) */}
@@ -157,7 +157,7 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
             })}
 
             {/* Legend */}
-            <rect x={width - 180} y={8} width={10} height={10} rx={2} fill="#f97316" />
+            <rect x={width - 180} y={8} width={10} height={10} rx={2} fill="#10b981" />
             <text x={width - 166} y={17} className="fill-slate-400 text-[10px]">Recorrente</text>
             <rect x={width - 100} y={8} width={10} height={10} rx={2} fill="#3b82f6" />
             <text x={width - 86} y={17} className="fill-slate-400 text-[10px]">Setup</text>
@@ -284,7 +284,7 @@ const KPICard: React.FC<{
                 </div>
             )}
         </div>
-        <p className="text-2xl font-black text-white leading-none mb-1">{value}</p>
+        <p className="text-xl font-black text-white leading-none mb-1">{value}</p>
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</p>
         {subtitle && <p className="text-[10px] text-slate-600 mt-1">{subtitle}</p>}
     </div>
@@ -606,7 +606,7 @@ ${context.months.map(m =>
                                 title="MRR"
                                 value={formatCompact(context.currentMRR)}
                                 change={context.mrrGrowth}
-                                icon={<DollarSign size={18} className="text-brand-coral" />}
+                                icon={<DollarSign size={18} className="text-emerald-400" />}
                                 subtitle="Receita Mensal Recorrente"
                             />
                             <KPICard
@@ -652,7 +652,7 @@ ${context.months.map(m =>
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                        <TrendingUp size={16} className="text-brand-coral" />
+                                        <TrendingUp size={16} className="text-emerald-400" />
                                         Evolução do MRR
                                     </h3>
                                     {comparisonYear && (
@@ -724,7 +724,7 @@ ${context.months.map(m =>
                                                         <span className="ml-2 text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-bold">PREV</span>
                                                     )}
                                                 </td>
-                                                <td className="py-3 px-3 text-right text-brand-coral font-medium">
+                                                <td className="py-3 px-3 text-right text-emerald-400 font-medium">
                                                     {m.isForecast ? '—' : formatCurrency(m.mrr)}
                                                 </td>
                                                 <td className="py-3 px-3 text-right text-amber-400 font-medium">
@@ -756,7 +756,7 @@ ${context.months.map(m =>
                                         {/* Totals row */}
                                         <tr className="border-t-2 border-slate-700 bg-slate-800/30 font-bold">
                                             <td className="py-3 px-3 text-white">TOTAL</td>
-                                            <td className="py-3 px-3 text-right text-brand-coral">
+                                            <td className="py-3 px-3 text-right text-emerald-400">
                                                 {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.mrr, 0))}
                                             </td>
                                             <td className="py-3 px-3 text-right text-amber-400">

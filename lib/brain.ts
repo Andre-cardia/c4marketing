@@ -87,7 +87,14 @@ function isExpired(exp: number | null): boolean {
     return exp <= Math.floor(Date.now() / 1000);
 }
 
-async function callChatBrainDirect(payload: { query: string; session_id: string | null }, bearerToken: string): Promise<AskBrainResponse> {
+type ChatBrainPayload = {
+    query: string;
+    session_id: string | null;
+    client_today?: string;
+    client_tz?: string;
+}
+
+async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: string): Promise<AskBrainResponse> {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -188,7 +195,15 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
 }
 
 export async function askBrain(query: string, sessionId?: string): Promise<AskBrainResponse> {
-    const payload = { query, session_id: sessionId || null };
+    const now = new Date();
+    const clientToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const payload: ChatBrainPayload = {
+        query,
+        session_id: sessionId || null,
+        client_today: clientToday,
+        client_tz: clientTimezone,
+    };
     const expectedRef = getProjectRefFromSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 
     let token = await getValidAccessToken();

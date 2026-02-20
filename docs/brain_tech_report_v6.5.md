@@ -175,6 +175,7 @@ O LLM Router recebe 7 ferramentas com **schemas JSON tipados**:
 │                         │ p_status: "backlog" | "in_progress" | "approval" │
 │                         │ | "done" | "paused" (compat: todo/review)        │
 │                         │ p_overdue: boolean (opcional)                     │
+│                         │ p_reference_date: "YYYY-MM-DD" (opcional)         │
 ├─────────────────────────┼────────────────────────────────────────────────────┤
 │ query_all_users         │ (sem parâmetros)                                  │
 ├─────────────────────────┼────────────────────────────────────────────────────┤
@@ -196,6 +197,7 @@ O system prompt do LLM Router inclui **exemplos de mapeamento** para guiar a cla
 "o que diz o contrato com a empresa X?" → rag_search()
 "tem alguma tarefa pendente?" → query_all_tasks(p_status: "backlog")
 "quais tarefas estão atrasadas?" → query_all_tasks(p_overdue: true)
+"quais tarefas estão atrasadas hoje?" → query_all_tasks(p_overdue: true, p_reference_date: "data local")
 ```
 
 ---
