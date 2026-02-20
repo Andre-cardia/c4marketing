@@ -571,13 +571,32 @@ const Dashboard: React.FC = () => {
 
                                                     let alertStatus: 'green' | 'yellow' | 'red' = 'green';
                                                     let alertText = 'Em dia';
-                                                    const now = new Date();
-                                                    const threeDaysFromNow = new Date();
-                                                    threeDaysFromNow.setDate(now.getDate() + 3);
 
-                                                    // Check for overdue or near due
-                                                    const overdueTasks = relevantTasks.filter(t => t.due_date && new Date(t.due_date) < now);
-                                                    const nearDueTasks = relevantTasks.filter(t => t.due_date && new Date(t.due_date) >= now && new Date(t.due_date) <= threeDaysFromNow);
+                                                    // Normalize "now" to start of today (local time)
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0);
+
+                                                    const threeDaysFromNow = new Date(today);
+                                                    threeDaysFromNow.setDate(today.getDate() + 3);
+
+                                                    // Helper to parse "YYYY-MM-DD" as local date (midnight)
+                                                    const parseLocalDate = (dateStr: string) => {
+                                                        const [year, month, day] = dateStr.split('-').map(Number);
+                                                        return new Date(year, month - 1, day);
+                                                    };
+
+                                                    // Check for overdue or near due among the relevant tasks
+                                                    const overdueTasks = relevantTasks.filter(t => {
+                                                        if (!t.due_date) return false;
+                                                        const taskDate = parseLocalDate(t.due_date);
+                                                        return taskDate < today;
+                                                    });
+
+                                                    const nearDueTasks = relevantTasks.filter(t => {
+                                                        if (!t.due_date) return false;
+                                                        const taskDate = parseLocalDate(t.due_date);
+                                                        return taskDate >= today && taskDate <= threeDaysFromNow;
+                                                    });
 
                                                     if (overdueTasks.length > 0) {
                                                         alertStatus = 'red';
