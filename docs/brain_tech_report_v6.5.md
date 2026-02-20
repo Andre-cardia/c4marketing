@@ -172,7 +172,9 @@ O LLM Router recebe 7 ferramentas com **schemas JSON tipados**:
 │                         │ p_status_filter: "Ativo" | "Inativo"             │
 ├─────────────────────────┼────────────────────────────────────────────────────┤
 │ query_all_tasks         │ p_project_id: number (opcional)                   │
-│                         │ p_status: "todo" | "in_progress" | "done" | ...  │
+│                         │ p_status: "backlog" | "in_progress" | "approval" │
+│                         │ | "done" | "paused" (compat: todo/review)        │
+│                         │ p_overdue: boolean (opcional)                     │
 ├─────────────────────────┼────────────────────────────────────────────────────┤
 │ query_all_users         │ (sem parâmetros)                                  │
 ├─────────────────────────┼────────────────────────────────────────────────────┤
@@ -192,7 +194,8 @@ O system prompt do LLM Router inclui **exemplos de mapeamento** para guiar a cla
 "liste todos os projetos de tráfego" → query_all_projects(p_service_type: "traffic")
 "quem acessou o sistema hoje?" → query_access_summary()
 "o que diz o contrato com a empresa X?" → rag_search()
-"tem alguma tarefa pendente?" → query_all_tasks(p_status: "todo")
+"tem alguma tarefa pendente?" → query_all_tasks(p_status: "backlog")
+"quais tarefas estão atrasadas?" → query_all_tasks(p_overdue: true)
 ```
 
 ---
@@ -443,7 +446,7 @@ LLM:     ✅ query_all_proposals(p_status_filter: "open")
 Agente:  Retornou as 6 propostas corretas em aberto
 
 Usuário: "tem alguma tarefa pendente?"
-LLM:     ✅ query_all_tasks(p_status: "todo")
+LLM:     ✅ query_all_tasks(p_status: "backlog")
 Agente:  "André, não há tarefas pendentes no momento." (resultado real)
 
 Usuário: "me mostra os clientes que estão inativos"

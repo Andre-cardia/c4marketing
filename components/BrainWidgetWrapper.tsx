@@ -5,10 +5,9 @@ import { BrainChat } from './BrainChat';
 export const BrainWidgetWrapper: React.FC = () => {
     const { userRole, loading } = useUserRole();
     const [isBrainOpen, setIsBrainOpen] = useState(false);
-    const allowedRoles = ['admin', 'gestor', 'comercial', 'operacional', 'leitor'];
 
-    // Hide for unauthenticated/loading users and for client-only access.
-    if (loading || !userRole || !allowedRoles.includes(userRole)) {
+    // Brain widget is restricted to managers only.
+    if (loading || userRole !== 'gestor') {
         return null;
     }
 

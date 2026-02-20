@@ -234,7 +234,11 @@ Deno.serve(async (req) => {
         const inferSupplementalDbCalls = (text: string): DbQueryCall[] => {
             const calls: DbQueryCall[] = []
 
-            const mentionsTasks = hasAny(text, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'pendente', 'pendentes'])
+            const mentionsTasks = hasAny(text, [
+                'tarefa', 'tarefas',
+                'pendencia', 'pendência', 'pendente', 'pendentes',
+                'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline'
+            ])
             const mentionsUsers = hasAny(text, [
                 'usuario', 'usuário', 'usuarios', 'usuários',
                 'colaborador', 'colaboradores', 'equipe', 'time',
@@ -248,11 +252,19 @@ Deno.serve(async (req) => {
             const mentionsProposals = hasAny(text, ['proposta', 'propostas', 'orcamento', 'orçamento'])
 
             if (mentionsTasks) {
+                const wantsOverdueTasks = hasAny(text, [
+                    'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline'
+                ])
                 let p_status: string | null = null
-                if (hasAny(text, ['pendente', 'pendentes', 'a fazer', 'em aberto'])) p_status = 'todo'
+                if (hasAny(text, ['pendente', 'pendentes', 'a fazer', 'em aberto'])) p_status = 'backlog'
                 else if (hasAny(text, ['em andamento', 'andamento'])) p_status = 'in_progress'
+                else if (hasAny(text, ['aprovacao', 'aprovação', 'aguardando aprovacao', 'aguardando aprovação'])) p_status = 'approval'
+                else if (hasAny(text, ['pausada', 'pausadas', 'pausado', 'pausados'])) p_status = 'paused'
                 else if (hasAny(text, ['concluida', 'concluído', 'concluido', 'finalizada', 'finalizado'])) p_status = 'done'
-                calls.push({ rpc_name: 'query_all_tasks', params: p_status ? { p_status } : {} })
+                const taskParams: Record<string, any> = {}
+                if (p_status) taskParams.p_status = p_status
+                if (wantsOverdueTasks) taskParams.p_overdue = true
+                calls.push({ rpc_name: 'query_all_tasks', params: taskParams })
             }
 
             if (mentionsUsers && mentionsAccess) {
@@ -672,8 +684,12 @@ Deno.serve(async (req) => {
                             },
                             p_status: {
                                 type: "string",
-                                enum: ["todo", "in_progress", "done", "review"],
-                                description: "Filtro por status da tarefa. Omita para retornar todas. 'todo' = pendentes, 'in_progress' = em andamento."
+                                enum: ["backlog", "in_progress", "approval", "done", "paused", "todo", "review"],
+                                description: "Filtro por status da tarefa. Status canônicos: backlog, in_progress, approval, done, paused. Compatibilidade: todo => backlog, review => approval."
+                            },
+                            p_overdue: {
+                                type: "boolean",
+                                description: "Quando true, retorna apenas tarefas atrasadas (due_date menor que hoje e status diferente de done)."
                             }
                         }
                     }
@@ -741,7 +757,8 @@ Exemplos:
 - "liste todos os projetos de tráfego" → query_all_projects(p_service_type: "traffic")
 - "quem acessou o sistema hoje?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
-- "quais tarefas estão pendentes?" → query_all_tasks(p_status: "todo")
+- "quais tarefas estão pendentes?" → query_all_tasks(p_status: "backlog")
+- "quais tarefas estão atrasadas?" → query_all_tasks(p_overdue: true)
 - "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
