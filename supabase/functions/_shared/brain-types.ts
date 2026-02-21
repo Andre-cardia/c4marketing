@@ -4,7 +4,8 @@ export type RetrievalPolicy =
   | "NORMATIVE_FIRST"
   | "DOCS_PLUS_RECENT_CHAT"
   | "CHAT_ONLY"
-  | "OPS_ONLY";
+  | "OPS_ONLY"
+  | "CANONICAL_ALWAYS"; // Tier-1: documentos canônicos corporativos (tenant c4_corporate_identity)
 
 export type BrainDocType =
   | "official_doc"
@@ -70,6 +71,10 @@ export interface MatchFilters {
   require_current?: boolean;
   require_searchable?: boolean;
   authority_rank_min?: number | null;
+
+  // canonical corporate layer (Tier 1)
+  role_allowlist?: string[] | null;  // cargos com acesso ao documento canônico
+  canonical_scope?: boolean;         // quando true, ignora tenant isolation e usa get_canonical_corporate_docs
 }
 
 export interface RetrievedDoc {

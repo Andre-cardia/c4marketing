@@ -126,6 +126,19 @@ function applyPolicy(filters: MatchFilters, policy: RetrievalPolicy): MatchFilte
             f.artifact_kind = "ops";
             break;
         }
+
+        case "CANONICAL_ALWAYS": {
+            // Ignora tenant do usuário — aponta para tenant canônico global.
+            // O RPC get_canonical_corporate_docs é chamado diretamente em chat-brain.
+            f.canonical_scope = true;
+            f.status = "active";
+            f.require_current = true;
+            f.require_searchable = true;
+            f.authority_rank_min = 90; // policy (100) e procedure/area-policy (90)
+            ensureBlock("chat_log", "session_summary");
+            f.time_window_minutes = null;
+            break;
+        }
     }
 
     f.type_allowlist = Array.from(allow);

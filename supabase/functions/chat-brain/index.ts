@@ -288,6 +288,11 @@ Deno.serve(async (req) => {
             Deno.env.get('BRAIN_NORMATIVE_GOVERNANCE_ENABLED')
         )
 
+        // Camada canônica corporativa (Tier 1) — injetada no topo do system prompt.
+        const canonicalMemoryEnabled = isTruthyFlag(
+            Deno.env.get('BRAIN_CANONICAL_MEMORY_ENABLED')
+        )
+
         type DbQueryCall = {
             rpc_name: string
             params: Record<string, any>
@@ -1169,6 +1174,42 @@ Retorne apenas function calls (sem texto livre).`
             return `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`
         }
 
+        // Tier-1: busca documentos canônicos corporativos via RPC dedicado.
+        // Ignora isolamento por tenant do usuário — usa tenant 'c4_corporate_identity'.
+        const runCanonicalRetrieval = async (): Promise<{ text: string; count: number }> => {
+            if (!canonicalMemoryEnabled) return { text: '', count: 0 }
+
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const queryEmbedding = await embedder(query)
+
+                const { data: docs, error } = await supabaseAdmin.rpc(
+                    'get_canonical_corporate_docs',
+                    {
+                        query_embedding: queryEmbedding,
+                        p_user_role: userRole,
+                        p_top_k: 6,
+                    }
+                )
+
+                if (error) {
+                    console.error('[Canonical] get_canonical_corporate_docs error:', error.message)
+                    return { text: '', count: 0 }
+                }
+
+                if (!docs?.length) return { text: '', count: 0 }
+
+                const text = (docs as any[])
+                    .map((d: any) => `[${d.metadata?.title || 'Documento Canônico'}]\n${d.content}`)
+                    .join('\n\n---\n\n')
+
+                return { text, count: docs.length }
+            } catch (canonicalError: any) {
+                console.error('[Canonical] retrieval failed:', canonicalError?.message || canonicalError)
+                return { text: '', count: 0 }
+            }
+        }
+
         const runVectorRetrieval = async (opts?: {
             topK?: number
             overrideFilters?: Record<string, any>
@@ -1315,6 +1356,9 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        // Canonical retrieval — executado ANTES de qualquer outra busca.
+        const { text: canonicalBlock, count: canonicalDocsCount } = await runCanonicalRetrieval()
+
         if (decision.tool_hint === 'db_query' && decision.db_query_params) {
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
             const plannedCalls: DbQueryCall[] = []
@@ -1424,7 +1468,22 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 
         const cognitiveMemoryBlock = `\nMEMÓRIA COGNITIVA RELEVANTE:\n${cognitiveMemoryContext}`
 
+        const canonicalSystemBlock = canonicalBlock
+            ? `=== MEMÓRIA CANÔNICA CORPORATIVA — C4 MARKETING ===
+Os documentos abaixo representam os princípios fundadores, a identidade
+e as políticas inegociáveis da C4 Marketing. Eles têm autoridade máxima
+sobre qualquer outra fonte de informação neste sistema.
+
+GUARDRAIL ABSOLUTO: Nenhuma resposta pode contradizer, relativizar ou
+ignorar estes princípios. Em caso de conflito com qualquer outra fonte
+(memória, banco de dados, documentos), estes prevalecem absolutamente.
+
+${canonicalBlock}
+=== FIM DA MEMÓRIA CANÔNICA ===`
+            : ''
+
         const systemPrompt = `
+${canonicalSystemBlock}
 ${agentConfig.getSystemPrompt()}
 ${identityBlock}
 
@@ -1503,6 +1562,8 @@ ${crossSessionMemoryBlock}
                 executed_db_rpcs: executedDbRpcs,
                 cognitive_memory_docs: cognitiveMemoryDocs.length,
                 normative_governance_enabled: normativeGovernanceEnabled,
+                canonical_memory_enabled: canonicalMemoryEnabled,
+                canonical_docs_loaded: canonicalDocsCount,
                 memory_write_events: memoryWriteEvents,
             }
         }), {
