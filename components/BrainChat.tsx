@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askBrain, addToBrain, BrainDocument, createChatSession, addChatMessage } from '../lib/brain';
 import { Send, Bot, User, Loader2, FileText, X } from 'lucide-react';
+import { C1Component, ThemeProvider } from "@thesysai/genui-sdk";
+import "@crayonai/react-ui/styles/index.css";
 import { useUserRole } from '../lib/UserRoleContext';
 
 interface Message {
@@ -156,14 +158,17 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                         <div className={`max-w-[85%] space-y-2 ${msg.role === 'user' ? 'items-end flex flex-col' : ''}`}>
                             <div
                                 className={`p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-br-none'
-                                    : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700'
+                                    ? 'bg-indigo-600 text-white rounded-br-none whitespace-pre-wrap'
+                                    : 'bg-slate-800 text-slate-200 rounded-bl-none border border-slate-700 custom-thesys-wrapper'
                                     }`}
                             >
-                                {/* <ReactMarkdown className="prose prose-invert prose-sm max-w-none">
-                                        {msg.content}
-                                    </ReactMarkdown> */}
-                                <div className="whitespace-pre-wrap">{msg.content}</div>
+                                {msg.role === 'user' ? (
+                                    msg.content
+                                ) : (
+                                    <ThemeProvider>
+                                        <C1Component c1Response={msg.content} />
+                                    </ThemeProvider>
+                                )}
                             </div>
 
                             {/* Sources */}
