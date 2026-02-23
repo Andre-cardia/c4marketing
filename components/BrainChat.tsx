@@ -168,9 +168,26 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                                     <ThemeProvider>
                                         <C1Component c1Response={
                                             (() => {
-                                                const txt = document.createElement("textarea");
-                                                txt.innerHTML = msg.content;
-                                                return txt.value;
+                                                // 1. Unescape strings manually, including double encoded ones
+                                                let str = msg.content;
+                                                str = str.replace(/&amp;/g, '&');
+                                                str = str.replace(/&quot;/g, '"');
+                                                str = str.replace(/&#39;/g, "'");
+                                                str = str.replace(/&lt;/g, '<');
+                                                str = str.replace(/&gt;/g, '>');
+                                                try {
+                                                    // 2. Tentar enxergar se dá pra extrair apenas o objeto JSON do Thesys do payload escapado
+                                                    const match = str.match(/<content[^>]*>([\s\S]*?)<\/content>/);
+                                                    if (match && match[1]) {
+                                                        const jsonPayload = JSON.parse(match[1]);
+                                                        // Se deu certo recriamos a tag thesys com o JSON validado pelo browser
+                                                        return `<content thesys="true">${JSON.stringify(jsonPayload)}</content>`;
+                                                    }
+                                                } catch (e) {
+                                                    // console.error("Could not parse Thesys JSON payload manually", e)
+                                                }
+                                                // Fallback to the unescaped string
+                                                return str;
                                             })()
                                         } />
                                     </ThemeProvider>
