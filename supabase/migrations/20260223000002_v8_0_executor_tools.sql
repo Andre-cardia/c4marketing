@@ -368,3 +368,124 @@ BEGIN
 END; $$;
 
 GRANT EXECUTE ON FUNCTION public.execute_update_project_status TO authenticated, service_role;
+
+
+-- ============================================================
+-- 5. execute_update_task  (atualizar campos de tarefa existente)
+--    Aceita p_task_id (UUID) OU p_task_title + p_project_id/name
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.execute_update_task(
+    p_session_id      TEXT    DEFAULT NULL,
+    p_project_id      BIGINT  DEFAULT NULL,
+    p_project_name    TEXT    DEFAULT NULL,
+    p_task_title      TEXT    DEFAULT NULL,
+    p_task_id         UUID    DEFAULT NULL,
+    p_new_title       TEXT    DEFAULT NULL,
+    p_new_description TEXT    DEFAULT NULL,
+    p_new_due_date    DATE    DEFAULT NULL,
+    p_new_priority    TEXT    DEFAULT NULL,
+    p_new_assignee    TEXT    DEFAULT NULL,
+    p_idempotency_key TEXT    DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+    v_task_title   TEXT;
+    v_client_name  TEXT;
+    v_changes      TEXT[] := '{}';
+BEGIN
+    -- Resolver projeto por nome se necessário
+    IF p_project_id IS NULL AND p_project_name IS NOT NULL THEN
+        SELECT a.id, a.company_name
+          INTO p_project_id, v_client_name
+          FROM acceptances a
+         WHERE lower(a.company_name) LIKE '%' || lower(trim(p_project_name)) || '%'
+         LIMIT 1;
+        IF p_project_id IS NULL THEN
+            RETURN jsonb_build_object('status','error',
+                'message', format('Projeto "%s" não encontrado.', p_project_name));
+        END IF;
+    END IF;
+
+    -- Buscar nome do cliente
+    IF v_client_name IS NULL AND p_project_id IS NOT NULL THEN
+        SELECT a.company_name INTO v_client_name FROM acceptances a WHERE a.id = p_project_id;
+    END IF;
+
+    IF p_task_id IS NULL AND p_task_title IS NULL THEN
+        RETURN jsonb_build_object('status','error',
+            'message','Informe p_task_id ou p_task_title para identificar a tarefa.');
+    END IF;
+
+    -- Resolver tarefa por título se ID não fornecido
+    IF p_task_id IS NULL THEN
+        SELECT pt.id, pt.title
+          INTO p_task_id, v_task_title
+          FROM project_tasks pt
+         WHERE lower(pt.title) LIKE '%' || lower(trim(p_task_title)) || '%'
+           AND (p_project_id IS NULL OR pt.project_id = p_project_id)
+         ORDER BY pt.created_at DESC
+         LIMIT 1;
+        IF p_task_id IS NULL THEN
+            RETURN jsonb_build_object('status','error',
+                'message', format('Tarefa "%s" não encontrada%s.',
+                    p_task_title,
+                    CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END));
+        END IF;
+    ELSE
+        SELECT pt.title INTO v_task_title FROM project_tasks pt WHERE pt.id = p_task_id;
+        IF v_task_title IS NULL THEN
+            RETURN jsonb_build_object('status','error',
+                'message', format('Tarefa com ID %s não encontrada.', p_task_id));
+        END IF;
+    END IF;
+
+    -- Aplicar atualizações condicionais
+    IF p_new_title IS NOT NULL THEN
+        UPDATE project_tasks SET title = p_new_title WHERE id = p_task_id;
+        v_changes := array_append(v_changes, 'título');
+    END IF;
+    IF p_new_description IS NOT NULL THEN
+        UPDATE project_tasks SET description = p_new_description WHERE id = p_task_id;
+        v_changes := array_append(v_changes, 'descrição');
+    END IF;
+    IF p_new_due_date IS NOT NULL THEN
+        UPDATE project_tasks SET due_date = p_new_due_date WHERE id = p_task_id;
+        v_changes := array_append(v_changes, 'prazo');
+    END IF;
+    IF p_new_priority IS NOT NULL THEN
+        UPDATE project_tasks SET priority = p_new_priority WHERE id = p_task_id;
+        v_changes := array_append(v_changes, 'prioridade');
+    END IF;
+    IF p_new_assignee IS NOT NULL THEN
+        UPDATE project_tasks SET assignee = p_new_assignee WHERE id = p_task_id;
+        v_changes := array_append(v_changes, 'responsável');
+    END IF;
+
+    IF array_length(v_changes, 1) IS NULL OR array_length(v_changes, 1) = 0 THEN
+        RETURN jsonb_build_object('status','info',
+            'message','Nenhum campo para atualizar foi informado.');
+    END IF;
+
+    -- Log fail-safe
+    BEGIN
+        INSERT INTO brain.execution_logs (session_id, agent_name, action, status, params, result, latency_ms)
+        VALUES (coalesce(p_session_id,'unknown'), 'Agent_Executor', 'update_task', 'success',
+            jsonb_build_object('task_id',p_task_id,'title',v_task_title,'changes',array_to_string(v_changes,', '),'client_name',v_client_name),
+            jsonb_build_object('updated',true), 0);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+
+    RETURN jsonb_build_object(
+        'status','success',
+        'task_id', p_task_id,
+        'task_title', coalesce(p_new_title, v_task_title),
+        'changes', array_to_string(v_changes, ', '),
+        'client_name', v_client_name,
+        'message', format('Tarefa "%s" atualizada (%s)%s.',
+            coalesce(p_new_title, v_task_title),
+            array_to_string(v_changes, ', '),
+            CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END)
+    );
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.execute_update_task TO authenticated, service_role;
