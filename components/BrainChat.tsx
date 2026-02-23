@@ -166,25 +166,13 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                                     msg.content
                                 ) : (
                                     <ThemeProvider>
-                                        <C1Component c1Response={JSON.stringify({
-                                            id: `chatcmpl-${idx}`,
-                                            object: "chat.completion",
-                                            created: Date.now(),
-                                            model: "c1-exp",
-                                            choices: [{
-                                                index: 0,
-                                                message: {
-                                                    role: "assistant",
-                                                    content: msg.content
-                                                        .replace(/&quot;/g, '"')
-                                                        .replace(/&#39;/g, "'")
-                                                        .replace(/&lt;/g, '<')
-                                                        .replace(/&gt;/g, '>')
-                                                        .replace(/&amp;/g, '&')
-                                                },
-                                                finish_reason: "stop"
-                                            }]
-                                        })} />
+                                        <C1Component c1Response={
+                                            (() => {
+                                                const txt = document.createElement("textarea");
+                                                txt.innerHTML = msg.content;
+                                                return txt.value;
+                                            })()
+                                        } />
                                     </ThemeProvider>
                                 )}
                             </div>
