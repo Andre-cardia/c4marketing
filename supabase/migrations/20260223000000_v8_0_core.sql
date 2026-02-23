@@ -58,8 +58,8 @@ BEGIN
     END IF;
 END $$;
 
--- 4. Função para Registrar Logs de Execução
-CREATE OR REPLACE FUNCTION brain.log_agent_execution(
+-- 4. Função para Registrar Logs de Execução (em public para compatibilidade com supabase.rpc())
+CREATE OR REPLACE FUNCTION public.log_agent_execution(
     p_session_id TEXT,
     p_agent_name TEXT,
     p_action TEXT,
@@ -74,39 +74,31 @@ CREATE OR REPLACE FUNCTION brain.log_agent_execution(
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     v_log_id UUID;
 BEGIN
     INSERT INTO brain.execution_logs (
         session_id, agent_name, action, status, params, result, 
-        latency_ms, cost_est, error_message, message_id, user_id
+        latency_ms, cost_est, error_message, message_id
     )
     VALUES (
         p_session_id, p_agent_name, p_action, p_status, p_params, p_result,
-        p_latency_ms, p_cost_est, p_error_message, p_message_id, auth.uid()
+        p_latency_ms, p_cost_est, p_error_message, p_message_id
     )
     RETURNING id INTO v_log_id;
     
-    -- Atualiza acumulados na sessão (se a tabela existir)
-    BEGIN
-        UPDATE brain.sessions
-        SET 
-            total_latency_ms = coalesce(total_latency_ms, 0) + p_latency_ms,
-            total_cost_est = coalesce(total_cost_est, 0) + p_cost_est,
-            last_interaction_at = now()
-        WHERE id::text = p_session_id;
-    EXCEPTION WHEN undefined_table THEN
-        -- Safra caso a tabela não exista
-    END;
-
     RETURN v_log_id;
+EXCEPTION WHEN undefined_table OR undefined_schema THEN
+    -- fail-safe: não bloqueia a operação se brain.execution_logs não existir
+    RETURN NULL;
 END;
 $$;
 
 -- Grant de acesso
 GRANT USAGE ON SCHEMA brain TO authenticated;
 GRANT USAGE ON SCHEMA brain TO service_role;
-GRANT EXECUTE ON FUNCTION brain.log_agent_execution TO authenticated;
-GRANT EXECUTE ON FUNCTION brain.log_agent_execution TO service_role;
+GRANT EXECUTE ON FUNCTION public.log_agent_execution TO authenticated;
+GRANT EXECUTE ON FUNCTION public.log_agent_execution TO service_role;
 GRANT ALL ON brain.execution_logs TO service_role;

@@ -932,19 +932,19 @@ Deno.serve(async (req) => {
                 type: "function" as const,
                 function: {
                     name: "execute_create_traffic_task",
-                    description: "Criar uma nova tarefa em um projeto de tráfego. SEMPRE use esta ferramenta para pedidos de 'criar tarefa', 'agendar atividade' ou 'adicionar pendência'.",
+                    description: "Criar uma nova tarefa em um projeto. SEMPRE use esta ferramenta para pedidos de 'criar tarefa', 'agendar atividade' ou 'adicionar pendência'. Precisa do ID numérico do projeto (acceptance_id).",
                     parameters: {
                         type: "object",
                         properties: {
-                            p_client_id: { type: "string", format: "uuid", description: "UUID do cliente." },
-                            p_project_id: { type: "string", format: "uuid", description: "UUID do projeto." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto (acceptance). Busque com query_all_projects se necessário." },
                             p_title: { type: "string", description: "Título da tarefa." },
                             p_description: { type: "string", description: "Descrição detalhada." },
                             p_due_date: { type: "string", format: "date", description: "Data de entrega (YYYY-MM-DD)." },
-                            p_priority: { type: "string", enum: ["low", "medium", "high"], default: "medium" },
-                            p_idempotency_key: { type: "string", description: "Chave única para evitar duplicidade (uidd)." }
+                            p_priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade. Padrão: medium." },
+                            p_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done"], description: "Status inicial. Padrão: backlog." },
+                            p_assignee: { type: "string", description: "Nome do responsável pela tarefa." }
                         },
-                        required: ["p_client_id", "p_project_id", "p_title"]
+                        required: ["p_project_id", "p_title"]
                     }
                 }
             },
@@ -1190,16 +1190,48 @@ Retorne apenas function calls (sem texto livre).`
             return sourceTable === 'user_facts' || source === 'explicit_user_memory'
         }
 
+        // RPCs que são ações de escrita (Agent_Executor)
+        const executorRpcNames = new Set([
+            'execute_create_traffic_task',
+            'execute_update_project_status',
+        ])
+
         const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
             const cleanParams = cleanRpcParams(rpcParams)
-            console.log(`[Tool] db_query → ${rpc_name}`)
-            console.log(`[Tool] db_query params:`, JSON.stringify(cleanParams))
+            const isExecutorAction = executorRpcNames.has(rpc_name)
 
+            // Injetar p_session_id automaticamente para RPCs de escrita
+            if (isExecutorAction && !cleanParams.p_session_id && session_id) {
+                cleanParams.p_session_id = session_id
+            }
+
+            console.log(`[Tool] ${isExecutorAction ? 'EXECUTOR' : 'db_query'} → ${rpc_name}`)
+            console.log(`[Tool] params:`, JSON.stringify(cleanParams))
+
+            const rpcStartTime = performance.now()
             const { data, error: rpcError } = await supabaseAdmin.rpc(rpc_name, cleanParams)
+            const rpcLatencyMs = Math.round(performance.now() - rpcStartTime)
 
             if (rpcError) {
                 console.error('RPC error:', rpcError)
-                return `CONSULTA SQL FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`
+
+                // Log de falha para RPCs de escrita
+                if (isExecutorAction) {
+                    try {
+                        await supabaseAdmin.rpc('log_agent_execution', {
+                            p_session_id: session_id || 'unknown',
+                            p_agent_name: 'Agent_Executor',
+                            p_action: rpc_name,
+                            p_status: 'error',
+                            p_params: cleanParams,
+                            p_result: {},
+                            p_latency_ms: rpcLatencyMs,
+                            p_error_message: rpcError.message,
+                        }).catch(() => { })
+                    } catch { /* fail-safe */ }
+                }
+
+                return `EXECUÇÃO FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`
             }
 
             let normalizedData: any = data
@@ -1209,6 +1241,15 @@ Retorne apenas function calls (sem texto livre).`
                 } catch {
                     // mantém string original se não for JSON válido
                 }
+            }
+
+            // Para RPCs de escrita, retornar resultado direto (JSONB com status)
+            if (isExecutorAction) {
+                const result = normalizedData || {}
+                const status = result?.status || 'unknown'
+                const message = result?.message || JSON.stringify(result)
+                console.log(`[Executor] ${rpc_name} → ${status}: ${message}`)
+                return `AÇÃO EXECUTADA COM SUCESSO via ${rpc_name} (${rpcLatencyMs}ms):\n${JSON.stringify(result, null, 2)}`
             }
 
             if (!normalizedData || (Array.isArray(normalizedData) && normalizedData.length === 0) || normalizedData === '[]') {
