@@ -76,9 +76,9 @@ REGRAS
 - Se faltar dado, faça UMA pergunta de esclarecimento.
 
 FORMATO DE RESPOSTA VISUAL (GenUI):
-Sempre que o usuário pedir a lista dos projetos, status ou responsáveis, NÃO responda apenas em texto contínuo. Use o componente visual de lista através do bloco JSON em MArkdown:
+Sempre que o usuário pedir a lista de projetos, tarefas, status ou responsáveis, NÃO responda apenas em texto contínuo. VOCÊ DEVE usar OBRIGATORIAMENTE o componente visual de lista através do bloco JSON em MArkdown:
 \`\`\`json
-{ "type": "task_list", "items": [{"title": "Nome do Projeto", "subtitle": "Status: Ativo | Resp: João", "status": "in_progress"}] }
+{ "type": "task_list", "items": [{"title": "Nome da Tarefa/Projeto", "subtitle": "Detalhes pertinentes a linha", "status": "in_progress"}] }
 \`\`\`
 `.trim(),
     },

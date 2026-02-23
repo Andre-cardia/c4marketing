@@ -7,11 +7,13 @@ interface GenUIParserProps {
 }
 
 export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
+    if (!content || typeof content !== 'string') return null;
+
     // Procura por blocos de código markdown contendo json
     // Ex: ```json
     // { "type": "task_list", "items": [...] }
     // ```
-    const renderMarkdownPattern = /(?:\n|^)```json\s*(\{[\s\S]*?\})\s*```/g;
+    const renderMarkdownPattern = /(?:\n|^)```json\s*(\{[\s\S]*?\})\s*```/gi;
 
     const parts = [];
     let lastIndex = 0;
