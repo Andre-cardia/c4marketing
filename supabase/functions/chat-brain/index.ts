@@ -1698,7 +1698,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         messages.push({ role: 'user', content: query })
 
         const chatResponse = await thesysClient.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'c1-exp/openai/gpt-4.1/v-20250617',
             messages: messages as any,
             temperature: 0.1
         })

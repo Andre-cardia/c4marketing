@@ -166,7 +166,14 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                                     msg.content
                                 ) : (
                                     <ThemeProvider>
-                                        <C1Component c1Response={msg.content} />
+                                        <C1Component c1Response={
+                                            msg.content
+                                                .replace(/&quot;/g, '"')
+                                                .replace(/&#39;/g, "'")
+                                                .replace(/&lt;/g, '<')
+                                                .replace(/&gt;/g, '>')
+                                                .replace(/&amp;/g, '&')
+                                        } />
                                     </ThemeProvider>
                                 )}
                             </div>
