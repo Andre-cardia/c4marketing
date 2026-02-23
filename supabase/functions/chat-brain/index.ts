@@ -998,9 +998,16 @@ Exemplos:
 - "quem é o CEO da C4?" → query_all_users()
 - "quem é o CTO da C4?" → query_all_users()
 - "qual é o cargo do André Cardia?" → query_all_users()
+- "crie uma tarefa chamada X para amanhã no projeto 28" → execute_create_traffic_task(p_project_id: 28, p_title: "X", p_due_date: "YYYY-MM-DD")
+- "adicione uma pendência de revisão de criativos no projeto 12" → execute_create_traffic_task(p_project_id: 12, p_title: "Revisão de criativos")
+- "agende uma atividade para o projeto da Amplexo" → execute_create_traffic_task(p_project_id: <id>, p_title: "...")
+- "marque o projeto como concluído" → execute_update_project_status(p_project_id: <id>, p_new_status: "Inativo")
+- "pause o projeto X" → execute_update_project_status(p_project_id: <id>, p_new_status: "Pausado")
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
 Quando a pergunta citar um mês/ano específico (ex: janeiro/2026, fev 2026), defina p_reference_date no último dia do mês citado.
+Quando o usuário pedir para CRIAR tarefa/pendência/atividade, SEMPRE use execute_create_traffic_task. NÃO peça confirmação — execute diretamente.
+Quando o usuário pedir para ALTERAR STATUS de projeto, SEMPRE use execute_update_project_status.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -1228,7 +1235,7 @@ Retorne apenas function calls (sem texto livre).`
                             p_latency_ms: rpcLatencyMs,
                             p_error_message: rpcError.message,
                         }).catch(() => { })
-                    } catch { /* fail-safe */ }
+                    } catch (_e) { /* fail-safe */ }
                 }
 
                 return `EXECUÇÃO FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`
