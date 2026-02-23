@@ -38,7 +38,8 @@ export type AgentName =
   | "Agent_Projects"
   | "Agent_Client360"
   | "Agent_GovernanceSecurity"
-  | "Agent_BrainOps";
+  | "Agent_BrainOps"
+  | "Agent_Executor";
 
 export interface MatchFilters {
   tenant_id: string;

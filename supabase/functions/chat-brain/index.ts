@@ -18,9 +18,13 @@ Deno.serve(async (req) => {
     }
 
     try {
+        const startTime = performance.now()
         const requestBody = await req.json()
         const query = typeof requestBody?.query === 'string' ? requestBody.query : ''
         const session_id = typeof requestBody?.session_id === 'string' ? requestBody.session_id : null
+
+        // Idempotency: Se recebido do frontend, evita duplicação de execução pesada em retentativa.
+        const idempotencyKey = req.headers.get('x-idempotency-key') || null
         const rawClientToday = typeof requestBody?.client_today === 'string' ? requestBody.client_today.trim() : null
         const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : null
         const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -1468,37 +1472,41 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 
         const cognitiveMemoryBlock = `\nMEMÓRIA COGNITIVA RELEVANTE:\n${cognitiveMemoryContext}`
 
+        // v8.0 Estratificação de Memória (Tier 3: Base Canônica)
         const canonicalSystemBlock = canonicalBlock
-            ? `=== MEMÓRIA CANÔNICA CORPORATIVA — C4 MARKETING ===
-Os documentos abaixo representam os princípios fundadores, a identidade
-e as políticas inegociáveis da C4 Marketing. Eles têm autoridade máxima
-sobre qualquer outra fonte de informação neste sistema.
+            ? `=== CAMADA 3: BASE DOCUMENTAL CANÔNICA (AUTORIDADE MÁXIMA) ===
+Os princípios abaixo representam a identidade e as políticas inegociáveis da C4 Marketing. 
+Eles têm precedência absoluta sobre qualquer outra fonte de informação.
 
-GUARDRAIL ABSOLUTO: Nenhuma resposta pode contradizer, relativizar ou
-ignorar estes princípios. Em caso de conflito com qualquer outra fonte
-(memória, banco de dados, documentos), estes prevalecem absolutamente.
-
+GUARDRAIL ABSOLUTO: Nenhuma resposta pode contradizer ou ignorar estes princípios.
 ${canonicalBlock}
-=== FIM DA MEMÓRIA CANÔNICA ===`
+=== FIM DA CAMADA 3 ===`
             : ''
 
+        // v8.0 Estratificação de Memória (Tier 2: Memória Consolidada e Contexto)
+        const consolidatedMemoryBlock = `
+=== CAMADA 2: MEMÓRIA CONSOLIDADA E CONTEXTO ===
+DADOS RELEVANTES (RAG/SQL):
+${contextText || "Nenhum documento específico encontrado."}
+
+FATOS DO USUÁRIO:
+${explicitUserFactsBlock}
+MEMÓRIA COGNITIVA:
+${cognitiveMemoryBlock}
+=== FIM DA CAMADA 2 ===
+        `.trim()
+
+        // v8.0 Estratificação de Memória (Tier 1: Memória Volátil / Histórico)
         const systemPrompt = `
 ${canonicalSystemBlock}
 ${agentConfig.getSystemPrompt()}
 ${identityBlock}
-
 ${responseStyleBlock}
 
-FONTE DOS DADOS: ${decision.tool_hint === 'db_query' ? 'Consulta SQL direta no banco de dados (dados completos e atualizados)' : 'Busca semântica no acervo vetorial'}
+${consolidatedMemoryBlock}
 
-CONTEXTO RECUPERADO:
-${contextText || "Nenhum documento relevante encontrado."}
-
-${explicitLeadershipFactBlock}
-${explicitUserFactsBlock}
-${cognitiveMemoryBlock}
-
-${crossSessionMemoryBlock}
+=== CAMADA 1: MEMÓRIA VOLÁTIL (HISTÓRICO DA SESSÃO) ===
+O histórico abaixo é o contexto imediato da nossa conversa atual.
         `.trim()
 
         // Montar mensagens multi-turn (system + histórico + pergunta atual)
@@ -1521,6 +1529,16 @@ ${crossSessionMemoryBlock}
             messages: messages as any,
             temperature: 0.1
         })
+
+        const endTime = performance.now()
+        const totalLatencyMs = Math.round(endTime - startTime)
+        const usage = chatResponse.usage
+
+        // Cálculo de custo estimado (GPT-4o)
+        // Preços (Fev 2026): Input $2.50/1M, Output $10.00/1M
+        const inputTokens = usage?.prompt_tokens || 0
+        const outputTokens = usage?.completion_tokens || 0
+        const costEst = (inputTokens * 0.0000025) + (outputTokens * 0.00001)
 
         let answer = chatResponse.choices[0].message.content || ''
 
@@ -1552,6 +1570,29 @@ ${crossSessionMemoryBlock}
 
         await persistCognitiveMemorySafe('assistant', answer, 'assistant_answer_outbound')
 
+        // Registro de telemetria e auditoria (v8.0)
+        let logId = null
+        try {
+            const { data } = await supabaseAdmin.rpc('log_agent_execution', {
+                p_session_id: session_id,
+                p_agent_name: agentConfig.name,
+                p_action: decision.tool_hint === 'db_query' ? 'sql_query' : 'rag_search',
+                p_status: 'success',
+                p_params: {
+                    decision,
+                    idempotency_key: idempotencyKey,
+                    token_usage: usage
+                },
+                p_result: { doc_count: retrievedDocs.length },
+                p_latency_ms: totalLatencyMs,
+                p_cost_est: costEst,
+                p_message_id: chatResponse.id
+            })
+            logId = data
+        } catch (logError) {
+            console.error('[v8.0] Failed to log execution:', logError)
+        }
+
         // 5. Return
         return new Response(JSON.stringify({
             answer,
@@ -1565,6 +1606,9 @@ ${crossSessionMemoryBlock}
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
                 memory_write_events: memoryWriteEvents,
+                latency_ms: totalLatencyMs,
+                cost_est: costEst,
+                log_id: logId
             }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

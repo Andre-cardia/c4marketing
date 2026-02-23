@@ -50,7 +50,7 @@ const syntheticJwt = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
   role: 'authenticated',
   sub: userId,
   email: userEmail,
-})}.signature`;
+})} signature`;
 
 const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
 
@@ -91,15 +91,22 @@ const pushResult = (name, pass, detail, critical = false) => {
 };
 
 try {
-  // 1) Health + normative flag
+  // 1) Health + v8.0 Telemetry
   const t1 = await callChat('Teste rápido de integração do cérebro. Responda em uma frase.');
   const t1Answer = t1.body?.answer || '';
-  const t1Normative = t1.body?.meta?.normative_governance_enabled === true;
-  const t1Pass = t1.status === 200 && t1Normative && !hasIntegrationError(t1Answer);
+  const meta = t1.body?.meta || {};
+
+  const hasLatency = typeof meta.latency_ms === 'number' && meta.latency_ms > 0;
+  const hasCost = typeof meta.cost_est === 'number' && meta.cost_est >= 0;
+  const hasLogId = !!meta.log_id;
+  const hasCanonical = meta.canonical_memory_enabled === true;
+
+  const t1Pass = t1.status === 200 && hasLatency && hasLogId && !hasIntegrationError(t1Answer);
+
   pushResult(
-    'Integração + Flag Normativa',
+    'v8.0: Saúde + Telemetria + Auditoria',
     t1Pass,
-    `HTTP=${t1.status}, normative_governance_enabled=${String(t1Normative)}`,
+    `HTTP=${t1.status}, Latency=${meta.latency_ms}ms, Cost=$${meta.cost_est?.toFixed(6)}, LogID=${meta.log_id}, Canonical=${hasCanonical}`,
     true
   );
 
