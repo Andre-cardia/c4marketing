@@ -74,7 +74,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             setFormData({
                 ...task,
                 due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
-                attachments: task.attachments || (task as any).attachment_url ? [{ name: 'Anexo Antigo', url: (task as any).attachment_url }] : []
+                attachments: (task.attachments && Array.isArray(task.attachments)) ? task.attachments : ((task as any).attachment_url ? [{ name: 'Anexo Antigo', url: (task as any).attachment_url }] : [])
             });
         } else {
             // Reset for new task
@@ -213,8 +213,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                 attachments: formData.attachments // Send JSONB array
             };
 
-            // Remove legacy field if it exists in cleanData
-            delete dataToSave.attachment_url;
+            // Clear legacy field to ensure full migration on first edit
+            dataToSave.attachment_url = null;
 
             if (task?.id) {
                 // Update
