@@ -321,6 +321,9 @@ Deno.serve(async (req) => {
             'execute_delete_task',
             'execute_move_task',
             'execute_update_task',
+            'execute_batch_move_tasks',
+            'execute_batch_delete_tasks',
+            'execute_schedule_task',
         ])
 
         const cleanRpcParams = (params: Record<string, any>) => {
@@ -1030,6 +1033,61 @@ Deno.serve(async (req) => {
                         required: []
                     }
                 }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_batch_move_tasks",
+                    description: "Mover TODAS as tarefas de um status para outro em um projeto (operação em lote). Use para 'mova todas as tarefas do backlog para em execução', 'mova tudo de X para Y no projeto Z'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Alternativa ao p_project_id." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto. Opcional se p_project_name for informado." },
+                            p_from_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done", "paused"], description: "Status de origem (tarefas que serão movidas)." },
+                            p_to_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done", "paused"], description: "Status de destino." },
+                            p_limit: { type: "number", description: "Limite máximo de tarefas a mover. Padrão: 50." }
+                        },
+                        required: ["p_from_status", "p_to_status"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_batch_delete_tasks",
+                    description: "Deletar TODAS as tarefas de um status em um projeto (operação em lote destrutiva). Use para 'delete todas as tarefas finalizadas', 'apague tudo do backlog do projeto X'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Alternativa ao p_project_id." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto. Opcional se p_project_name for informado." },
+                            p_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done", "paused"], description: "Status das tarefas a deletar." },
+                            p_limit: { type: "number", description: "Limite máximo de tarefas a deletar. Padrão: 50." }
+                        },
+                        required: ["p_status"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_schedule_task",
+                    description: "Criar uma tarefa recorrente/agendada que se repete automaticamente. Use para 'crie uma tarefa toda segunda-feira', 'agende reunião mensal', 'tarefa diária de relatório'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto. Opcional se p_project_name for informado." },
+                            p_title: { type: "string", description: "Título da tarefa recorrente." },
+                            p_recurrence_rule: { type: "string", enum: ["daily", "weekly_monday", "weekly_friday", "weekly", "biweekly", "monthly_1st", "monthly_15th", "monthly"], description: "Regra de recorrência. Use: daily=diário, weekly_monday=toda segunda, weekly_friday=toda sexta, weekly=semanal, biweekly=quinzenal, monthly_1st=todo dia 1, monthly_15th=todo dia 15, monthly=mensal." },
+                            p_description: { type: "string", description: "Descrição da tarefa." },
+                            p_priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade. Padrão: medium." },
+                            p_assignee: { type: "string", description: "Responsável pela tarefa." }
+                        },
+                        required: ["p_title", "p_recurrence_rule"]
+                    }
+                }
             }
         ]
 
@@ -1077,6 +1135,13 @@ Exemplos:
 - "atualize a descrição da tarefa X no projeto Duarte Vinhos" → execute_update_task(p_task_title: "X", p_project_name: "Duarte Vinhos", p_new_description: "...")
 - "marque o projeto Duarte Vinhos como concluído" → execute_update_project_status(p_project_name: "Duarte Vinhos", p_new_status: "Inativo")
 - "pause o projeto Amplexo" → execute_update_project_status(p_project_name: "Amplexo", p_new_status: "Pausado")
+- "mova todas as tarefas do backlog para em execução no projeto Duarte Vinhos" → execute_batch_move_tasks(p_project_name: "Duarte Vinhos", p_from_status: "backlog", p_to_status: "in_progress")
+- "mova tudo de backlog para em andamento no projeto X" → execute_batch_move_tasks(p_project_name: "X", p_from_status: "backlog", p_to_status: "in_progress")
+- "delete todas as tarefas finalizadas do projeto X" → execute_batch_delete_tasks(p_project_name: "X", p_status: "done")
+- "apague todas as tarefas do backlog do projeto Duarte Vinhos" → execute_batch_delete_tasks(p_project_name: "Duarte Vinhos", p_status: "backlog")
+- "crie uma tarefa toda segunda-feira no projeto X" → execute_schedule_task(p_project_name: "X", p_title: "...", p_recurrence_rule: "weekly_monday")
+- "agende uma tarefa diária de relatório no projeto Y" → execute_schedule_task(p_project_name: "Y", p_title: "Relatório diário", p_recurrence_rule: "daily")
+- "crie uma reunião mensal no dia 1 para o projeto Z" → execute_schedule_task(p_project_name: "Z", p_title: "Reunião mensal", p_recurrence_rule: "monthly_1st")
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
 Quando a pergunta citar um mês/ano específico (ex: janeiro/2026, fev 2026), defina p_reference_date no último dia do mês citado.
@@ -1126,6 +1191,9 @@ Retorne apenas function calls (sem texto livre).`
                     'execute_move_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_project_status': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_batch_move_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_batch_delete_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_schedule_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                 }
 
                 const llmDbCalls: DbQueryCall[] = parsedCalls
@@ -1285,7 +1353,20 @@ Retorne apenas function calls (sem texto livre).`
             'execute_move_task',
             'execute_update_task',
             'execute_update_project_status',
+            'execute_batch_move_tasks',
+            'execute_batch_delete_tasks',
+            'execute_schedule_task',
         ])
+
+        // RPCs destrutivas que exigem confirmação explícita do usuário
+        const destructiveRpcNames = new Set([
+            'execute_delete_task',
+            'execute_batch_delete_tasks',
+        ])
+        const confirmationTokens = [
+            'confirmar', 'sim deletar', 'pode deletar', 'confirmo',
+            'pode excluir', 'sim excluir', 'confirme', 'sim, pode',
+        ]
 
         const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
             const cleanParams = cleanRpcParams(rpcParams)
@@ -1559,6 +1640,24 @@ Retorne apenas function calls (sem texto livre).`
                 // Guardrail: sempre consultar alguma base antes de responder
                 contextText = await runVectorRetrieval()
             } else {
+                // Confirmação inteligente: verificar RPCs destrutivas antes de executar
+                for (const call of finalCalls) {
+                    if (destructiveRpcNames.has(call.rpc_name) && !hasAny(query, confirmationTokens)) {
+                        const taskInfo = call.params.p_task_title || call.params.p_status || 'as tarefas selecionadas'
+                        const projectInfo = call.params.p_project_name ? ` no projeto "${call.params.p_project_name}"` : ''
+                        const isBatch = call.rpc_name === 'execute_batch_delete_tasks'
+                        const confirmAnswer = isBatch
+                            ? `⚠️ Confirmação necessária: deseja deletar **todas as tarefas com status "${call.params.p_status}"**${projectInfo}? Esta ação não pode ser desfeita.\n\nResponda **"confirmar"** para prosseguir com a exclusão.`
+                            : `⚠️ Confirmação necessária: deseja deletar a tarefa **"${taskInfo}"**${projectInfo}? Esta ação não pode ser desfeita.\n\nResponda **"confirmar"** para prosseguir com a exclusão.`
+                        await persistCognitiveMemorySafe('assistant', confirmAnswer, 'assistant_confirmation_request')
+                        return new Response(JSON.stringify({
+                            answer: confirmAnswer,
+                            documents: [],
+                            meta: { confirmation_required: true, rpc_name: call.rpc_name }
+                        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+                    }
+                }
+
                 const sections: string[] = []
                 for (const call of finalCalls) {
                     executedDbRpcs.push(call.rpc_name)
@@ -1742,6 +1841,24 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         }
 
         await persistCognitiveMemorySafe('assistant', answer, 'assistant_answer_outbound')
+
+        // v9.0 Agent_Autonomy: pós-execução de ações do Executor → sugestões proativas
+        const isExecutorAction = executedDbRpcs.some((rpc) => executorRpcNames.has(rpc))
+        if (isExecutorAction) {
+            try {
+                const lastExecutorRpc = executedDbRpcs.find((rpc) => executorRpcNames.has(rpc))
+                const { data: suggestions } = await supabaseAdmin.rpc('query_autonomy_suggestions', {
+                    p_project_id: null
+                })
+                if (Array.isArray(suggestions) && suggestions.length > 0) {
+                    const topSuggestions = suggestions.slice(0, 3)
+                    const suggestionLines = topSuggestions.map((s: any) => `• ${s.message}`).join('\n')
+                    answer += `\n\n💡 **Sugestões do Agente Autônomo:**\n${suggestionLines}`
+                }
+            } catch (_autonomyError) {
+                // fail-safe: não bloquear resposta por falha nas sugestões
+            }
+        }
 
         // Registro de telemetria e auditoria (v8.0)
         let logId = null
