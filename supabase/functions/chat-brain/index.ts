@@ -313,6 +313,8 @@ Deno.serve(async (req) => {
             'query_survey_responses',
             'execute_create_traffic_task',
             'execute_update_project_status',
+            'execute_delete_task',
+            'execute_move_task',
         ])
 
         const cleanRpcParams = (params: Record<string, any>) => {
@@ -932,19 +934,55 @@ Deno.serve(async (req) => {
                 type: "function" as const,
                 function: {
                     name: "execute_create_traffic_task",
-                    description: "Criar uma nova tarefa em um projeto. SEMPRE use esta ferramenta para pedidos de 'criar tarefa', 'agendar atividade' ou 'adicionar pendência'. Precisa do ID numérico do projeto (acceptance_id).",
+                    description: "Criar uma nova tarefa em um projeto. SEMPRE use para 'criar tarefa', 'agendar atividade' ou 'adicionar pendência'. Aceita ID numérico OU nome do projeto.",
                     parameters: {
                         type: "object",
                         properties: {
-                            p_project_id: { type: "number", description: "ID numérico do projeto (acceptance). Busque com query_all_projects se necessário." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto (acceptance). Opcional se p_project_name for informado." },
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Alternativa ao p_project_id (ex: 'Duarte Vinhos')." },
                             p_title: { type: "string", description: "Título da tarefa." },
                             p_description: { type: "string", description: "Descrição detalhada." },
                             p_due_date: { type: "string", format: "date", description: "Data de entrega (YYYY-MM-DD)." },
                             p_priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade. Padrão: medium." },
-                            p_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done"], description: "Status inicial. Padrão: backlog." },
+                            p_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done", "paused"], description: "Status inicial. Padrão: backlog." },
                             p_assignee: { type: "string", description: "Nome do responsável pela tarefa." }
                         },
-                        required: ["p_project_id", "p_title"]
+                        required: ["p_title"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_delete_task",
+                    description: "Deletar/apagar/excluir uma tarefa. Aceita ID da tarefa OU título + projeto (por ID ou nome).",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_task_id: { type: "string", format: "uuid", description: "UUID da tarefa. Opcional se p_task_title for informado." },
+                            p_task_title: { type: "string", description: "Título (ou parte) da tarefa a deletar." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto. Opcional." },
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Opcional." }
+                        },
+                        required: []
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_move_task",
+                    description: "Mover tarefa entre colunas do Kanban (mudar status). Status: backlog, in_progress, approval, done, paused.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_task_id: { type: "string", format: "uuid", description: "UUID da tarefa. Opcional se p_task_title for informado." },
+                            p_task_title: { type: "string", description: "Título (ou parte) da tarefa a mover." },
+                            p_new_status: { type: "string", enum: ["backlog", "in_progress", "approval", "done", "paused"], description: "Novo status/coluna." },
+                            p_project_id: { type: "number", description: "ID numérico do projeto. Opcional." },
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Opcional." }
+                        },
+                        required: ["p_new_status"]
                     }
                 }
             },
@@ -952,16 +990,16 @@ Deno.serve(async (req) => {
                 type: "function" as const,
                 function: {
                     name: "execute_update_project_status",
-                    description: "Atualizar o status de um projeto de tráfego/site/lp. Use para 'marcar projeto como concluído', 'pausar projeto', etc.",
+                    description: "Atualizar o status de um projeto de tráfego/site/lp. Use para 'marcar projeto como concluído', 'pausar projeto', etc. Aceita UUID ou nome.",
                     parameters: {
                         type: "object",
                         properties: {
-                            p_project_id: { type: "string", format: "uuid", description: "UUID do projeto." },
+                            p_project_id: { type: "string", format: "uuid", description: "UUID do projeto. Opcional se p_project_name for informado." },
+                            p_project_name: { type: "string", description: "Nome do projeto/cliente. Alternativa ao UUID." },
                             p_new_status: { type: "string", description: "Novo status (ex: Ativo, Inativo, Pausado)." },
-                            p_notes: { type: "string", description: "Notas sobre a alteração." },
-                            p_idempotency_key: { type: "string", description: "Chave única (uuid)." }
+                            p_notes: { type: "string", description: "Notas sobre a alteração." }
                         },
-                        required: ["p_project_id", "p_new_status"]
+                        required: ["p_new_status"]
                     }
                 }
             }
@@ -998,16 +1036,24 @@ Exemplos:
 - "quem é o CEO da C4?" → query_all_users()
 - "quem é o CTO da C4?" → query_all_users()
 - "qual é o cargo do André Cardia?" → query_all_users()
-- "crie uma tarefa chamada X para amanhã no projeto 28" → execute_create_traffic_task(p_project_id: 28, p_title: "X", p_due_date: "YYYY-MM-DD")
+- "crie uma tarefa chamada X para amanhã no projeto Duarte Vinhos" → execute_create_traffic_task(p_project_name: "Duarte Vinhos", p_title: "X", p_due_date: "YYYY-MM-DD")
 - "adicione uma pendência de revisão de criativos no projeto 12" → execute_create_traffic_task(p_project_id: 12, p_title: "Revisão de criativos")
-- "agende uma atividade para o projeto da Amplexo" → execute_create_traffic_task(p_project_id: <id>, p_title: "...")
-- "marque o projeto como concluído" → execute_update_project_status(p_project_id: <id>, p_new_status: "Inativo")
-- "pause o projeto X" → execute_update_project_status(p_project_id: <id>, p_new_status: "Pausado")
+- "agende uma atividade para o projeto da Amplexo" → execute_create_traffic_task(p_project_name: "Amplexo", p_title: "...")
+- "apague a tarefa Teste v8 do projeto Duarte Vinhos" → execute_delete_task(p_task_title: "Teste v8", p_project_name: "Duarte Vinhos")
+- "delete a tarefa de revisão" → execute_delete_task(p_task_title: "revisão")
+- "mova a tarefa X para em execução" → execute_move_task(p_task_title: "X", p_new_status: "in_progress")
+- "finalize a tarefa de criativos do projeto Amplexo" → execute_move_task(p_task_title: "criativos", p_new_status: "done", p_project_name: "Amplexo")
+- "coloque a tarefa X em aprovação" → execute_move_task(p_task_title: "X", p_new_status: "approval")
+- "marque o projeto Duarte Vinhos como concluído" → execute_update_project_status(p_project_name: "Duarte Vinhos", p_new_status: "Inativo")
+- "pause o projeto Amplexo" → execute_update_project_status(p_project_name: "Amplexo", p_new_status: "Pausado")
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
 Quando a pergunta citar um mês/ano específico (ex: janeiro/2026, fev 2026), defina p_reference_date no último dia do mês citado.
 Quando o usuário pedir para CRIAR tarefa/pendência/atividade, SEMPRE use execute_create_traffic_task. NÃO peça confirmação — execute diretamente.
-Quando o usuário pedir para ALTERAR STATUS de projeto, SEMPRE use execute_update_project_status.
+Quando o usuário pedir para DELETAR/APAGAR/EXCLUIR tarefa, SEMPRE use execute_delete_task.
+Quando o usuário pedir para MOVER tarefa ou MUDAR STATUS de tarefa, use execute_move_task. Mapeie: "em execução"→in_progress, "aprovação"→approval, "finalizado/concluído/feito"→done, "pausado"→paused, "backlog"→backlog.
+Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use execute_update_project_status.
+Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 Retorne apenas function calls (sem texto livre).`
                     },
@@ -1044,6 +1090,8 @@ Retorne apenas function calls (sem texto livre).`
                     'query_survey_responses': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                     'execute_create_traffic_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_move_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_project_status': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                 }
 
@@ -1200,6 +1248,8 @@ Retorne apenas function calls (sem texto livre).`
         // RPCs que são ações de escrita (Agent_Executor)
         const executorRpcNames = new Set([
             'execute_create_traffic_task',
+            'execute_delete_task',
+            'execute_move_task',
             'execute_update_project_status',
         ])
 
