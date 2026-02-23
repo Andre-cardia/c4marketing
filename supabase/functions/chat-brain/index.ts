@@ -49,11 +49,6 @@ Deno.serve(async (req) => {
             apiKey: Deno.env.get('OPENAI_API_KEY'),
         })
 
-        const thesysClient = new OpenAI({
-            apiKey: Deno.env.get('THESYS_API_KEY') || Deno.env.get('OPENAI_API_KEY'), // fallback to openAI string if someone forgets
-            baseURL: "https://api.thesys.dev/v1/embed"
-        })
-
         // 1. Get User Context
         const authHeader = req.headers.get('Authorization')
         let userRole = 'anon'
@@ -1796,8 +1791,8 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         // Mensagem atual do usuário
         messages.push({ role: 'user', content: query })
 
-        const chatResponse = await thesysClient.chat.completions.create({
-            model: 'c1-exp/openai/gpt-4.1/v-20250617',
+        const chatResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
             messages: messages as any,
             temperature: 0.1
         })

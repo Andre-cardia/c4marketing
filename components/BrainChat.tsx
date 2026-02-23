@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { askBrain, addToBrain, BrainDocument, createChatSession, addChatMessage } from '../lib/brain';
 import { Send, Bot, User, Loader2, FileText, X } from 'lucide-react';
-import { C1Component, ThemeProvider } from "@thesysai/genui-sdk";
-import "@crayonai/react-ui/styles/index.css";
+import { GenUIParser } from './chat/GenUIParser';
 import { useUserRole } from '../lib/UserRoleContext';
 
 interface Message {
@@ -165,32 +164,7 @@ export function BrainChat({ onClose }: { onClose?: () => void }) {
                                 {msg.role === 'user' ? (
                                     msg.content
                                 ) : (
-                                    <ThemeProvider>
-                                        <C1Component c1Response={
-                                            (() => {
-                                                // 1. Unescape strings manually, including double encoded ones
-                                                let str = msg.content;
-                                                str = str.replace(/&amp;/g, '&');
-                                                str = str.replace(/&quot;/g, '"');
-                                                str = str.replace(/&#39;/g, "'");
-                                                str = str.replace(/&lt;/g, '<');
-                                                str = str.replace(/&gt;/g, '>');
-                                                try {
-                                                    // 2. Tentar enxergar se dá pra extrair apenas o objeto JSON do Thesys do payload escapado
-                                                    const match = str.match(/<content[^>]*>([\s\S]*?)<\/content>/);
-                                                    if (match && match[1]) {
-                                                        const jsonPayload = JSON.parse(match[1]);
-                                                        // Se deu certo recriamos a tag thesys com o JSON validado pelo browser
-                                                        return `<content thesys="true">${JSON.stringify(jsonPayload)}</content>`;
-                                                    }
-                                                } catch (e) {
-                                                    // console.error("Could not parse Thesys JSON payload manually", e)
-                                                }
-                                                // Fallback to the unescaped string
-                                                return str;
-                                            })()
-                                        } />
-                                    </ThemeProvider>
+                                    <GenUIParser content={msg.content} />
                                 )}
                             </div>
 
