@@ -1,5 +1,8 @@
--- Migração v8.0: Observabilidade, Logs de Execução e Curadoria de Memória
+-- Migração v8.0 (REVISADA): Infraestrutura de Observabilidade do Segundo Cérebro
 -- Data: 23 de Fevereiro de 2026
+
+-- 0. Garantir existência do schema brain
+CREATE SCHEMA IF NOT EXISTS brain;
 
 -- 1. Tabela de Logs de Execução para Agentes
 CREATE TABLE IF NOT EXISTS brain.execution_logs (
@@ -24,32 +27,38 @@ CREATE INDEX IF NOT EXISTS idx_execution_logs_agent_name ON brain.execution_logs
 CREATE INDEX IF NOT EXISTS idx_execution_logs_created_at ON brain.execution_logs(created_at);
 
 -- 2. Evolução da Tabela de Sessões para Telemetria
+-- Nota: Caso a tabela 'sessions' não esteja no schema brain, ajuste conforme necessário.
+-- Como vi em sessões anteriores que 'sessions' é usada para chat-brain, assume-se schema brain ou public.
+-- Pelo contexto do erro 42P01, o usuário tentou SELECT em brain.execution_logs.
 DO $$ 
 BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'total_latency_ms') THEN
-        ALTER TABLE brain.sessions ADD COLUMN total_latency_ms INTEGER DEFAULT 0;
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'total_cost_est') THEN
-        ALTER TABLE brain.sessions ADD COLUMN total_cost_est NUMERIC(10, 6) DEFAULT 0;
-    END IF;
+    -- Verifica se a tabela brain.sessions existe antes de tentar alterá-la
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'brain' AND table_name = 'sessions') THEN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'total_latency_ms') THEN
+            ALTER TABLE brain.sessions ADD COLUMN total_latency_ms INTEGER DEFAULT 0;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'total_cost_est') THEN
+            ALTER TABLE brain.sessions ADD COLUMN total_cost_est NUMERIC(10, 6) DEFAULT 0;
+        END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'last_interaction_at') THEN
-        ALTER TABLE brain.sessions ADD COLUMN last_interaction_at TIMESTAMPTZ DEFAULT now();
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'brain' AND table_name = 'sessions' AND column_name = 'last_interaction_at') THEN
+            ALTER TABLE brain.sessions ADD COLUMN last_interaction_at TIMESTAMPTZ DEFAULT now();
+        END IF;
     END IF;
 END $$;
 
 -- 3. Curadoria de Memória: Flag de Verdade Canônica
 DO $$ 
 BEGIN 
-    -- Como a tabela documents usa metadados em JSONB, garantimos que o índice suporte a nova flag
-    -- A flag será acessada via metadata->>'is_canonical_truth'
-    CREATE INDEX IF NOT EXISTS idx_brain_docs_canonical_truth 
-    ON brain.documents (((metadata->>'is_canonical_truth')::boolean))
-    WHERE (metadata->>'is_canonical_truth') IS NOT NULL;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'brain' AND table_name = 'documents') THEN
+        CREATE INDEX IF NOT EXISTS idx_brain_docs_canonical_truth 
+        ON brain.documents (((metadata->>'is_canonical_truth')::boolean))
+        WHERE (metadata->>'is_canonical_truth') IS NOT NULL;
+    END IF;
 END $$;
 
--- 4. Função para Registrar Logs de Execução de forma segura
+-- 4. Função para Registrar Logs de Execução
 CREATE OR REPLACE FUNCTION brain.log_agent_execution(
     p_session_id TEXT,
     p_agent_name TEXT,
@@ -79,19 +88,23 @@ BEGIN
     )
     RETURNING id INTO v_log_id;
     
-    -- Atualiza acumulados na sessão
-    UPDATE brain.sessions
-    SET 
-        total_latency_ms = coalesce(total_latency_ms, 0) + p_latency_ms,
-        total_cost_est = coalesce(total_cost_est, 0) + p_cost_est,
-        last_interaction_at = now()
-    WHERE id::text = p_session_id;
+    -- Atualiza acumulados na sessão (se a tabela existir)
+    BEGIN
+        UPDATE brain.sessions
+        SET 
+            total_latency_ms = coalesce(total_latency_ms, 0) + p_latency_ms,
+            total_cost_est = coalesce(total_cost_est, 0) + p_cost_est,
+            last_interaction_at = now()
+        WHERE id::text = p_session_id;
+    EXCEPTION WHEN undefined_table THEN
+        -- Safra caso a tabela não exista
+    END;
 
     RETURN v_log_id;
 END;
 $$;
 
--- Grant de acesso para funções executadas via anon/auth no Edge Function
+-- Grant de acesso
 GRANT USAGE ON SCHEMA brain TO authenticated;
 GRANT USAGE ON SCHEMA brain TO service_role;
 GRANT EXECUTE ON FUNCTION brain.log_agent_execution TO authenticated;
