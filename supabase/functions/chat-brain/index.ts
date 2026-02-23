@@ -311,6 +311,8 @@ Deno.serve(async (req) => {
             'query_all_tasks',
             'query_access_summary',
             'query_survey_responses',
+            'execute_create_traffic_task',
+            'execute_update_project_status',
         ])
 
         const cleanRpcParams = (params: Record<string, any>) => {
@@ -925,6 +927,43 @@ Deno.serve(async (req) => {
                         }
                     }
                 }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_create_traffic_task",
+                    description: "Criar uma nova tarefa em um projeto de tráfego. SEMPRE use esta ferramenta para pedidos de 'criar tarefa', 'agendar atividade' ou 'adicionar pendência'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_client_id: { type: "string", format: "uuid", description: "UUID do cliente." },
+                            p_project_id: { type: "string", format: "uuid", description: "UUID do projeto." },
+                            p_title: { type: "string", description: "Título da tarefa." },
+                            p_description: { type: "string", description: "Descrição detalhada." },
+                            p_due_date: { type: "string", format: "date", description: "Data de entrega (YYYY-MM-DD)." },
+                            p_priority: { type: "string", enum: ["low", "medium", "high"], default: "medium" },
+                            p_idempotency_key: { type: "string", description: "Chave única para evitar duplicidade (uidd)." }
+                        },
+                        required: ["p_client_id", "p_project_id", "p_title"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "execute_update_project_status",
+                    description: "Atualizar o status de um projeto de tráfego/site/lp. Use para 'marcar projeto como concluído', 'pausar projeto', etc.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_project_id: { type: "string", format: "uuid", description: "UUID do projeto." },
+                            p_new_status: { type: "string", description: "Novo status (ex: Ativo, Inativo, Pausado)." },
+                            p_notes: { type: "string", description: "Notas sobre a alteração." },
+                            p_idempotency_key: { type: "string", description: "Chave única (uuid)." }
+                        },
+                        required: ["p_project_id", "p_new_status"]
+                    }
+                }
             }
         ]
 
@@ -997,6 +1036,8 @@ Retorne apenas function calls (sem texto livre).`
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_survey_responses': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
+                    'execute_create_traffic_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_update_project_status': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                 }
 
                 const llmDbCalls: DbQueryCall[] = parsedCalls
