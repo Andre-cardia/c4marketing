@@ -315,6 +315,7 @@ const Account: React.FC = () => {
             const { error } = await supabase
                 .from('app_users')
                 .update({
+                    name: fullName,
                     full_name: fullName,
                     cal_com_link: calComLink
                 })
@@ -668,8 +669,8 @@ const Account: React.FC = () => {
                                                         onClick={handleMarkRead}
                                                         disabled={aiMessage.is_read}
                                                         className={`flex items-center gap-2 text-xs font-bold transition-colors px-3 py-1.5 rounded-lg border ${aiMessage.is_read
-                                                                ? 'text-slate-500 bg-slate-800/50 border-slate-700 cursor-default'
-                                                                : 'text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border-brand-coral/20'
+                                                            ? 'text-slate-500 bg-slate-800/50 border-slate-700 cursor-default'
+                                                            : 'text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border-brand-coral/20'
                                                             }`}
                                                     >
                                                         {aiMessage.is_read ? (
