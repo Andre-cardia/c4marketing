@@ -303,18 +303,15 @@ Deno.serve(async (req) => {
         }
 
         const dbRpcNames = new Set([
-            'query_all_proposals',
-            'query_all_clients',
-            'query_all_projects',
+            'query_all_projects', 'query_all_clients', 'query_all_proposals',
+            'query_all_users', 'query_all_tasks', 'query_access_summary',
             'query_financial_summary',
-            'query_all_users',
-            'query_all_tasks',
-            'query_access_summary',
+            'query_task_distribution_chart',
             'query_survey_responses',
             'execute_create_traffic_task',
-            'execute_update_project_status',
             'execute_delete_task',
             'execute_move_task',
+            'execute_update_project_status',
             'execute_update_task',
             'execute_batch_move_tasks',
             'execute_batch_delete_tasks',
@@ -1195,6 +1192,7 @@ Retorne apenas function calls (sem texto livre).`
                     'query_all_clients': { agent: 'Agent_Client360', artifact_kind: 'client' },
                     'query_all_projects': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_financial_summary': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
+                    'query_task_distribution_chart': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_all_users': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
@@ -1234,6 +1232,17 @@ Retorne apenas function calls (sem texto livre).`
                     }
                     if (!explicitlyWantsProjectList) {
                         dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_projects')
+                    }
+                }
+
+                const hasTaskChartCall = dbCalls.some((c) => c.rpc_name === 'query_task_distribution_chart')
+                if (hasTaskChartCall) {
+                    const explicitlyWantsTaskList = hasAny(input.user_message, [
+                        'liste as tarefas', 'listar as tarefas', 'quais tarefas', 'mostre as tarefas',
+                        'todas as tarefas', 'nomes das tarefas', 'detalhar tarefas'
+                    ])
+                    if (!explicitlyWantsTaskList) {
+                        dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_tasks')
                     }
                 }
 
@@ -1413,7 +1422,7 @@ Retorne apenas function calls (sem texto livre).`
                 const chartBlock = {
                     type: 'chart',
                     chartType: 'bar',
-                    title: `Distribuição de Tarefas por ${groupBy.toUpperCase()} (debug_backend_size: ${Array.isArray(allTasks) ? allTasks.length : JSON.stringify(allTasks)})`,
+                    title: `Distribuição de Tarefas por ${groupBy.toUpperCase()}`,
                     xAxis: 'name',
                     series: [{ key: 'total', name: 'Tarefas', color: '#6366f1' }],
                     data: chartData,
@@ -1895,6 +1904,10 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
 
         // FORÇA BRUTA: Injetar componente UI na resposta final via backend
         if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
+            // ANTI-DUPLICAÇÃO: Remover blocos ```json que o LLM já tenha gerado por conta própria
+            // para evitar que o GenUIParser renderize dois componentes iguais
+            answer = answer.replace(/```json\s*\n[\s\S]*?\n```/g, '').trim();
+
             let genUiType = 'unknown_list';
             let genUiPayload: any = { type: genUiType, items: rawDbRecordsForGenUI };
 
@@ -1910,6 +1923,15 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             }
             else if (rpcNameForGenUI === 'query_all_clients') {
                 genUiPayload = { type: 'client_list', items: rawDbRecordsForGenUI };
+            }
+            else if (rpcNameForGenUI === 'query_all_users') {
+                // SANITIZAR: Remover campos sensíveis antes de expor no chat
+                const sanitizedUsers = rawDbRecordsForGenUI.map((u: any) => ({
+                    name: u.full_name || u.name || 'Sem nome',
+                    role: u.role || 'Não definido',
+                    last_access: u.last_access || null,
+                }));
+                genUiPayload = { type: 'user_list', items: sanitizedUsers };
             }
             // 2. Lógica para Relatórios (Métricas Financeiras Mapeadas)
             else if (rpcNameForGenUI === 'query_financial_summary') {

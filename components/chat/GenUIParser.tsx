@@ -192,6 +192,49 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                         );
                     }
 
+                    if (data.type === 'user_list') {
+                        const users = Array.isArray(data.items) ? data.items : [];
+                        const roleLabels: Record<string, string> = {
+                            'gestor': 'Gestor',
+                            'operacional': 'Operacional',
+                            'cliente': 'Cliente',
+                            'admin': 'Administrador',
+                        };
+                        const roleColors: Record<string, string> = {
+                            'gestor': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+                            'operacional': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                            'cliente': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                            'admin': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+                        };
+                        return (
+                            <div key={index} className="flex flex-col gap-2 my-3">
+                                {users.map((user: any, idx: number) => {
+                                    const roleLower = (user.role || '').toLowerCase();
+                                    return (
+                                        <div key={idx} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:border-white/20 transition-all duration-300">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                                {(user.name || '?')[0].toUpperCase()}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-semibold text-slate-100 truncate">{user.name}</h4>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${roleColors[roleLower] || 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
+                                                        {roleLabels[roleLower] || user.role || 'Sem cargo'}
+                                                    </span>
+                                                    {user.last_access && (
+                                                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                            <Clock size={10} /> Último acesso: {format(parseISO(user.last_access), 'dd MMM yyyy', { locale: ptBR })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    }
+
                     if (data.type === 'report') {
                         const isPositive = data.trend && data.trend.startsWith('+');
                         return (
