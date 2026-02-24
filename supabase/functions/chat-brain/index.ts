@@ -1246,6 +1246,12 @@ Retorne apenas function calls (sem texto livre).`
                     }
                 }
 
+                // Se o LLM pediu access_summary, não precisa da lista genérica de usuários
+                const hasAccessSummaryCall = dbCalls.some((c) => c.rpc_name === 'query_access_summary')
+                if (hasAccessSummaryCall) {
+                    dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_users')
+                }
+
                 if (dbCalls.length > 0) {
                     const primary = dbCalls[0]
                     const config = funcToAgent[primary.rpc_name] || funcToAgent['query_all_projects']
@@ -1496,7 +1502,24 @@ Retorne apenas function calls (sem texto livre).`
             }
 
             const records = Array.isArray(normalizedData) ? normalizedData : [normalizedData]
-            return { section: `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`, rawData: records }
+
+            // SANITIZAÇÃO PRÉ-LLM: Remover PII dos dados antes de enviar ao contexto do LLM
+            let sanitizedRecordsForPrompt = records;
+            if (rpc_name === 'query_access_summary') {
+                sanitizedRecordsForPrompt = records.map((r: any) => {
+                    const email = r.user_email || '';
+                    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                    return { nome: name, total_acessos: r.total_accesses, ultimo_acesso: r.last_access };
+                });
+            } else if (rpc_name === 'query_all_users') {
+                sanitizedRecordsForPrompt = records.map((r: any) => ({
+                    nome: r.full_name || r.name || 'Sem nome',
+                    cargo: r.role || 'Não definido',
+                    ultimo_acesso: r.last_access || null,
+                }));
+            }
+
+            return { section: `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(sanitizedRecordsForPrompt, null, 2)}`, rawData: records }
         }
 
         // Tier-1: busca documentos canônicos corporativos via RPC dedicado.
@@ -1932,6 +1955,19 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                     last_access: u.last_access || null,
                 }));
                 genUiPayload = { type: 'user_list', items: sanitizedUsers };
+            }
+            else if (rpcNameForGenUI === 'query_access_summary') {
+                // SANITIZAR: Mascarar emails nos logs de acesso
+                const sanitizedAccess = rawDbRecordsForGenUI.map((a: any) => {
+                    const email = a.user_email || '';
+                    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                    return {
+                        name,
+                        total_accesses: a.total_accesses || 0,
+                        last_access: a.last_access || null,
+                    };
+                });
+                genUiPayload = { type: 'access_list', items: sanitizedAccess };
             }
             // 2. Lógica para Relatórios (Métricas Financeiras Mapeadas)
             else if (rpcNameForGenUI === 'query_financial_summary') {

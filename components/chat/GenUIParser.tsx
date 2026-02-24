@@ -235,6 +235,34 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                         );
                     }
 
+                    if (data.type === 'access_list') {
+                        const accessItems = Array.isArray(data.items) ? data.items : [];
+                        return (
+                            <div key={index} className="flex flex-col gap-2 my-3">
+                                {accessItems.map((item: any, idx: number) => (
+                                    <div key={idx} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:border-white/20 transition-all duration-300">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                                            {(item.name || '?')[0].toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm font-semibold text-slate-100 truncate">{item.name}</h4>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                    <User size={10} /> {item.total_accesses || 0} acessos
+                                                </span>
+                                                {item.last_access && (
+                                                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                        <Clock size={10} /> Último: {format(parseISO(item.last_access), 'dd MMM yyyy HH:mm', { locale: ptBR })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    }
+
                     if (data.type === 'report') {
                         const isPositive = data.trend && data.trend.startsWith('+');
                         return (
