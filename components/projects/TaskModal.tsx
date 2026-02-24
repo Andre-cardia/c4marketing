@@ -213,6 +213,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             // Clear legacy field to ensure full migration on first edit
             dataToSave.attachment_url = null;
 
+            console.log('[TaskModal] Saving with created_by:', dataToSave.created_by, '| fullName:', fullName);
+
             // Helper: tenta salvar com created_by, fallback sem ele se a coluna não existir
             const trySave = async (data: any, retry = true): Promise<any> => {
                 if (task?.id) {

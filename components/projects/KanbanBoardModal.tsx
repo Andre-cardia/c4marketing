@@ -20,6 +20,7 @@ interface Task {
     assignee: string;
     due_date: string;
     created_at: string;
+    created_by?: string;
 }
 
 interface KanbanBoardModalProps {
