@@ -1810,20 +1810,12 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
 
 FORMATO DE RESPOSTA VISUAL (GenUI) - REGRA ABSOLUTA:
-NÃO FAÇA LISTAS EM TEXTO (ex: 1. Tarefa X, - Projeto Y).
-Sempre que o resultado de uma consulta retornar mais de 1 item (Tarefas, Projetos, Propostas, Pessoas), você DEVE obrigatoriamente retornar a resposta com um texto intro e logo após um bloco de código Markdown contendo o JSON.
+O sistema AUTOMATICAMENTE anexará a interface visual (GenUI) dos resultados da consulta ao final da sua mensagem.
+Portanto, NÃO crie listas textuais (ex: 1. Tarefa X, - Projeto Y) e NÃO gere blocos JSON na sua resposta sob nenhuma hipótese.
+Apenas escreva uma frase introdutória curta e amigável confirmando os dados encontrados. 
 
 EXEMPLO DE RESPOSTA ESPERADA:
 Aqui estão as suas tarefas atuais:
-\`\`\`json
-{
-  "type": "task_list",
-  "items": [
-    { "title": "Criar Layout", "subtitle": "Status: Pendente | Vencimento: Amanhã", "status": "backlog" },
-    { "title": "Aprovar Contrato", "subtitle": "Status: Em andamento", "status": "in_progress" }
-  ]
-}
-\`\`\`
 `.trim()
 
         // Montar bloco de identidade
@@ -1928,8 +1920,8 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         // FORÇA BRUTA: Injetar componente UI na resposta final via backend
         if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
             // ANTI-DUPLICAÇÃO: Remover blocos ```json que o LLM já tenha gerado por conta própria
-            // para evitar que o GenUIParser renderize dois componentes iguais
-            answer = answer.replace(/```json\s*\n[\s\S]*?\n```/g, '').trim();
+            // ou blocos de json truncados, para evitar duplicação com a injenção do GenUI
+            answer = answer.replace(/```json[\s\S]*?(?:```|$)/g, '').trim();
 
             let genUiType = 'unknown_list';
             let genUiPayload: any = { type: genUiType, items: rawDbRecordsForGenUI };
