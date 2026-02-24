@@ -1097,6 +1097,18 @@ Deno.serve(async (req) => {
                         required: ["p_title", "p_recurrence_rule"]
                     }
                 }
+            },
+            {
+                type: "function" as const,
+                function: {
+                    name: "no_action",
+                    description: "Use quando o usuário fizer uma saudação (oi, olá, bom dia, tudo bem, etc.), conversa casual, ou qualquer mensagem que NÃO precise de consulta ao banco de dados. NÃO use nenhuma outra ferramenta para cumprimentos.",
+                    parameters: {
+                        type: "object",
+                        properties: {},
+                        required: []
+                    }
+                }
             }
         ]
 
@@ -1106,7 +1118,7 @@ Deno.serve(async (req) => {
                 model: 'gpt-4o-mini',
                 temperature: 0,
                 tools: availableTools,
-                tool_choice: "required",
+                tool_choice: "auto",
                 messages: [
                     {
                         role: 'system',
@@ -1163,6 +1175,7 @@ Quando o usuário pedir para EDITAR/ATUALIZAR campos de tarefa (responsável, de
 Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use execute_update_project_status.
 Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
+QUANDO O USUÁRIO FIZER SAUDAÇÕES (oi, olá, bom dia, boa tarde, tudo bem, e aí, hey, etc.) ou conversa casual sem intenção de consulta, use OBRIGATORIAMENTE a ferramenta no_action. NUNCA dispare consultas de banco para cumprimentos.
 Retorne apenas function calls (sem texto livre).`
                     },
                     { role: 'user', content: input.user_message }
@@ -1206,10 +1219,12 @@ Retorne apenas function calls (sem texto livre).`
                     'execute_batch_move_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_batch_delete_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_schedule_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'no_action': { agent: 'Agent_Conversational', artifact_kind: 'none' },
                 }
 
                 const llmDbCalls: DbQueryCall[] = parsedCalls
                     .filter((call) => call.name !== 'rag_search')
+                    .filter((call) => call.name !== 'no_action')
                     .filter((call) => dbRpcNames.has(call.name))
                     .map((call) => ({ rpc_name: call.name, params: call.args || {} }))
 
