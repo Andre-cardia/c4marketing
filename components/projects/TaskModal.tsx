@@ -14,6 +14,7 @@ interface Task {
     due_date: string;
     attachments?: { name: string; url: string }[];
     created_at?: string;
+    created_by?: string;
 }
 
 interface UserSummary {
@@ -202,58 +203,70 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
             // Exclude project_name (UI only) from data sent to DB
             const { project_name, ...cleanData } = formData as any;
 
-            // Ensure backward compatibility or clean up old field if needed. 
-            // Ideally we just send 'attachments' JSONB.
-            // For now, we update both if we wanted to support old app versions, but let's stick to new schema.
-            // We map attachments to JSONB.
-
             const dataToSave = {
                 ...cleanData,
                 due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
-                attachments: formData.attachments // Send JSONB array
+                attachments: formData.attachments, // Send JSONB array
+                created_by: cleanData.created_by || fullName || 'Sistema', // Auto-fill author
             };
 
             // Clear legacy field to ensure full migration on first edit
             dataToSave.attachment_url = null;
 
-            if (task?.id) {
-                // Update
-                const { error } = await supabase
-                    .from('project_tasks')
-                    .update(dataToSave)
-                    .eq('id', task.id);
-                if (error) throw error;
+            // Helper: tenta salvar com created_by, fallback sem ele se a coluna não existir
+            const trySave = async (data: any, retry = true): Promise<any> => {
+                if (task?.id) {
+                    const { error } = await supabase
+                        .from('project_tasks')
+                        .update(data)
+                        .eq('id', task.id);
+                    if (error) {
+                        if (retry && error.message?.includes('created_by')) {
+                            const { created_by, ...withoutCreatedBy } = data;
+                            return trySave(withoutCreatedBy, false);
+                        }
+                        throw error;
+                    }
 
-                await supabase.from('task_history').insert({
-                    task_id: task.id,
-                    project_id: projectId,
-                    action: task.status !== dataToSave.status ? 'status_change' : 'updated',
-                    old_status: task.status,
-                    new_status: dataToSave.status,
-                    changed_by: fullName || 'Sistema',
-                    details: { title: task.title }
-                });
-
-            } else {
-                // Insert
-                const { data: newTask, error } = await supabase
-                    .from('project_tasks')
-                    .insert([dataToSave])
-                    .select()
-                    .single();
-                if (error) throw error;
-
-                if (newTask) {
                     await supabase.from('task_history').insert({
-                        task_id: newTask.id,
+                        task_id: task.id,
                         project_id: projectId,
-                        action: 'created',
-                        new_status: newTask.status,
+                        action: task.status !== data.status ? 'status_change' : 'updated',
+                        old_status: task.status,
+                        new_status: data.status,
                         changed_by: fullName || 'Sistema',
-                        details: { title: newTask.title }
+                        details: { title: task.title }
                     });
+                    return null;
+                } else {
+                    const { data: newTask, error } = await supabase
+                        .from('project_tasks')
+                        .insert([data])
+                        .select()
+                        .single();
+                    if (error) {
+                        if (retry && error.message?.includes('created_by')) {
+                            const { created_by, ...withoutCreatedBy } = data;
+                            return trySave(withoutCreatedBy, false);
+                        }
+                        throw error;
+                    }
+
+                    if (newTask) {
+                        await supabase.from('task_history').insert({
+                            task_id: newTask.id,
+                            project_id: projectId,
+                            action: 'created',
+                            new_status: newTask.status,
+                            changed_by: fullName || 'Sistema',
+                            details: { title: newTask.title }
+                        });
+                    }
+                    return newTask;
                 }
-            }
+            };
+
+            await trySave(dataToSave);
 
             onSave();
             onClose();
@@ -308,11 +321,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             />
                         </div>
 
-                        {/* Creation Date (Read-only) */}
+                        {/* Creation Date & Author (Read-only) */}
                         {task?.created_at && (
-                            <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                                <Calendar size={12} />
-                                <span>Criado em: {new Date(task.created_at).toLocaleDateString('pt-BR')} às {new Date(task.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-3">
+                                <span className="flex items-center gap-1">
+                                    <Calendar size={12} />
+                                    Criado em: {new Date(task.created_at).toLocaleDateString('pt-BR')} às {new Date(task.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <User size={12} />
+                                    por: <strong className="text-slate-300">{task.created_by || 'Não registrado'}</strong>
+                                </span>
                             </div>
                         )}
 
@@ -373,19 +392,32 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             </div>
 
                             {/* Due Date */}
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo</label>
-                                <div className="relative">
-                                    <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
-                                    <input
-                                        type="date"
-                                        value={formData.due_date}
-                                        onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                                        onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none cursor-pointer"
-                                    />
-                                </div>
-                            </div>
+                            {(() => {
+                                const isEditing = !!task?.id;
+                                const isAuthor = !isEditing || (task?.created_by && task.created_by === fullName);
+                                const canEditDueDate = !isEditing || isAuthor;
+
+                                return (
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo</label>
+                                        <div className="relative">
+                                            <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                                            <input
+                                                type="date"
+                                                value={formData.due_date}
+                                                onChange={e => canEditDueDate && setFormData({ ...formData, due_date: e.target.value })}
+                                                onClick={(e) => canEditDueDate && (e.target as HTMLInputElement).showPicker?.()}
+                                                disabled={!canEditDueDate}
+                                                title={!canEditDueDate ? `Somente o autor (${task?.created_by}) pode alterar o prazo` : ''}
+                                                className={`w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none ${canEditDueDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                                            />
+                                            {!canEditDueDate && (
+                                                <p className="text-[10px] text-amber-500 mt-1">🔒 Apenas o criador ({task?.created_by}) pode alterar o prazo</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Description */}
