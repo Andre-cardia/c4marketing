@@ -462,18 +462,17 @@ const Dashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="h-64 flex items-end gap-2 sm:gap-4 md:gap-8">
+                            <div className="h-64 flex items-end gap-2 sm:gap-4 md:gap-6">
                                 {(() => {
                                     const months = [];
                                     const today = new Date();
-                                    // Generate last 1 month and next 4 months
                                     for (let i = -1; i < 5; i++) {
                                         const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
                                         months.push(d);
                                     }
 
                                     const data = months.map(month => {
-                                        const monthKey = month.toISOString().slice(0, 7); // YYYY-MM
+                                        const monthKey = month.toISOString().slice(0, 7);
                                         const monthTasks = tasks.filter(t => t.due_date && t.due_date.startsWith(monthKey));
 
                                         return {
@@ -486,7 +485,14 @@ const Dashboard: React.FC = () => {
                                         };
                                     });
 
-                                    const maxTotal = Math.max(...data.map(d => d.total), 1); // Avoid div by zero
+                                    const maxVal = Math.max(...data.flatMap(d => [d.backlog, d.in_progress, d.approval, d.done]), 1);
+
+                                    const barConfig = [
+                                        { key: 'backlog', color: 'bg-slate-400', hoverColor: 'hover:bg-slate-500', label: 'B' },
+                                        { key: 'in_progress', color: 'bg-blue-600', hoverColor: 'hover:bg-blue-700', label: 'E' },
+                                        { key: 'approval', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600', label: 'A' },
+                                        { key: 'done', color: 'bg-emerald-500', hoverColor: 'hover:bg-emerald-600', label: 'F' },
+                                    ];
 
                                     return data.map((d, index) => (
                                         <div key={index} className="flex-1 flex flex-col items-center group relative">
@@ -501,21 +507,26 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Bar Stack */}
-                                            <div className="w-full max-w-[40px] bg-slate-50 dark:bg-slate-800 rounded-t-xl overflow-hidden relative flex flex-col-reverse" style={{ height: '200px' }}>
-                                                {/* Background track handled by container bg */}
-
-                                                {/* Stacked Segments (flex-col-reverse fills from bottom) */}
-                                                {d.total > 0 ? (
-                                                    <>
-                                                        <div style={{ height: `${(d.backlog / maxTotal) * 100}%` }} className="bg-slate-400 w-full transition-all duration-500 hover:bg-slate-500"></div>
-                                                        <div style={{ height: `${(d.in_progress / maxTotal) * 100}%` }} className="bg-blue-600 w-full transition-all duration-500 hover:bg-blue-700"></div>
-                                                        <div style={{ height: `${(d.approval / maxTotal) * 100}%` }} className="bg-amber-500 w-full transition-all duration-500 hover:bg-amber-600"></div>
-                                                        <div style={{ height: `${(d.done / maxTotal) * 100}%` }} className="bg-emerald-500 w-full transition-all duration-500 hover:bg-emerald-600"></div>
-                                                    </>
-                                                ) : (
-                                                    <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 absolute bottom-0"></div>
-                                                )}
+                                            {/* Grouped Bars */}
+                                            <div className="w-full flex items-end justify-center gap-[2px] sm:gap-1" style={{ height: '200px' }}>
+                                                {barConfig.map((bar) => {
+                                                    const value = (d as any)[bar.key] as number;
+                                                    const heightPct = maxVal > 0 ? (value / maxVal) * 100 : 0;
+                                                    return (
+                                                        <div
+                                                            key={bar.key}
+                                                            className={`flex-1 max-w-[12px] ${bar.color} ${bar.hoverColor} rounded-t-md transition-all duration-500 relative`}
+                                                            style={{ height: `${Math.max(heightPct, value > 0 ? 4 : 0)}%` }}
+                                                            title={`${bar.label}: ${value}`}
+                                                        >
+                                                            {value > 0 && (
+                                                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    {value}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Label */}
