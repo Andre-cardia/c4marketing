@@ -35,42 +35,94 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     // Use console.log to debug browser execution
     console.log('[GenUIParser] Receiving Content Length:', content.length);
 
-    // Extract markdown text and ```json ... ``` blocks securely using string indices
+    // Advanced Extractor: Looks for standard markdown or bare JSON payloads
     const parts = [];
     let remaining = content;
 
     while (remaining.length > 0) {
-        const startTag = '```json';
-        const endIndexStr = '```';
-        const startIndex = remaining.indexOf(startTag);
+        // Tenta achar com a tag markdown padrão (que pode estar minificada)
+        let startIndex = remaining.indexOf('```json');
+        let isBareJson = false;
 
         if (startIndex === -1) {
-            // No more json blocks
+            // Se não achar a tag, tenta achar o padrão identificador do nosso payload
+            const possibleBareJsonStart = remaining.search(/\{\s*"type"\s*:/);
+            if (possibleBareJsonStart !== -1) {
+                startIndex = possibleBareJsonStart;
+                isBareJson = true;
+            }
+        }
+
+        if (startIndex === -1) {
+            // Nenhum payload encontrado ou tag detectada no resto do texto
             parts.push({ type: 'text', content: remaining });
             break;
         }
 
-        // Push text before the json block
+        // Push do texto normal que veio antes do JSON
         if (startIndex > 0) {
             parts.push({ type: 'text', content: remaining.slice(0, startIndex) });
         }
 
-        // Advance to start of json payload
-        let blockRemaining = remaining.slice(startIndex + startTag.length);
+        let jsonStr = '';
+        let endIndex = -1;
+        let consumedLength = 0;
 
-        // Find the END of this specific block
-        const endIndex = blockRemaining.indexOf(endIndexStr);
+        if (isBareJson) {
+            // Modo 1: Bare JSON string scanning (brace balancing algorithm)
+            let blockRemaining = remaining.slice(startIndex);
+            let openBraces = 0;
+            let foundEnd = false;
 
-        if (endIndex === -1) {
-            // Unclosed json block - push the rest as text
-            parts.push({ type: 'text', content: startTag + blockRemaining });
-            break;
+            for (let i = 0; i < blockRemaining.length; i++) {
+                if (blockRemaining[i] === '{') openBraces++;
+                if (blockRemaining[i] === '}') {
+                    openBraces--;
+                    if (openBraces === 0) {
+                        endIndex = i + 1;
+                        foundEnd = true;
+                        break;
+                    }
+                }
+            }
+
+            if (foundEnd) {
+                jsonStr = blockRemaining.slice(0, endIndex).trim();
+                consumedLength = endIndex; // Relative to startIndex
+            } else {
+                // Bracket not matched (LLM parou no meio ou corrupto)
+                parts.push({ type: 'text', content: blockRemaining });
+                break;
+            }
+
+        } else {
+            // Modo 2: Tag extraída normalmente via Markdown
+            const startTag = '```json';
+            let blockRemaining = remaining.slice(startIndex + startTag.length);
+
+            // Search for triple backtick closing tag
+            endIndex = blockRemaining.indexOf('```');
+
+            // Fallback for truncated LLM streams missing the closing tag
+            if (endIndex === -1) {
+                endIndex = blockRemaining.lastIndexOf('}');
+                if (endIndex !== -1) {
+                    endIndex += 1; // Include the brace
+                }
+            }
+
+            if (endIndex !== -1) {
+                jsonStr = blockRemaining.slice(0, endIndex).trim();
+                // Consume from the markdown start to the closing backticks (if present)
+                let closingBlockLength = blockRemaining.indexOf('```') !== -1 ? 3 : 0;
+                consumedLength = startTag.length + endIndex + closingBlockLength;
+            } else {
+                parts.push({ type: 'text', content: startTag + blockRemaining });
+                break;
+            }
         }
 
-        // Extract the raw json string
-        let jsonStr = blockRemaining.slice(0, endIndex).trim();
-
-        // Push the Gen UI block
+        // Parse and push the Gen UI block
         try {
             const parsedData = JSON.parse(jsonStr);
             parts.push({ type: 'gen_ui', data: parsedData });
@@ -84,15 +136,15 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                     snippet: jsonStr.substring(0, 300) || 'N/A'
                 }
             });
-            // Adiciona fallback texto bruto
+            // Fallback plain text
             parts.push({
                 type: 'text',
-                content: `${startTag}\n${jsonStr}\n${endIndexStr}`
+                content: remaining.slice(startIndex, startIndex + consumedLength)
             });
         }
 
         // Advance the remaining string state
-        remaining = blockRemaining.slice(endIndex + endIndexStr.length);
+        remaining = remaining.slice(startIndex + consumedLength);
     }
 
     console.log('[GenUIParser] Total parts generated:', parts.length);
@@ -390,6 +442,6 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
 
                 return null;
             })}
-        </div>
+        </div >
     );
 };
