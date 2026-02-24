@@ -35,63 +35,64 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     // Use console.log to debug browser execution
     console.log('[GenUIParser] Receiving Content Length:', content.length);
 
-    // Procura por blocos de código markdown contendo json
-    // Ex: ```json
-    // { "type": "task_list", "items": [...] }
-    // ```
-    const renderMarkdownPattern = /(?:\n|^)\s*```json\s*(\{[\s\S]*?\})\s*```/gi;
-
+    // Extract markdown text and ```json ... ``` blocks securely using string indices
     const parts = [];
-    let lastIndex = 0;
-    let match;
+    let remaining = content;
 
-    while ((match = renderMarkdownPattern.exec(content)) !== null) {
-        console.log('[GenUIParser] Match Found:', match[0].substring(0, 50) + '...');
-        // Texto comum antes do JSON
-        if (match.index > lastIndex) {
-            parts.push({
-                type: 'text',
-                content: content.slice(lastIndex, match.index)
-            });
+    while (remaining.length > 0) {
+        const startTag = '```json';
+        const endIndexStr = '```';
+        const startIndex = remaining.indexOf(startTag);
+
+        if (startIndex === -1) {
+            // No more json blocks
+            parts.push({ type: 'text', content: remaining });
+            break;
         }
 
-        // Tentar parsear o JSON para Componentes App-Specíficos
-        try {
-            const jsonStr = match[1];
-            const parsedData = JSON.parse(jsonStr);
-            console.log('[GenUIParser] JSON parsed correctly:', parsedData.type);
+        // Push text before the json block
+        if (startIndex > 0) {
+            parts.push({ type: 'text', content: remaining.slice(0, startIndex) });
+        }
 
-            parts.push({
-                type: 'gen_ui',
-                data: parsedData
-            });
+        // Advance to start of json payload
+        let blockRemaining = remaining.slice(startIndex + startTag.length);
+
+        // Find the END of this specific block
+        const endIndex = blockRemaining.indexOf(endIndexStr);
+
+        if (endIndex === -1) {
+            // Unclosed json block - push the rest as text
+            parts.push({ type: 'text', content: startTag + blockRemaining });
+            break;
+        }
+
+        // Extract the raw json string
+        let jsonStr = blockRemaining.slice(0, endIndex).trim();
+
+        // Push the Gen UI block
+        try {
+            const parsedData = JSON.parse(jsonStr);
+            parts.push({ type: 'gen_ui', data: parsedData });
         } catch (e: any) {
             console.error('[GenUIParser] Parse Error:', e.message);
-            // Visually surface the JSON parsing error for debugging
             parts.push({
                 type: 'gen_ui',
                 data: {
                     type: 'parser_error',
                     error: e.message,
-                    snippet: match[1]?.substring(0, 300) || 'N/A'
+                    snippet: jsonStr.substring(0, 300) || 'N/A'
                 }
             });
-            // Adiciona o bloco original também para fallback
+            // Adiciona fallback texto bruto
             parts.push({
                 type: 'text',
-                content: match[0]
+                content: `${startTag}\n${jsonStr}\n${endIndexStr}`
             });
         }
 
-        lastIndex = renderMarkdownPattern.lastIndex;
-    }
-
-    // Pega qualquer resto de texto do final da resposta
-    if (lastIndex < content.length) {
-        parts.push({
-            type: 'text',
-            content: content.slice(lastIndex)
-        });
+        // Advance the remaining string state
+        remaining = blockRemaining.slice(endIndex + endIndexStr.length);
     }
 
     console.log('[GenUIParser] Total parts generated:', parts.length);

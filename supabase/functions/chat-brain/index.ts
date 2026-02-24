@@ -1809,13 +1809,13 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
 
-FORMATO DE RESPOSTA VISUAL (GenUI) - REGRA ABSOLUTA:
+FORMATO DE RESPOSTA (GenUI) - REGRA ABSOLUTA:
 O sistema AUTOMATICAMENTE anexará a interface visual (GenUI) dos resultados da consulta ao final da sua mensagem.
 Portanto, NÃO crie listas textuais (ex: 1. Tarefa X, - Projeto Y) e NÃO gere blocos JSON na sua resposta sob nenhuma hipótese.
-Apenas escreva uma frase introdutória curta e amigável confirmando os dados encontrados. 
+Apenas escreva uma frase introdutória amigável confirmando os dados encontrados.
 
 EXEMPLO DE RESPOSTA ESPERADA:
-Aqui estão as suas tarefas atuais:
+"Aqui estão as suas tarefas atuais:" ou "Encontrei as seguintes propostas no sistema:"
 `.trim()
 
         // Montar bloco de identidade
