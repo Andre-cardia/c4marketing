@@ -26,15 +26,19 @@ Deno.serve(async (req) => {
         // Idempotency: Se recebido do frontend, evita duplicação de execução pesada em retentativa.
         const idempotencyKey = req.headers.get('x-idempotency-key') || null
         const rawClientToday = typeof requestBody?.client_today === 'string' ? requestBody.client_today.trim() : null
-        const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : null
+        const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : 'America/Sao_Paulo'
         const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
         const clientToday = rawClientToday && isIsoDate(rawClientToday) ? rawClientToday : null
         const runtimeToday = (() => {
+            // Sempre calcular a data atual no fuso de Brasília (America/Sao_Paulo)
             const now = new Date()
-            const y = String(now.getFullYear())
-            const m = String(now.getMonth() + 1).padStart(2, '0')
-            const d = String(now.getDate()).padStart(2, '0')
-            return `${y}-${m}-${d}`
+            const brasiliaDate = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).format(now) // Retorna YYYY-MM-DD no locale en-CA
+            return brasiliaDate
         })()
 
         if (!query) throw new Error('Query is required')
