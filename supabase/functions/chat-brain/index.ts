@@ -1322,6 +1322,8 @@ Retorne apenas function calls (sem texto livre).`
         // 3. Retrieval Step (Hybrid: RAG ou SQL direto)
         let contextText = ''
         let retrievedDocs: any[] = []
+        let rawDbRecordsForGenUI: any[] | null = null;
+        let rpcNameForGenUI: string = '';
         let cognitiveMemoryDocs: any[] = []
         let cognitiveMemoryContext = ''
         let explicitUserFacts: string[] = []
@@ -1398,7 +1400,7 @@ Retorne apenas function calls (sem texto livre).`
                     } catch (_e) { /* fail-safe */ }
                 }
 
-                return `EXECUÇÃO FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`
+                return { section: `EXECUÇÃO FALHOU via ${rpc_name}: ${rpcError.message}. Informe o erro com transparência e não invente dados.`, rawData: null }
             }
 
             let normalizedData: any = data
@@ -1416,15 +1418,15 @@ Retorne apenas function calls (sem texto livre).`
                 const status = result?.status || 'unknown'
                 const message = result?.message || JSON.stringify(result)
                 console.log(`[Executor] ${rpc_name} → ${status}: ${message}`)
-                return `AÇÃO EXECUTADA COM SUCESSO via ${rpc_name} (${rpcLatencyMs}ms):\n${JSON.stringify(result, null, 2)}`
+                return { section: `AÇÃO EXECUTADA COM SUCESSO via ${rpc_name} (${rpcLatencyMs}ms):\n${JSON.stringify(result, null, 2)}`, rawData: result }
             }
 
             if (!normalizedData || (Array.isArray(normalizedData) && normalizedData.length === 0) || normalizedData === '[]') {
-                return `CONSULTA REALIZADA COM SUCESSO via ${rpc_name}, mas NENHUM registro foi encontrado. Informe ao usuário que a consulta foi feita no banco de dados e não há registros correspondentes no momento.`
+                return { section: `CONSULTA REALIZADA COM SUCESSO via ${rpc_name}, mas NENHUM registro foi encontrado. Informe ao usuário que a consulta foi feita no banco de dados e não há registros correspondentes no momento.`, rawData: [] }
             }
 
             const records = Array.isArray(normalizedData) ? normalizedData : [normalizedData]
-            return `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`
+            return { section: `DADOS DO BANCO DE DADOS (${records.length} registros encontrados via ${rpc_name}):\n\n${JSON.stringify(records, null, 2)}`, rawData: records }
         }
 
         // Tier-1: busca documentos canônicos corporativos via RPC dedicado.
@@ -1656,8 +1658,13 @@ Retorne apenas function calls (sem texto livre).`
                 const sections: string[] = []
                 for (const call of finalCalls) {
                     executedDbRpcs.push(call.rpc_name)
-                    const section = await executeDbRpc(call.rpc_name, call.params)
+                    const { section, rawData } = await executeDbRpc(call.rpc_name, call.params)
                     sections.push(section)
+
+                    if (!executorRpcNames.has(call.rpc_name) && call.rpc_name !== '__batch__') {
+                        rawDbRecordsForGenUI = rawData;
+                        rpcNameForGenUI = call.rpc_name;
+                    }
                 }
 
                 // Guardrail adicional para perguntas de liderança/cargo:
@@ -1709,10 +1716,20 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
 
-FORMATO DE RESPOSTA VISUAL (GenUI):
-Sempre que você for listar itens como: Tarefas (tasks), Projetos (projects), Propostas, Pessoas ou Métricas, OBRIGATORIAMENTE gere a resposta principal utilizando um bloco de código Markdown JSON, seguindo este formato de Lista:
+FORMATO DE RESPOSTA VISUAL (GenUI) - REGRA ABSOLUTA:
+NÃO FAÇA LISTAS EM TEXTO (ex: 1. Tarefa X, - Projeto Y).
+Sempre que o resultado de uma consulta retornar mais de 1 item (Tarefas, Projetos, Propostas, Pessoas), você DEVE obrigatoriamente retornar a resposta com um texto intro e logo após um bloco de código Markdown contendo o JSON.
+
+EXEMPLO DE RESPOSTA ESPERADA:
+Aqui estão as suas tarefas atuais:
 \`\`\`json
-{ "type": "task_list", "items": [{"title": "Nome do que está sendo listado", "subtitle": "Descrição ou dados adicionais", "status": "Status atual"}] }
+{
+  "type": "task_list",
+  "items": [
+    { "title": "Criar Layout", "subtitle": "Status: Pendente | Vencimento: Amanhã", "status": "backlog" },
+    { "title": "Aprovar Contrato", "subtitle": "Status: Em andamento", "status": "in_progress" }
+  ]
+}
 \`\`\`
 `.trim()
 
@@ -1814,6 +1831,18 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         const costEst = (inputTokens * 0.0000025) + (outputTokens * 0.00001)
 
         let answer = chatResponse.choices[0].message.content || ''
+
+        // FORÇA BRUTA: Injetar componente UI na resposta final via backend
+        if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
+            let genUiType = 'unknown_list';
+            if (rpcNameForGenUI === 'query_all_tasks') genUiType = 'task_list';
+            else if (rpcNameForGenUI === 'query_all_projects') genUiType = 'project_list';
+            else if (rpcNameForGenUI === 'query_all_proposals') genUiType = 'proposal_list';
+            else if (rpcNameForGenUI === 'query_all_clients') genUiType = 'client_list';
+
+            const genUiBlock = `\n\n\`\`\`json\n${JSON.stringify({ type: genUiType, items: rawDbRecordsForGenUI })}\n\`\`\``;
+            answer += genUiBlock;
+        }
 
         // Pós-processamento para bloquear frase proibida sobre "não ter acesso ao histórico".
         // Quando houver histórico, reformulamos para resumo do que está disponível.

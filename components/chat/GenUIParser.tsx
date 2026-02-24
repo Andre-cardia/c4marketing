@@ -13,7 +13,7 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     // Ex: ```json
     // { "type": "task_list", "items": [...] }
     // ```
-    const renderMarkdownPattern = /(?:\n|^)```json\s*(\{[\s\S]*?\})\s*```/gi;
+    const renderMarkdownPattern = /(?:\n|^)\s*```json\s*(\{[\s\S]*?\})\s*```/gi;
 
     const parts = [];
     let lastIndex = 0;
@@ -37,8 +37,17 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                 type: 'gen_ui',
                 data: parsedData
             });
-        } catch (e) {
-            // Se falhar o parse, renderizamos como texto do markdown de codeblock normal
+        } catch (e: any) {
+            // Visually surface the JSON parsing error for debugging
+            parts.push({
+                type: 'gen_ui',
+                data: {
+                    type: 'parser_error',
+                    error: e.message,
+                    snippet: match[1]?.substring(0, 300) || 'N/A'
+                }
+            });
+            // Adiciona o bloco original também para fallback
             parts.push({
                 type: 'text',
                 content: match[0]
@@ -83,6 +92,15 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                                 <pre className="text-xs text-slate-500 overflow-x-auto">
                                     {JSON.stringify(data, null, 2)}
                                 </pre>
+                            </div>
+                        );
+                    }
+
+                    if (data.type === 'parser_error') {
+                        return (
+                            <div key={index} className="bg-red-500/10 border border-red-500/50 p-4 rounded-xl my-2 text-xs">
+                                <span className="text-red-400 font-bold mb-1 block">Crash parsing JSON: {data.error}</span>
+                                <pre className="text-slate-400 whitespace-pre-wrap">{data.snippet}</pre>
                             </div>
                         );
                     }
