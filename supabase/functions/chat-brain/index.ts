@@ -896,6 +896,23 @@ Deno.serve(async (req) => {
             {
                 type: "function" as const,
                 function: {
+                    name: "query_task_distribution_chart",
+                    description: "Gerar um gráfico de distribuição de tarefas (por status, usuário, etc). Use quando o usuário pedir 'gráfico de tarefas', 'distribuição de status', 'resumo visual das tarefas'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_group_by: {
+                                type: "string",
+                                enum: ["status", "assignee", "priority"],
+                                description: "Campo para agrupar as tarefas no gráfico. Padrão: status."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
                     name: "query_access_summary",
                     description: "Consultar logs de acesso ao sistema. Mostra quem acessou, quantas vezes, primeiro e último acesso.",
                     parameters: { type: "object", properties: {} }
@@ -1106,6 +1123,8 @@ Exemplos:
 - "qual o MRR e ARR dos contratos ativos?" → query_financial_summary(p_status: "Ativo")
 - "qual o faturamento recorrente atual?" → query_financial_summary(p_status: "Ativo")
 - "qual foi o faturamento de janeiro de 2026?" → query_financial_summary(p_status: "Ativo", p_reference_date: "2026-01-31")
+- "gere um gráfico das tarefas" → query_task_distribution_chart(p_group_by: "status")
+- "gráfico por responsável" → query_task_distribution_chart(p_group_by: "assignee")
 - "quem acessou o sistema hoje?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "backlog")
@@ -1365,9 +1384,49 @@ Retorne apenas function calls (sem texto livre).`
             'pode excluir', 'sim excluir', 'confirme', 'sim, pode',
         ]
 
-        const executeDbRpc = async (rpc_name: string, rpcParams: Record<string, any>) => {
-            const cleanParams = cleanRpcParams(rpcParams)
-            const isExecutorAction = executorRpcNames.has(rpc_name)
+        // Função unificada para buscar e normalizar dados
+        const executeDbRpc = async (rpc_name: string, payload: any): Promise<{ section: string; rawData: any }> => {
+            const isExecutorAction = rpc_name.startsWith('execute_')
+
+            // INTENÇÃO ESPECIAL: Gráfico Recharts (Mockado a partir dos dados brutod para efeitos de V1)
+            // Em uma V2 o banco teria uma view, mas aqui fazemos JS group by na Edge
+            if (rpc_name === 'query_task_distribution_chart') {
+                const groupBy = payload.p_group_by || 'status';
+                const { data: allTasks, error: errT } = await supabaseAdmin.rpc('query_all_tasks', { p_user_role: userRole });
+
+                if (errT || !allTasks) {
+                    return { section: `FALHA: Não foi possível gerar gráfico.`, rawData: [] }
+                }
+
+                // Agrupando
+                const counts: Record<string, number> = {};
+                for (const t of allTasks) {
+                    const key = t[groupBy] || 'Não Definido';
+                    counts[key] = (counts[key] || 0) + 1;
+                }
+
+                const chartData = Object.keys(counts).map(k => ({ name: k.replace(/_/g, ' ').toUpperCase(), total: counts[k] }));
+
+                // Preparando Payload Especial Chart
+                const chartBlock = {
+                    type: 'chart',
+                    chartType: 'bar',
+                    title: `Distribuição de Tarefas por ${groupBy.toUpperCase()}`,
+                    xAxis: 'name',
+                    series: [{ key: 'total', name: 'Tarefas', color: '#6366f1' }],
+                    data: chartData,
+                    isCurrency: false
+                };
+
+                // Vamos injetar esse block na variável de injeção global e retornar string vazia ao invés de string text,
+                // ASSIM resolvemos o parser lá no final.
+                rawDbRecordsForGenUI = [chartBlock]; // para não dar nulo
+                rpcNameForGenUI = 'query_task_distribution_chart'; // para mapear no parser no switch final
+
+                return { section: `GRÁFICO GERADO COM SUCESSO. Os dados visuais foram ocultados da string para evitar poluição textural, mas já estão prontos para UI. Apenas diga "Aqui está o gráfico solicitado:"`, rawData: [chartBlock] };
+            }
+
+            const cleanParams = cleanRpcParams(payload)
 
             // Injetar p_session_id automaticamente para RPCs de escrita
             if (isExecutorAction && !cleanParams.p_session_id && session_id) {
@@ -1835,13 +1894,71 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         // FORÇA BRUTA: Injetar componente UI na resposta final via backend
         if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
             let genUiType = 'unknown_list';
-            if (rpcNameForGenUI === 'query_all_tasks') genUiType = 'task_list';
-            else if (rpcNameForGenUI === 'query_all_projects') genUiType = 'project_list';
-            else if (rpcNameForGenUI === 'query_all_proposals') genUiType = 'proposal_list';
-            else if (rpcNameForGenUI === 'query_all_clients') genUiType = 'client_list';
+            let genUiPayload: any = { type: genUiType, items: rawDbRecordsForGenUI };
 
-            const genUiBlock = `\n\n\`\`\`json\n${JSON.stringify({ type: genUiType, items: rawDbRecordsForGenUI })}\n\`\`\``;
-            answer += genUiBlock;
+            // 1. Lógica para Listas Clássicas
+            if (rpcNameForGenUI === 'query_all_tasks') {
+                genUiPayload = { type: 'task_list', items: rawDbRecordsForGenUI };
+            }
+            else if (rpcNameForGenUI === 'query_all_projects') {
+                genUiPayload = { type: 'project_list', items: rawDbRecordsForGenUI };
+            }
+            else if (rpcNameForGenUI === 'query_all_proposals') {
+                genUiPayload = { type: 'proposal_list', items: rawDbRecordsForGenUI };
+            }
+            else if (rpcNameForGenUI === 'query_all_clients') {
+                genUiPayload = { type: 'client_list', items: rawDbRecordsForGenUI };
+            }
+            // 2. Lógica para Relatórios (Métricas Financeiras Mapeadas)
+            else if (rpcNameForGenUI === 'query_financial_summary') {
+                try {
+                    const financeRecord = rawDbRecordsForGenUI[0];
+                    // Se for MRR (exemplo simplificado), monta um array com vários cards.
+                    // O GenUIParser lida com um report por vez, então podemos passar múltiplos blocos ou criar um type: 'dashboard_grid' no futuro.
+                    // Por enquanto vamos cuspir 1 cartão principal e 1 gráfico
+
+                    const mrrValue = financeRecord.mrr || financeRecord.receita_recorrente || 0;
+                    const arrValue = mrrValue * 12;
+
+                    genUiPayload = null; // desabilita payload padrão
+
+                    const reportBlockMRR = `\n\n\`\`\`json\n${JSON.stringify({
+                        type: 'report',
+                        title: 'Receita Recorrente (MRR)',
+                        value: `R$ ${Number(mrrValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                        icon: 'trending-up',
+                        trend: '+Ativo',
+                        subtitle: 'Contratos Vigentes'
+                    })}\n\`\`\``;
+
+                    const reportBlockARR = `\n\n\`\`\`json\n${JSON.stringify({
+                        type: 'report',
+                        title: 'Receita Anualizada (ARR)',
+                        value: `R$ ${Number(arrValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                        icon: 'trending-up',
+                        subtitle: 'Projeção (MRR x 12)'
+                    })}\n\`\`\``;
+
+                    answer += reportBlockMRR + reportBlockARR;
+
+                } catch (e) { /* fallback */ }
+            }
+            // 3. Lógica para Gráficos Previamente Preparados pela Função do Backend
+            else if (rpcNameForGenUI === 'query_task_distribution_chart') {
+                try {
+                    genUiPayload = null; // O bloco inteiro foi devolvido no rawData no executeDbRpc
+                    const chartBlockPre = rawDbRecordsForGenUI[0];
+                    if (chartBlockPre?.type === 'chart') {
+                        const chartJsonMd = `\n\n\`\`\`json\n${JSON.stringify(chartBlockPre)}\n\`\`\``;
+                        answer += chartJsonMd;
+                    }
+                } catch (e) { /* fallback */ }
+            }
+
+            if (genUiPayload) {
+                const genUiBlock = `\n\n\`\`\`json\n${JSON.stringify(genUiPayload)}\n\`\`\``;
+                answer += genUiBlock;
+            }
         }
 
         // Pós-processamento para bloquear frase proibida sobre "não ter acesso ao histórico".

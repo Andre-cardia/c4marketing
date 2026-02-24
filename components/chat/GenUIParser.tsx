@@ -1,13 +1,39 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar, User, Clock, CheckCircle2, Circle, AlertCircle, PlayCircle, PauseCircle, TrendingUp, TrendingDown, Image as ImageIcon } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 interface GenUIParserProps {
     content: string;
 }
 
+const getTaskStatusInfo = (status: string) => {
+    switch (status) {
+        case 'done': return { label: 'Concluído', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', icon: CheckCircle2 };
+        case 'in_progress': return { label: 'Em Andamento', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20', icon: PlayCircle };
+        case 'approval': return { label: 'Em Aprovação', color: 'text-purple-500 bg-purple-500/10 border-purple-500/20', icon: Clock };
+        case 'paused': return { label: 'Pausado', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20', icon: PauseCircle };
+        case 'canceled': return { label: 'Cancelado', color: 'text-red-500 bg-red-500/10 border-red-500/20', icon: AlertCircle };
+        default: return { label: 'Backlog', color: 'text-slate-500 bg-slate-500/10 border-slate-500/20', icon: Circle };
+    }
+};
+
+const getPriorityColor = (p: string) => {
+    switch (p) {
+        case 'high': return 'text-red-500';
+        case 'medium': return 'text-amber-500';
+        case 'low': return 'text-emerald-500';
+        default: return 'text-slate-400';
+    }
+};
+
 export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     if (!content || typeof content !== 'string') return null;
+
+    // Use console.log to debug browser execution
+    console.log('[GenUIParser] Receiving Content Length:', content.length);
 
     // Procura por blocos de código markdown contendo json
     // Ex: ```json
@@ -20,6 +46,7 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     let match;
 
     while ((match = renderMarkdownPattern.exec(content)) !== null) {
+        console.log('[GenUIParser] Match Found:', match[0].substring(0, 50) + '...');
         // Texto comum antes do JSON
         if (match.index > lastIndex) {
             parts.push({
@@ -32,12 +59,14 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
         try {
             const jsonStr = match[1];
             const parsedData = JSON.parse(jsonStr);
+            console.log('[GenUIParser] JSON parsed correctly:', parsedData.type);
 
             parts.push({
                 type: 'gen_ui',
                 data: parsedData
             });
         } catch (e: any) {
+            console.error('[GenUIParser] Parse Error:', e.message);
             // Visually surface the JSON parsing error for debugging
             parts.push({
                 type: 'gen_ui',
@@ -65,6 +94,8 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
         });
     }
 
+    console.log('[GenUIParser] Total parts generated:', parts.length);
+
     return (
         <div className="flex flex-col gap-4">
             {parts.map((part, index) => {
@@ -84,14 +115,185 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                     const data = part.data;
 
                     if (data.type === 'task_list') {
+                        const items = Array.isArray(data.items) ? data.items : [];
                         return (
-                            <div key={index} className="bg-white/5 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm my-2">
-                                <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-3 flex items-center gap-2">
-                                    <span className="text-indigo-500">📋</span> Lista de Tarefas
-                                </h4>
-                                <pre className="text-xs text-slate-500 overflow-x-auto">
-                                    {JSON.stringify(data, null, 2)}
-                                </pre>
+                            <div key={index} className="flex flex-col gap-3 my-4">
+                                {items.map((task: any, i: number) => {
+                                    const st = getTaskStatusInfo(task.status);
+                                    const StatusIcon = st.icon;
+                                    const isOverdue = task.is_overdue || false;
+
+                                    return (
+                                        <div key={task.id || i} className="group relative bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 hover:border-white/20 p-4 rounded-xl shadow-lg transition-all duration-300">
+                                            {/* Header */}
+                                            <div className="flex items-start justify-between gap-4 mb-2">
+                                                <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                    <div className={`mt-1 flex-shrink-0 ${st.color.split(' ')[0]}`}>
+                                                        <StatusIcon size={18} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                                                {task.client_name || 'Projeto'}
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${st.color}`}>
+                                                                {st.label}
+                                                            </span>
+                                                            {isOverdue && (
+                                                                <span className="px-2 py-0.5 justify-center flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 text-[10px] font-medium text-red-400">
+                                                                    <AlertCircle size={10} /> Atrasada
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="text-sm font-semibold text-slate-100 line-clamp-2">
+                                                            {task.title}
+                                                        </h4>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="pl-7 pr-2">
+                                                {/* Description Preview */}
+                                                {task.description && (
+                                                    <p className="text-xs text-slate-400 line-clamp-2 mb-3">
+                                                        {task.description.replace(/[-*]\s/g, '')}
+                                                    </p>
+                                                )}
+
+                                                {/* Meta Info */}
+                                                <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
+                                                    {task.due_date && (
+                                                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-400' : ''}`}>
+                                                            <Calendar size={13} />
+                                                            <span>{format(parseISO(task.due_date), 'dd MMM yyyy', { locale: ptBR })}</span>
+                                                        </div>
+                                                    )}
+                                                    {task.assignee && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <User size={13} />
+                                                            <span>{task.assignee}</span>
+                                                        </div>
+                                                    )}
+                                                    {task.priority && (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`w-1.5 h-1.5 rounded-full bg-current ${getPriorityColor(task.priority)}`} />
+                                                            <span className="capitalize">{
+                                                                task.priority === 'high' ? 'Alta' :
+                                                                    task.priority === 'medium' ? 'Média' : 'Baixa'
+                                                            }</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    }
+
+                    if (data.type === 'report') {
+                        const isPositive = data.trend && data.trend.startsWith('+');
+                        return (
+                            <div key={index} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 p-6 rounded-2xl shadow-lg my-4 flex flex-col group hover:border-white/20 transition-all duration-300">
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">{data.title || 'Métrica'}</span>
+                                    {data.icon === 'trending-up' ? (
+                                        <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 border border-emerald-500/20"><TrendingUp size={16} /></div>
+                                    ) : data.icon === 'trending-down' ? (
+                                        <div className="p-2 bg-red-500/10 rounded-lg text-red-400 border border-red-500/20"><TrendingDown size={16} /></div>
+                                    ) : (
+                                        <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 border border-indigo-500/20"><CheckCircle2 size={16} /></div>
+                                    )}
+                                </div>
+                                <h3 className="text-3xl font-light text-white tracking-tight">{data.value || 'N/A'}</h3>
+                                {data.trend && (
+                                    <div className="mt-4 flex items-center gap-2">
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isPositive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                            {data.trend}
+                                        </span>
+                                        {data.subtitle && <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">{data.subtitle}</span>}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+
+                    if (data.type === 'chart') {
+                        const chartData = Array.isArray(data.data) ? data.data : [];
+                        const chartType = data.chartType || 'bar'; // 'bar', 'line', 'pie'
+                        const xAxisKey = data.xAxis || 'name';
+                        const series = Array.isArray(data.series) ? data.series : [{ key: 'value', color: '#6366f1' }];
+                        const COLORS = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6'];
+
+                        return (
+                            <div key={index} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 p-5 rounded-2xl shadow-lg my-4 group hover:border-white/20 transition-all duration-300">
+                                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-6">{data.title || 'Gráfico'}</h4>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        {chartType === 'line' ? (
+                                            <LineChart data={chartData}>
+                                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+                                                <XAxis dataKey={xAxisKey} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => data.isCurrency ? `R$${val}` : val} />
+                                                <RechartsTooltip
+                                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '12px' }}
+                                                    itemStyle={{ color: '#e2e8f0' }}
+                                                />
+                                                {series.map((s: any, idx: number) => (
+                                                    <Line key={s.key} type="monotone" dataKey={s.key} name={s.name || s.key} stroke={s.color || COLORS[idx % COLORS.length]} strokeWidth={2} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                                                ))}
+                                            </LineChart>
+                                        ) : chartType === 'pie' ? (
+                                            <PieChart>
+                                                <Pie data={chartData} dataKey={series[0]?.key || "value"} nameKey={xAxisKey} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2}>
+                                                    {chartData.map((entry: any, idx: number) => (
+                                                        <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <RechartsTooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '12px' }} />
+                                            </PieChart>
+                                        ) : (
+                                            <BarChart data={chartData}>
+                                                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} vertical={false} />
+                                                <XAxis dataKey={xAxisKey} stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => data.isCurrency ? `R$${val}` : val} />
+                                                <RechartsTooltip
+                                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.5rem', color: '#f1f5f9', fontSize: '12px' }}
+                                                    cursor={{ fill: '#334155', opacity: 0.4 }}
+                                                />
+                                                {series.map((s: any, idx: number) => (
+                                                    <Bar key={s.key} dataKey={s.key} name={s.name || s.key} fill={s.color || COLORS[idx % COLORS.length]} radius={[4, 4, 0, 0]} />
+                                                ))}
+                                            </BarChart>
+                                        )}
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    if (data.type === 'image_grid') {
+                        const items = Array.isArray(data.items) ? data.items : [];
+                        return (
+                            <div key={index} className="my-4">
+                                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-3">{data.title || 'Arquivos Visuais'}</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {items.map((img: any, i: number) => (
+                                        <div key={i} className="group relative rounded-xl overflow-hidden bg-slate-800 border border-slate-700 aspect-video">
+                                            {img.url ? (
+                                                <img src={img.url} alt={img.caption || 'Imagem'} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-600"><ImageIcon size={24} /></div>
+                                            )}
+                                            {img.caption && (
+                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-6 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                                    <p className="text-xs text-white font-medium line-clamp-2">{img.caption}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         );
                     }

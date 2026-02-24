@@ -10,6 +10,7 @@ import {
     createChatSession, getChatSessions, getChatMessages, addChatMessage,
     addToBrain, askBrain, ChatSession, ChatMessage
 } from '../lib/brain';
+import { GenUIParser } from '../components/chat/GenUIParser';
 
 export default function BrainManager() {
     const { userRole, avatarUrl } = useUserRole();
@@ -362,7 +363,11 @@ export default function BrainManager() {
                                             ? 'bg-indigo-600 text-white rounded-br-none shadow-sm'
                                             : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-bl-none shadow-sm'
                                             }`}>
-                                            {msg.content}
+                                            {msg.role === 'user' ? (
+                                                msg.content
+                                            ) : (
+                                                <GenUIParser content={msg.content} />
+                                            )}
                                         </div>
                                         <div className="text-[10px] text-slate-400 dark:text-slate-600 px-1 opacity-0 hover:opacity-100 transition-opacity">
                                             {new Date(msg.created_at).toLocaleTimeString()}
