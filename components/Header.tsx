@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useUserRole } from '../lib/UserRoleContext';
 import { useTheme } from '../lib/ThemeContext';
+import DigitalClock from './DigitalClock';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -29,8 +30,14 @@ const Header: React.FC = () => {
   return (
     <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 transition-all duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/dashboard')}>
-          <img src="/logo.png" alt="C4 Marketing" className="h-8 dark:brightness-0 dark:invert" />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/dashboard')}>
+            <img src="/logo.png" alt="C4 Marketing" className="h-8 dark:brightness-0 dark:invert" />
+          </div>
+
+          <div className="hidden lg:block">
+            <DigitalClock />
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <button
