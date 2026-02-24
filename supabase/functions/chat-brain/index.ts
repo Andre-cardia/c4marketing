@@ -1392,7 +1392,7 @@ Retorne apenas function calls (sem texto livre).`
             // Em uma V2 o banco teria uma view, mas aqui fazemos JS group by na Edge
             if (rpc_name === 'query_task_distribution_chart') {
                 const groupBy = payload.p_group_by || 'status';
-                const { data: allTasks, error: errT } = await supabaseAdmin.rpc('query_all_tasks', { p_user_role: userRole });
+                const { data: allTasks, error: errT } = await supabaseAdmin.rpc('query_all_tasks', {});
 
                 if (errT || !allTasks) {
                     return { section: `FALHA: Não foi possível gerar gráfico.`, rawData: [] }
@@ -1400,9 +1400,11 @@ Retorne apenas function calls (sem texto livre).`
 
                 // Agrupando
                 const counts: Record<string, number> = {};
-                for (const t of allTasks) {
-                    const key = t[groupBy] || 'Não Definido';
-                    counts[key] = (counts[key] || 0) + 1;
+                if (Array.isArray(allTasks)) {
+                    for (const t of allTasks) {
+                        const key = t[groupBy] || 'Não Definido';
+                        counts[key] = (counts[key] || 0) + 1;
+                    }
                 }
 
                 const chartData = Object.keys(counts).map(k => ({ name: k.replace(/_/g, ' ').toUpperCase(), total: counts[k] }));
@@ -1411,7 +1413,7 @@ Retorne apenas function calls (sem texto livre).`
                 const chartBlock = {
                     type: 'chart',
                     chartType: 'bar',
-                    title: `Distribuição de Tarefas por ${groupBy.toUpperCase()}`,
+                    title: `Distribuição de Tarefas por ${groupBy.toUpperCase()} (debug_backend_size: ${Array.isArray(allTasks) ? allTasks.length : JSON.stringify(allTasks)})`,
                     xAxis: 'name',
                     series: [{ key: 'total', name: 'Tarefas', color: '#6366f1' }],
                     data: chartData,
@@ -1913,12 +1915,10 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             else if (rpcNameForGenUI === 'query_financial_summary') {
                 try {
                     const financeRecord = rawDbRecordsForGenUI[0];
-                    // Se for MRR (exemplo simplificado), monta um array com vários cards.
-                    // O GenUIParser lida com um report por vez, então podemos passar múltiplos blocos ou criar um type: 'dashboard_grid' no futuro.
-                    // Por enquanto vamos cuspir 1 cartão principal e 1 gráfico
 
-                    const mrrValue = financeRecord.mrr || financeRecord.receita_recorrente || 0;
-                    const arrValue = mrrValue * 12;
+                    // O retorno de query_financial_summary é um JSON nested, onde as métricas estão em financeRecord.totals
+                    const mrrValue = financeRecord?.totals?.mrr || financeRecord?.mrr || financeRecord?.receita_recorrente || 0;
+                    const arrValue = financeRecord?.totals?.arr || financeRecord?.arr || mrrValue * 12;
 
                     genUiPayload = null; // desabilita payload padrão
 
