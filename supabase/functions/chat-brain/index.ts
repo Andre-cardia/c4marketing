@@ -1708,7 +1708,13 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se a consulta financeira indicar contratos ativos sem mensalidade cadastrada, destaque essa limitação e informe que o MRR/ARR pode estar subestimado.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
-        `.trim()
+
+FORMATO DE RESPOSTA VISUAL (GenUI):
+Sempre que você for listar itens como: Tarefas (tasks), Projetos (projects), Propostas, Pessoas ou Métricas, OBRIGATORIAMENTE gere a resposta principal utilizando um bloco de código Markdown JSON, seguindo este formato de Lista:
+\`\`\`json
+{ "type": "task_list", "items": [{"title": "Nome do que está sendo listado", "subtitle": "Descrição ou dados adicionais", "status": "Status atual"}] }
+\`\`\`
+`.trim()
 
         // Montar bloco de identidade
         const identityBlock = userProfile
