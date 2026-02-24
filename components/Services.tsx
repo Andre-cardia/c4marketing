@@ -87,9 +87,9 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
                 ))}
               </div>
 
-              {trafficData && (typeof trafficData !== 'string' && trafficData.details) && (
+              {trafficData && (typeof trafficData !== 'string' && (trafficData as any).details) && (
                 <div className="mt-6 p-5 bg-blue-50/50 rounded-2xl border border-blue-100/50 text-sm text-blue-900 italic">
-                  <strong className="text-blue-600 block mb-1">Detalhamento Adicional da Gestão:</strong> {trafficData.details}
+                  <strong className="text-blue-600 block mb-1">Detalhamento Adicional da Gestão:</strong> {(trafficData as any).details}
                 </div>
               )}
             </div>

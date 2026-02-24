@@ -990,7 +990,7 @@ const Dashboard: React.FC = () => {
                                         {(() => {
                                             // Calculate Stats
                                             const currentMonth = new Date().toISOString().slice(0, 7);
-                                            const stats = Array.from(usersMap.values()).map(user => {
+                                            const stats = (Array.from(usersMap.values()) as any[]).map(user => {
                                                 const userLogs = accessLogs.filter(l => {
                                                     const isSameMonth = l.accessed_at.startsWith(currentMonth);
                                                     const matchesId = l.user_id === user.id;
