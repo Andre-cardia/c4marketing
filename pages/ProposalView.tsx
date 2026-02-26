@@ -125,24 +125,18 @@ const ProposalView: React.FC = () => {
                 generated_at: new Date().toISOString()
             };
 
-            const { data: acceptanceData, error } = await supabase
-                .from('acceptances')
-                .insert([
-                    {
-                        name: formData.name,
-                        email: formData.email,
-                        cpf: formData.cpf,
-                        company_name: formData.companyName,
-                        cnpj: formData.cnpj,
-                        proposal_id: proposal.id,
-                        contract_snapshot: contractSnapshot,
-                        status: 'Ativo' // Mudança de regra: inicia ativo
-                    }
-                ])
-                .select()
-                .single();
+            const { data: acceptanceId, error } = await supabase.rpc('submit_proposal_acceptance', {
+                p_name: formData.name,
+                p_email: formData.email,
+                p_cpf: formData.cpf,
+                p_cnpj: formData.cnpj,
+                p_company_name: formData.companyName,
+                p_proposal_id: proposal.id,
+                p_contract_snapshot: contractSnapshot,
+            });
 
             if (error) throw error;
+            const acceptanceData = { id: acceptanceId as number };
 
             // 3. Create Traffic Project immediately (Frontend attempt)
             // This ensures the dashboard works instantly without waiting for Edge Function
