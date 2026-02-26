@@ -11,8 +11,10 @@ const Footer: React.FC<FooterProps> = ({ isAccepted }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-12 mb-12">
           <div className="max-w-xs">
-            <div className="flex items-center mb-6">
-              <img src="/logo.png" alt="C4 Marketing" className="h-12" />
+            <div className="flex items-center gap-6 mb-6">
+              <img src="/logo.png" alt="C4 Marketing" className="h-10" />
+              <div className="w-px h-8 bg-slate-200"></div>
+              <img src="/C4 Lab Verdr.png" alt="C4 Lab" className="h-14" />
             </div>
             <p className="text-slate-500 text-sm">
               Expertise em performance e aceleração de negócios através de mídia paga e tecnologia.

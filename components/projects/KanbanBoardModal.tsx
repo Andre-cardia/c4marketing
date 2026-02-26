@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Plus, Calendar, MoreHorizontal, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase } from 'lucide-react';
+import { X, Plus, Calendar, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
 import TaskModal from './TaskModal';
@@ -30,12 +30,53 @@ interface KanbanBoardModalProps {
 }
 
 const COLUMNS = [
-    { id: 'backlog', title: 'Backlog', icon: AlertCircle, color: 'text-slate-500', bg: 'bg-slate-100 dark:bg-slate-800', border: 'border-slate-300' },
-    { id: 'in_progress', title: 'Em Execução', icon: PlayCircle, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-300' },
-    { id: 'approval', title: 'Aprovação', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-300' },
-    { id: 'done', title: 'Finalizado', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-300' },
-    { id: 'paused', title: 'Pausado', icon: PauseCircle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-300' },
+    {
+        id: 'backlog',
+        title: 'Backlog',
+        icon: AlertCircle,
+        iconColor: 'text-neutral-400',
+        borderColor: '#6b7280',
+        badgeBg: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400',
+    },
+    {
+        id: 'in_progress',
+        title: 'Em Execução',
+        icon: PlayCircle,
+        iconColor: 'text-blue-500',
+        borderColor: '#3b82f6',
+        badgeBg: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    },
+    {
+        id: 'approval',
+        title: 'Aprovação',
+        icon: Clock,
+        iconColor: 'text-violet-500',
+        borderColor: '#8b5cf6',
+        badgeBg: 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400',
+    },
+    {
+        id: 'done',
+        title: 'Finalizado',
+        icon: CheckCircle,
+        iconColor: 'text-emerald-500',
+        borderColor: '#10b981',
+        badgeBg: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
+    },
+    {
+        id: 'paused',
+        title: 'Pausado',
+        icon: PauseCircle,
+        iconColor: 'text-amber-500',
+        borderColor: '#f59e0b',
+        badgeBg: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+    },
 ];
+
+const PRIORITY_DOT: Record<string, string> = {
+    high: 'bg-red-500',
+    medium: 'bg-amber-400',
+    low: 'bg-emerald-400',
+};
 
 const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, project }) => {
     const { fullName } = useUserRole();
@@ -44,10 +85,9 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
     const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
     const [showBookingModal, setShowBookingModal] = useState(false);
 
-    // Placeholder for the shared team calendar link.
-    // Replace 'c4-marketing' with your actual organization/username to enable bookings.
     const SHARED_CAL_LINK = 'grupo-c4/reuniao-grupo-c4';
 
     useEffect(() => {
@@ -59,7 +99,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const fetchTasks = async () => {
         if (!project) return;
         setLoading(true);
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('project_tasks')
             .select('*')
             .eq('project_id', project.id)
@@ -79,20 +119,25 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
         setShowTaskModal(true);
     };
 
-    // Drag and Drop Handlers
+    // Drag and Drop
     const handleDragStart = (e: React.DragEvent, taskId: string) => {
         setDraggedTaskId(taskId);
         e.dataTransfer.effectAllowed = 'move';
-        // Transparent ghost image if needed, or default browser behavior
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Necessary to allow dropping
+    const handleDragOver = (e: React.DragEvent, colId: string) => {
+        e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        setDragOverColumn(colId);
+    };
+
+    const handleDragLeave = () => {
+        setDragOverColumn(null);
     };
 
     const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
         e.preventDefault();
+        setDragOverColumn(null);
 
         if (!draggedTaskId) return;
 
@@ -102,14 +147,12 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
             return;
         }
 
-        // Optimistic UI Update
         const updatedTasks = tasks.map(t =>
             t.id === draggedTaskId ? { ...t, status: targetStatus as any } : t
         );
         setTasks(updatedTasks);
         setDraggedTaskId(null);
 
-        // Update in Supabase
         const { error } = await supabase
             .from('project_tasks')
             .update({ status: targetStatus })
@@ -117,18 +160,16 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
 
         if (error) {
             console.error('Error moving task:', error);
-            alert('Erro ao mover tarefa.');
-            fetchTasks(); // Revert on error
+            fetchTasks();
         } else {
-            // Log History
             await supabase.from('task_history').insert({
                 task_id: draggedTaskId,
-                project_id: project.id,
+                project_id: project!.id,
                 action: 'status_change',
                 old_status: taskToMove.status,
                 new_status: targetStatus,
                 changed_by: fullName || 'Sistema',
-                details: { title: taskToMove.title }
+                details: { title: taskToMove.title },
             });
         }
     };
@@ -136,113 +177,153 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     if (!isOpen || !project) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-slate-50 dark:bg-slate-950 w-full h-full max-w-[95vw] max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="bg-neutral-50 dark:bg-neutral-950 w-full h-full max-w-[96vw] max-h-[92vh] rounded-c4 overflow-hidden flex flex-col shadow-2xl border border-neutral-200 dark:border-neutral-800">
 
                 {/* Header */}
-                <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                            {project.company_name}
-                        </h2>
+                <div className="bg-white dark:bg-neutral-900 px-6 py-4 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-8 rounded-full bg-brand-coral" />
+                        <div>
+                            <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white leading-tight">
+                                {project.company_name}
+                            </h2>
+                            <p className="text-xs text-neutral-400 font-medium">Quadro de Tarefas</p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-4">
+
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={handleCreateTask}
-                            className="flex items-center gap-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral px-3 py-1.5 rounded-lg border border-brand-coral/20"
+                            className="flex items-center gap-1.5 text-xs font-bold text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border border-brand-coral/20 hover:border-brand-coral px-3 py-1.5 rounded-c4 transition-all duration-150"
                         >
-                            <Plus size={14} /> Nova Tarefa
+                            <Plus size={14} />
+                            Nova Tarefa
                         </button>
                         <button
                             onClick={() => setShowBookingModal(true)}
-                            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-white transition-colors bg-slate-500/10 hover:bg-slate-500 px-3 py-1.5 rounded-lg border border-slate-500/20 dark:text-slate-400 dark:hover:text-white dark:bg-slate-700/30 dark:hover:bg-slate-600 dark:border-slate-600/30"
+                            className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 dark:text-neutral-400 hover:text-white bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-500 dark:hover:bg-neutral-600 border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 rounded-c4 transition-all duration-150"
                         >
-                            <Calendar size={14} /> <span className="hidden sm:inline">Agendar</span>
+                            <Calendar size={14} />
+                            <span className="hidden sm:inline">Agendar</span>
                         </button>
                         <button
                             onClick={onClose}
-                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 transition-colors"
+                            className="p-2 rounded-c4 text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
                         >
-                            <X size={28} />
+                            <X size={20} />
                         </button>
                     </div>
                 </div>
 
                 {/* Board */}
-                <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
-                    <div className="flex gap-6 h-full min-w-max">
-                        {COLUMNS.map(col => {
-                            const colTasks = tasks.filter(t => t.status === col.id);
-                            return (
-                                <div
-                                    key={col.id}
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, col.id)}
-                                    className={`w-80 flex flex-col h-full rounded-2xl bg-white dark:bg-slate-900 border-t-4 transition-colors ${colTasks.length === 0 && 'opacity-80'}`}
-                                    style={{ borderColor: col.id === 'done' ? '#10b981' : col.id === 'backlog' ? '#cbd5e1' : col.id === 'in_progress' ? '#3b82f6' : col.id === 'approval' ? '#a855f7' : '#f59e0b' }}
-                                >
+                <div className="flex-1 overflow-x-auto overflow-y-hidden p-5">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-full text-neutral-400 text-sm">
+                            Carregando tarefas...
+                        </div>
+                    ) : (
+                        <div className="flex gap-4 h-full min-w-max">
+                            {COLUMNS.map(col => {
+                                const colTasks = tasks.filter(t => t.status === col.id);
+                                const isOver = dragOverColumn === col.id;
 
-                                    {/* Column Header */}
-                                    <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                        <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200">
-                                            <col.icon size={18} className={col.color} />
-                                            {col.title}
-                                            <span className="ml-2 px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 rounded-full text-xs">
+                                return (
+                                    <div
+                                        key={col.id}
+                                        onDragOver={(e) => handleDragOver(e, col.id)}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, col.id)}
+                                        className={`w-72 flex flex-col h-full rounded-c4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${isOver ? 'ring-2 ring-brand-coral/50 scale-[1.01]' : ''}`}
+                                        style={{ borderTop: `3px solid ${col.borderColor}` }}
+                                    >
+                                        {/* Column Header */}
+                                        <div className="px-4 py-3 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between flex-shrink-0">
+                                            <div className="flex items-center gap-2">
+                                                <col.icon size={16} className={col.iconColor} />
+                                                <span className="text-sm font-bold text-neutral-700 dark:text-neutral-200">
+                                                    {col.title}
+                                                </span>
+                                            </div>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${col.badgeBg}`}>
                                                 {colTasks.length}
                                             </span>
                                         </div>
-                                    </div>
 
-                                    {/* Tasks List */}
-                                    <div className={`p-4 flex-1 overflow-y-auto space-y-3 ${col.bg}`}>
-                                        {colTasks.map(task => (
-                                            <div
-                                                key={task.id}
-                                                draggable
-                                                onDragStart={(e) => handleDragStart(e, task.id)}
-                                                onClick={() => handleEditTask(task)}
-                                                className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-coral transition-all group relative animate-in fade-in zoom-in duration-200"
-                                            >
-                                                {task.priority === 'high' && (
-                                                    <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" title="Prioridade Alta"></div>
-                                                )}
+                                        {/* Tasks List */}
+                                        <div className="flex-1 overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
+                                            {colTasks.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center h-24 text-neutral-300 dark:text-neutral-700 text-xs text-center gap-1">
+                                                    <col.icon size={20} className="opacity-30" />
+                                                    <span>Nenhuma tarefa</span>
+                                                </div>
+                                            ) : (
+                                                colTasks.map(task => (
+                                                    <div
+                                                        key={task.id}
+                                                        draggable
+                                                        onDragStart={(e) => handleDragStart(e, task.id)}
+                                                        onClick={() => handleEditTask(task)}
+                                                        className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-brand-coral dark:hover:border-brand-coral p-3.5 rounded-c4 cursor-grab active:cursor-grabbing hover:shadow-md hover:shadow-brand-coral/5 transition-all group relative"
+                                                    >
+                                                        {/* Priority dot */}
+                                                        {task.priority && (
+                                                            <span
+                                                                className={`absolute top-3 right-3 w-2 h-2 rounded-full ${PRIORITY_DOT[task.priority] || 'bg-neutral-300'}`}
+                                                                title={`Prioridade: ${task.priority}`}
+                                                            />
+                                                        )}
 
-                                                <h4 className="font-bold text-slate-800 dark:text-white mb-2 pr-4">{task.title}</h4>
+                                                        <h4 className="text-sm font-bold text-neutral-800 dark:text-white mb-1 pr-4 leading-snug">
+                                                            {task.title}
+                                                        </h4>
 
-                                                {task.description && (
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
-                                                        {task.description}
-                                                    </p>
-                                                )}
+                                                        {task.description && (
+                                                            <p className="text-xs text-neutral-400 dark:text-neutral-500 line-clamp-2 mb-3 leading-relaxed">
+                                                                {task.description}
+                                                            </p>
+                                                        )}
 
-                                                <div className="flex flex-col gap-2 w-full mt-3 pt-3 border-t border-slate-100 dark:border-slate-600">
-                                                    <div className="flex items-center gap-1.5 font-semibold text-slate-500 dark:text-slate-400 text-xs text-brand-coral">
-                                                        <Briefcase size={12} />
-                                                        {project.company_name}
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs text-slate-400 w-full">
-                                                        <div className="flex items-center gap-3">
-                                                            {task.assignee && (
-                                                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">
-                                                                    <User size={10} /> {task.assignee}
-                                                                </div>
-                                                            )}
-                                                            {task.due_date && (
-                                                                <div className="flex items-center gap-1 text-slate-500 dark:text-slate-300">
-                                                                    <Calendar size={10} />
-                                                                    {new Date(task.due_date).toLocaleDateString()}
-                                                                </div>
-                                                            )}
+                                                        <div className="flex flex-col gap-1.5 mt-2 pt-2.5 border-t border-neutral-200 dark:border-neutral-700">
+                                                            <div className="flex items-center gap-1.5 text-brand-coral text-xs font-semibold">
+                                                                <Briefcase size={11} />
+                                                                <span className="truncate">{project.company_name}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-xs text-neutral-400">
+                                                                {task.assignee && (
+                                                                    <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-700 px-1.5 py-0.5 rounded-full">
+                                                                        <User size={9} />
+                                                                        <span>{task.assignee}</span>
+                                                                    </div>
+                                                                )}
+                                                                {task.due_date && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Calendar size={10} />
+                                                                        <span>{new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {/* Add task shortcut */}
+                                        <div className="p-2 border-t border-neutral-100 dark:border-neutral-800 flex-shrink-0">
+                                            <button
+                                                onClick={handleCreateTask}
+                                                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-neutral-400 hover:text-brand-coral hover:bg-brand-coral/5 rounded-lg transition-all"
+                                            >
+                                                <Plus size={13} />
+                                                Adicionar tarefa
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 {/* Modals */}

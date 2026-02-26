@@ -49,11 +49,27 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.email) {
-                setEmail(session.user.email);
+                let activeSession = session;
+                const firstUserCheck = await supabase.auth.getUser();
+                if (firstUserCheck.error || !firstUserCheck.data?.user) {
+                    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+                    if (refreshError || !refreshed.session) {
+                        clearUserData();
+                        return;
+                    }
+                    activeSession = refreshed.session;
+                    const secondUserCheck = await supabase.auth.getUser();
+                    if (secondUserCheck.error || !secondUserCheck.data?.user) {
+                        clearUserData();
+                        return;
+                    }
+                }
+
+                setEmail(activeSession.user.email ?? null);
                 const { data } = await supabase
                     .from('app_users')
                     .select('role, full_name, avatar_url, cal_com_link')
-                    .eq('email', session.user.email)
+                    .eq('email', activeSession.user.email)
                     .single();
 
                 if (data) {
@@ -63,7 +79,9 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                     setCalComLink(data.cal_com_link);
 
                     // Log access
-                    logAccess(session.user.id, session.user.email);
+                    if (activeSession.user.email) {
+                        logAccess(activeSession.user.id, activeSession.user.email);
+                    }
                 } else {
                     setUserRole(null);
                 }

@@ -319,9 +319,14 @@ const ContractView: React.FC = () => {
                                 {proposal.setup_fee > 0 && (
                                     <div className="mb-0 text-sm">
                                         <p><strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.</p>
-                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'website') && (
+                                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'website') && (
                                             <p className="mt-1 text-xs text-slate-500 italic">
                                                 * Para o serviço de Web Site Institucional, o pagamento será realizado em duas parcelas: 50% no ato do aceite e os 50% restantes na entrega do projeto.
+                                            </p>
+                                        )}
+                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'ai_agents') && (
+                                            <p className="mt-1 text-xs text-slate-500 italic">
+                                                * Para o serviço de Agentes de IA, o Setup/Implementação é cobrado no ato do aceite (pagamento único). A mensalidade inclui infraestrutura (VPS, API OpenAI – até 2 milhões de tokens/mês – e API WhatsApp). Caso o volume de tokens ultrapasse o limite mensal incluso, o valor poderá ser reajustado proporcionalmente, com comunicação prévia.
                                             </p>
                                         )}
                                     </div>
@@ -341,7 +346,7 @@ const ContractView: React.FC = () => {
                         5.1. O presente contrato tem prazo de <strong>{proposal.contract_duration} meses</strong>, iniciando-se na data de aceite deste instrumento.
                     </p>
                     <p className="mb-2 text-sm">
-                        5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
+                        5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem e Agentes de IA), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
                     </p>
                     {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'traffic_management') && (
                         <p className="mb-2 text-sm">

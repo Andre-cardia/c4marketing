@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Header from '../components/Header';
 import {
     MessageSquare, Plus, FileText, Upload, Send, Bot, User,
     MoreHorizontal, Trash2, Search, Paperclip, Loader2, X, RefreshCw, Database
@@ -8,7 +7,8 @@ import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import {
     createChatSession, getChatSessions, getChatMessages, addChatMessage,
-    addToBrain, askBrain, ChatSession, ChatMessage
+    addToBrain, askBrain, ChatSession, ChatMessage, isTrafficSession, deleteChatSession,
+    updateChatSessionTitle
 } from '../lib/brain';
 import { GenUIParser } from '../components/chat/GenUIParser';
 
@@ -20,8 +20,11 @@ export default function BrainManager() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSessionsLoading, setIsSessionsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     // Initial Load
     useEffect(() => {
@@ -40,17 +43,21 @@ export default function BrainManager() {
     // Auto-scroll to bottom of chat
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, isLoading]);
 
     const loadSessions = async () => {
+        setIsSessionsLoading(true);
         try {
             const data = await getChatSessions();
-            setSessions(data);
-            if (data.length > 0 && !currentSessionId) {
-                setCurrentSessionId(data[0].id);
+            const brainSessions = data.filter(s => !isTrafficSession(s));
+            setSessions(brainSessions);
+            if (brainSessions.length > 0 && !currentSessionId) {
+                setCurrentSessionId(brainSessions[0].id);
             }
         } catch (error) {
             console.error('Failed to load sessions:', error);
+        } finally {
+            setIsSessionsLoading(false);
         }
     };
 
@@ -68,11 +75,34 @@ export default function BrainManager() {
 
     const handleNewChat = async () => {
         try {
-            const newSession = await createChatSession('Nova Conversa');
+            const newSession = await createChatSession('Conversa: ' + new Date().toLocaleDateString('pt-BR'));
             setSessions([newSession, ...sessions]);
             setCurrentSessionId(newSession.id);
+            setMessages([]);
         } catch (error) {
             console.error('Failed to create session:', error);
+        }
+    };
+
+    const handleDeleteSession = async (sessionId: string) => {
+        if (confirmDeleteId !== sessionId) {
+            setConfirmDeleteId(sessionId);
+            setTimeout(() => setConfirmDeleteId((prev) => (prev === sessionId ? null : prev)), 3000);
+            return;
+        }
+        setConfirmDeleteId(null);
+        setDeletingSessionId(sessionId);
+        try {
+            await deleteChatSession(sessionId);
+            const remaining = sessions.filter((s) => s.id !== sessionId);
+            setSessions(remaining);
+            if (currentSessionId === sessionId) {
+                setCurrentSessionId(remaining[0]?.id ?? null);
+            }
+        } catch (err) {
+            console.error('Erro ao excluir sessão:', err);
+        } finally {
+            setDeletingSessionId(null);
         }
     };
 
@@ -81,13 +111,13 @@ export default function BrainManager() {
         if (!input.trim() || isLoading) return;
 
         let sessionId = currentSessionId;
-        const userMsgContent = input;
+        const userMsgContent = input.trim();
+        setInput('');
 
-        // Se não houver sessão ativa, cria uma nova
         if (!sessionId) {
             setIsLoading(true);
             try {
-                const newSession = await createChatSession('Nova Conversa');
+                const newSession = await createChatSession('Conversa Estratégica');
                 setSessions([newSession, ...sessions]);
                 setCurrentSessionId(newSession.id);
                 sessionId = newSession.id;
@@ -98,9 +128,6 @@ export default function BrainManager() {
             }
         }
 
-        setInput('');
-
-        // Optimistic update
         const tempUserMsg: ChatMessage = {
             id: 'temp-' + Date.now(),
             session_id: sessionId,
@@ -112,92 +139,42 @@ export default function BrainManager() {
         setIsLoading(true);
 
         try {
-            // 1. Persistência local de histórico (não bloqueia resposta da IA)
-            try {
-                await addChatMessage(sessionId, 'user', userMsgContent);
-            } catch (persistUserError) {
-                console.error('Falha ao salvar mensagem do usuário no histórico:', persistUserError);
+            // 1. Persist user message
+            await addChatMessage(sessionId, 'user', userMsgContent);
+
+            // 2. Get AI response (Returns { answer, documents })
+            const response = await askBrain(userMsgContent, sessionId);
+
+            // 2.1. Renomear sessão com sugestão do LLM (primeira mensagem)
+            const suggestedTitle = (response.meta?.suggested_session_title || '').trim();
+            if (suggestedTitle) {
+                // Persist to DB first (client-side fallback in case backend update failed)
+                updateChatSessionTitle(sessionId!, suggestedTitle).catch(err =>
+                    console.warn('[BrainManager] Failed to persist session title:', err)
+                );
+                setSessions(prev =>
+                    prev.map(s => (s.id === sessionId ? { ...s, title: suggestedTitle } : s))
+                );
             }
 
-            // 2. Save User Message to Brain (Memory)
-            addToBrain(userMsgContent, {
-                type: 'chat_log',
-                role: 'user',
-                timestamp: new Date().toISOString(),
-                status: 'active',
-                session_id: sessionId
-            }).catch(console.error);
+            // 3. Persist AI message (Access .answer)
+            await addChatMessage(sessionId, 'assistant', response.answer);
 
-            // 3. Ask Brain (RAG) — com fallback automático sem session_id se a primeira tentativa falhar
-            let response;
-            try {
-                response = await askBrain(userMsgContent, sessionId);
-            } catch (primaryAskError: any) {
-                console.error('Falha ao chamar chat-brain com session_id, tentando fallback sem session_id:', primaryAskError);
-                response = await askBrain(userMsgContent);
-            }
-            const aiMsgContent = response.answer;
-
-            // 4. Save AI Message to DB (não bloqueia)
-            let assistantPersisted = false;
-            try {
-                await addChatMessage(sessionId, 'assistant', aiMsgContent);
-                assistantPersisted = true;
-            } catch (persistAssistantError) {
-                console.error('Falha ao salvar resposta da IA no histórico:', persistAssistantError);
-            }
-
-            // 5. Save AI Message to Brain (Memory)
-            addToBrain(aiMsgContent, {
-                type: 'chat_log',
-                role: 'assistant',
-                timestamp: new Date().toISOString(),
-                status: 'active',
-                session_id: sessionId,
-                related_query: userMsgContent
-            }).catch(console.error);
-
-            // Refresh messages to get real IDs; fallback otimista se persistência falhar
-            if (assistantPersisted) {
-                loadMessages(sessionId);
-            } else {
-                const fallbackAiMsg: ChatMessage = {
-                    id: 'temp-ai-' + Date.now(),
-                    session_id: sessionId,
-                    role: 'assistant',
-                    content: aiMsgContent,
-                    created_at: new Date().toISOString()
-                };
-                setMessages(prev => [...prev, fallbackAiMsg]);
-            }
-
+            // 4. Reload messages to get final IDs and order
+            await loadMessages(sessionId);
         } catch (error: any) {
-            console.error('Failed to send message:', error);
-            let debugMessage = '';
-            if (error && typeof error === 'object' && 'context' in error) {
-                try {
-                    const body = await error.context.json();
-                    debugMessage = body?.error ? ` Detalhes: ${body.error}` : '';
-                } catch {
-                    debugMessage = '';
-                }
-            } else if (error?.message) {
-                debugMessage = ` Detalhes: ${error.message}`;
-            }
-            const errorMsg: ChatMessage = {
-                id: 'temp-error-' + Date.now(),
-                session_id: sessionId,
+            console.error('Chat error:', error);
+            setMessages(prev => [...prev, {
+                id: 'err-' + Date.now(),
+                session_id: sessionId!,
                 role: 'assistant',
-                content: `Não consegui responder agora por um erro de integração. Tente novamente em alguns segundos.${debugMessage}`,
+                content: `❌ Erro: ${error?.message || 'Erro ao processar mensagem.'}`,
                 created_at: new Date().toISOString()
-            };
-            setMessages(prev => [...prev, errorMsg]);
+            }]);
         } finally {
             setIsLoading(false);
         }
     };
-
-
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -205,41 +182,11 @@ export default function BrainManager() {
 
         setIsUploading(true);
         try {
-            // Simple text extraction for .txt and basic handling
-            // For PDF we would need a library like pdfjs-dist, but keeping it simple for now or assuming text
-            let content = '';
-
-            if (file.type === 'text/plain') {
-                content = await file.text();
-            } else if (file.type === 'application/pdf') {
-                // Placeholder: Real PDF extraction requires additional libraries not present
-                // We will inform the user or use a simple alert for now
-                alert('Upload de PDF requer processamento adicional. Por favor use arquivos de texto (.txt) por enquanto ou copie e cole o conteúdo.');
-                setIsUploading(false);
-                return;
-            } else {
-                alert('Formato não suportado. Apenas .txt por enquanto.');
-                setIsUploading(false);
-                return;
-            }
-
-            // Upload text to Brain
-            await addToBrain(content, {
-                type: 'document',
-                source: file.name,
-                timestamp: new Date().toISOString(),
-                uploaded_by_user: true
-            });
-
-            // Notify in chat
-            const notification = `Arquivo "${file.name}" foi processado e adicionado ao meu cérebro.`;
-            if (currentSessionId) {
-                await addChatMessage(currentSessionId, 'assistant', notification);
-                loadMessages(currentSessionId);
-            }
-
+            const text = await file.text();
+            await addToBrain(text, { fileName: file.name, type: 'upload' });
+            alert('Arquivo processado e adicionado ao cérebro com sucesso!');
         } catch (error) {
-            console.error('Upload failed:', error);
+            console.error('Upload error:', error);
             alert('Falha ao processar arquivo.');
         } finally {
             setIsUploading(false);
@@ -247,176 +194,207 @@ export default function BrainManager() {
         }
     };
 
-    if (userRole !== 'gestor') {
+    if (userRole !== 'gestor' && userRole !== 'admin') {
         return (
-            <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-white">
+            <div className="flex items-center justify-center min-h-[400px] text-neutral-500">
                 <p>Acesso restrito a gestores.</p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
-            <Header />
+        <div className="text-slate-900 dark:text-neutral-100 flex flex-col h-full">
+            <div className="mb-5">
+                <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Chat com o Cérebro</h1>
+                <p className="text-xs text-slate-500 dark:text-neutral-500 font-bold uppercase tracking-widest mt-1">
+                    Interface estratégica de consulta ao conhecimento corporativo.
+                </p>
+            </div>
 
-            <div className="flex flex-1 overflow-hidden">
-                {/* Sidebar */}
-                <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col hidden md:flex">
-                    <div className="p-4">
+            <div className="h-[calc(100vh-250px)] min-h-[600px] border border-slate-200 dark:border-neutral-800 rounded-c4 bg-white dark:bg-black/60 overflow-hidden flex shadow-lg dark:shadow-2xl">
+                {/* Sidebar Conversas */}
+                <aside className="hidden md:flex w-72 border-r border-slate-200 dark:border-neutral-800 flex-col bg-slate-50/50 dark:bg-neutral-950/70">
+                    <div className="p-4 border-b border-slate-200 dark:border-neutral-800 shadow-sm dark:shadow-none bg-white dark:bg-transparent">
                         <button
                             onClick={handleNewChat}
-                            className="w-full flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg transition-all shadow-lg shadow-indigo-500/20 font-medium text-sm"
+                            className="w-full flex items-center justify-center gap-2 bg-brand-coral hover:bg-brand-coral/90 text-white px-4 py-2.5 rounded-c4 transition-all shadow-lg shadow-brand-coral/20 font-black text-xs uppercase tracking-widest"
                         >
-                            <Plus className="w-4 h-4" />
-                            Nova Conversa
+                            <Plus size={16} /> Nova Conversa
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
-                        <p className="px-4 py-2 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Histórico</p>
-                        {sessions.map(session => (
-                            <button
-                                key={session.id}
-                                onClick={() => setCurrentSessionId(session.id)}
-                                className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center gap-3 transition-colors ${currentSessionId === session.id
-                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-200'
-                                    }`}
-                            >
-                                <MessageSquare className="w-4 h-4 shrink-0 opacity-70" />
-                                <span className="truncate">{session.title}</span>
-                            </button>
-                        ))}
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                        {isSessionsLoading ? (
+                            <div className="px-4 py-3 text-[10px] text-slate-400 dark:text-neutral-500 uppercase font-black tracking-widest animate-pulse">Sincronizando sessões...</div>
+                        ) : sessions.length === 0 ? (
+                            <div className="px-4 py-8 text-center opacity-30">
+                                <MessageSquare size={32} className="mx-auto mb-2 text-slate-300 dark:text-neutral-700" />
+                                <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-neutral-700">Sem conversas</p>
+                            </div>
+                        ) : (
+                            sessions.map(session => (
+                                <div
+                                    key={session.id}
+                                    className={`group w-full text-left px-4 py-3 rounded-c4 text-sm flex items-center gap-3 transition-all ${currentSessionId === session.id
+                                        ? 'bg-slate-200/50 dark:bg-neutral-800 text-brand-coral border border-slate-300/50 dark:border-neutral-700 font-bold'
+                                        : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/30 dark:hover:bg-neutral-900/50'
+                                        }`}
+                                >
+                                    <button
+                                        onClick={() => setCurrentSessionId(session.id)}
+                                        className="flex-1 min-w-0 flex items-center gap-3 text-left"
+                                    >
+                                        <MessageSquare size={14} className={`shrink-0 ${currentSessionId === session.id ? 'opacity-100' : 'opacity-40'}`} />
+                                        <span className="truncate">{session.title}</span>
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
+                                        disabled={deletingSessionId === session.id}
+                                        className={`shrink-0 p-1 rounded transition-colors disabled:opacity-40 ${confirmDeleteId === session.id
+                                            ? 'text-rose-500 bg-rose-500/15 hover:bg-rose-500/25'
+                                            : 'text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100'
+                                            }`}
+                                        title={confirmDeleteId === session.id ? 'Clique para confirmar exclusão' : 'Excluir conversa'}
+                                    >
+                                        {deletingSessionId === session.id
+                                            ? <Loader2 size={13} className="animate-spin" />
+                                            : <Trash2 size={13} />}
+                                    </button>
+                                </div>
+                            ))
+                        )}
                     </div>
 
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-3 px-2 py-2 text-slate-500 dark:text-slate-400 text-sm">
-                            <div className="w-8 h-8 rounded-full bg-brand-coral/20 flex items-center justify-center text-brand-coral font-bold overflow-hidden">
+                    <div className="p-4 bg-slate-100/50 dark:bg-black/40 border-t border-slate-200 dark:border-neutral-800">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-brand-coral/10 flex items-center justify-center border border-brand-coral/20 overflow-hidden shadow-sm">
                                 {avatarUrl ? (
-                                    <img src={avatarUrl} alt="Gestor" className="w-full h-full object-cover" />
+                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <span>G</span>
+                                    <User size={16} className="text-brand-coral" />
                                 )}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="font-medium text-slate-700 dark:text-slate-200 truncate">Gestor</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500 truncate">Gerenciamento</p>
+                                <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest truncate">Gestor Responsável</p>
+                                <div className="flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span className="text-[9px] text-slate-500 dark:text-neutral-500 uppercase font-black tracking-tighter">Conectado</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </aside>
 
-                {/* Main Chat Area */}
-                <main className="flex-1 flex flex-col min-w-0 bg-white/50 dark:bg-slate-950/50">
-                    {/* Toolbar / Mobile Header */}
-                    <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white/80 dark:bg-slate-900/50 backdrop-blur-md">
-                        <h2 className="font-semibold text-lg flex items-center gap-2 text-slate-900 dark:text-white">
-                            <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                            {sessions.find(s => s.id === currentSessionId)?.title || 'Nova Conversa'}
-                        </h2>
+                {/* Chat Area */}
+                <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-neutral-900/30">
+                    <header className="h-16 border-b border-slate-200 dark:border-neutral-800 px-6 flex items-center justify-between bg-white/80 dark:bg-black/20 backdrop-blur-sm shadow-sm dark:shadow-none">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral border border-brand-coral/20">
+                                <Bot size={18} />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tighter">
+                                    {sessions.find(s => s.id === currentSessionId)?.title || 'Cérebro Corporativo'}
+                                </h3>
+                                <p className="text-[10px] text-slate-400 dark:text-neutral-500 uppercase tracking-[0.2em] font-black">Diretor de Estratégia</p>
+                            </div>
+                        </div>
 
                         <div className="flex items-center gap-2">
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                className="hidden"
-                                accept=".txt,.md,.pdf" // PDF support is strictly placeholder for now
-                                onChange={handleFileUpload}
-                            />
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isUploading}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-md text-sm transition-colors border border-slate-200 dark:border-slate-700"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-600 dark:text-neutral-300 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-slate-200 dark:border-neutral-700 disabled:opacity-50 shadow-sm"
                             >
-                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                <span className="hidden sm:inline">Upload Arquivo</span>
+                                {isUploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                                <span className="hidden sm:inline">Upload de Contexto</span>
                             </button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt,.pdf,.docx" />
                         </div>
-                    </div>
+                    </header>
 
-                    {/* Messages List */}
-                    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar">
-                        {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center opacity-70 dark:opacity-50 space-y-4">
-                                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-3xl flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-700">
-                                    <Bot className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-white/40 dark:bg-black/10">
+                        {messages.length === 0 && !isLoading ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center">
+                                <div className="p-6 bg-slate-100 dark:bg-neutral-800/20 rounded-full border border-slate-200 dark:border-neutral-800 mb-4 shadow-inner">
+                                    <Database size={40} className="text-slate-300 dark:text-neutral-700" />
                                 </div>
-                                <h3 className="text-xl font-medium text-slate-800 dark:text-slate-300">Segundo Cérebro Corporativo</h3>
-                                <p className="max-w-md text-slate-500">
-                                    Comece uma conversa para analisar dados, criar estratégias ou gerenciar informações da empresa.
-                                </p>
+                                <h4 className="text-sm font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Memória Vetorial Pronta</h4>
+                                <p className="text-[11px] max-w-xs mt-2 text-slate-500 dark:text-neutral-600 font-medium">Acesse o conhecimento da C4 Marketing via linguagem natural.</p>
                             </div>
                         ) : (
                             messages.map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    className={`flex gap-4 max-w-4xl mx-auto ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
+                                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     {msg.role === 'assistant' && (
-                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center shrink-0 mt-1">
-                                            <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                                        <div className="w-8 h-8 rounded-full bg-brand-coral/10 border border-brand-coral/20 flex items-center justify-center shrink-0 shadow-sm">
+                                            <Bot size={16} className="text-brand-coral" />
                                         </div>
                                     )}
-
-                                    <div className={`space-y-1 ${msg.role === 'user' ? 'items-end flex flex-col' : ''} max-w-[85%] md:max-w-[75%]`}>
-                                        <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user'
-                                            ? 'bg-indigo-600 text-white rounded-br-none shadow-sm'
-                                            : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-bl-none shadow-sm'
-                                            }`}>
-                                            {msg.role === 'user' ? (
-                                                msg.content
-                                            ) : (
-                                                <GenUIParser content={msg.content} />
-                                            )}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 dark:text-slate-600 px-1 opacity-0 hover:opacity-100 transition-opacity">
-                                            {new Date(msg.created_at).toLocaleTimeString()}
-                                        </div>
+                                    <div
+                                        className={`max-w-[85%] p-4 rounded-c4 text-[13px] leading-relaxed shadow-sm ${msg.role === 'user'
+                                            ? 'bg-brand-coral text-white rounded-br-none shadow-brand-coral/10'
+                                            : 'bg-white dark:bg-neutral-800/70 border border-slate-200 dark:border-neutral-700 text-slate-700 dark:text-neutral-200 rounded-bl-none custom-thesys-wrapper'
+                                            }`}
+                                    >
+                                        {msg.role === 'user' ? (
+                                            msg.content
+                                        ) : (
+                                            <GenUIParser content={msg.content} />
+                                        )}
                                     </div>
-
                                     {msg.role === 'user' && (
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+                                        <div className="w-8 h-8 rounded-full bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                                             {avatarUrl ? (
                                                 <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
                                             ) : (
-                                                <User className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                                                <User size={16} className="text-slate-400 dark:text-neutral-500" />
                                             )}
                                         </div>
                                     )}
                                 </div>
                             ))
                         )}
+                        {isLoading && (
+                            <div className="flex justify-start">
+                                <div className="flex gap-3 items-center">
+                                    <div className="w-8 h-8 rounded-full bg-brand-coral/10 border border-brand-coral/20 flex items-center justify-center shadow-sm">
+                                        <Bot size={16} className="text-brand-coral animate-pulse" />
+                                    </div>
+                                    <div className="bg-white dark:bg-neutral-800/40 border border-slate-200 dark:border-neutral-800 p-3 rounded-c4 rounded-bl-none">
+                                        <Loader2 className="w-4 h-4 animate-spin text-brand-coral" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 bg-white dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
-                        <div className="max-w-4xl mx-auto relative">
-                            <form onSubmit={handleSendMessage} className="relative">
+                    <footer className="p-4 bg-white/80 dark:bg-black/40 border-t border-slate-200 dark:border-neutral-800 backdrop-blur-sm">
+                        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex gap-3">
+                            <div className="relative flex-1 group">
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder="Digite sua mensagem para o cérebro..."
-                                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl py-4 pl-5 pr-14 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner"
+                                    placeholder="Pergunte ao Cérebro Corporativo..."
+                                    className="w-full bg-white dark:bg-neutral-900/80 border border-slate-200 dark:border-neutral-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-neutral-600 rounded-c4 px-5 py-3.5 text-sm focus:outline-none focus:border-brand-coral/50 focus:ring-1 focus:ring-brand-coral/20 transition-all shadow-sm dark:shadow-none"
                                     disabled={isLoading}
                                 />
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || isLoading}
-                                    className="absolute right-2 top-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-indigo-500/20"
-                                >
-                                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                                </button>
-                            </form>
-                            <p className="text-center text-[10px] text-slate-400 dark:text-slate-600 mt-2">
-                                O Segundo Cérebro pode cometer erros. Verifique informações importantes.
-                            </p>
-                        </div>
-                    </div>
+                                <div className="absolute inset-0 rounded-c4 border border-brand-coral/0 group-focus-within:border-brand-coral/20 pointer-events-none transition-all"></div>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isLoading || !input.trim()}
+                                className="bg-brand-coral hover:bg-brand-coral/90 disabled:opacity-50 text-white px-5 rounded-c4 transition-all shadow-lg shadow-brand-coral/20 flex items-center justify-center shrink-0"
+                            >
+                                <Send size={18} />
+                            </button>
+                        </form>
+                    </footer>
                 </main>
             </div>
         </div>
-
     );
 }

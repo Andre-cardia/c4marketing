@@ -35,14 +35,37 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
             return;
         }
 
-        setSession(session);
+        // Verify if local session is still valid on Auth server.
+        let activeSession = session;
+        let { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData?.user) {
+            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError || !refreshed.session) {
+                await supabase.auth.signOut();
+                setSession(null);
+                setAuthorized(false);
+                setLoading(false);
+                return;
+            }
+            activeSession = refreshed.session;
+            const secondCheck = await supabase.auth.getUser();
+            if (secondCheck.error || !secondCheck.data?.user) {
+                await supabase.auth.signOut();
+                setSession(null);
+                setAuthorized(false);
+                setLoading(false);
+                return;
+            }
+        }
+
+        setSession(activeSession);
 
         // Security Check: Is the user email in our allowed list?
         try {
             const { data: userRecord, error } = await supabase
                 .from('app_users')
                 .select('role')
-                .eq('email', session.user.email)
+                .eq('email', activeSession.user.email)
                 .single();
 
             if (error || !userRecord) {

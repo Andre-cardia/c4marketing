@@ -47,6 +47,17 @@ function inferSurveyProjectType(msg: string): "traffic" | "landing_page" | "webs
     return null;
 }
 
+function hasTrafficMarketingIntent(msg: string): boolean {
+    return hasAny(msg, [
+        "google ads", "meta ads", "trafego pago", "tráfego pago",
+        "campanha", "campanhas", "anuncio", "anúncio", "anuncios", "anúncios",
+        "publico", "público", "segmentacao", "segmentação",
+        "palavra-chave", "palavras-chave", "keyword", "keywords",
+        "roas", "cpc", "cpa", "ctr", "conversao", "conversão",
+        "copy", "criativo", "criativos", "remarketing", "funil"
+    ]);
+}
+
 // --- Filter Logic ---
 
 function applyPolicyToFilters(filters: RouteFilters, policy: RetrievalPolicy): RouteFilters {
@@ -372,16 +383,69 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
         });
     }
 
+    // Marketing / Tráfego Pago
+    if (hasTrafficMarketingIntent(msg)) {
+        const surveyProjectType = inferSurveyProjectType(msg);
+        const shouldUseSurveySql = hasAny(msg, [
+            "questionario", "questionário", "survey", "formulario", "formulário", "briefing"
+        ]) || surveyProjectType === "traffic";
+
+        if (shouldUseSurveySql) {
+            return makeDecision(input, {
+                artifact_kind: "project",
+                task_kind: "analysis",
+                risk_level: "medium",
+                agent: "Agent_MarketingTraffic",
+                retrieval_policy: "STRICT_DOCS_ONLY",
+                top_k: 0,
+                tools_allowed: ["rag_search", "db_read"],
+                tool_hint: "db_query",
+                db_query_params: {
+                    rpc_name: "query_survey_responses",
+                    p_project_type: "traffic",
+                    p_limit: 10,
+                },
+                confidence: 0.94,
+                reason: "Heuristic: traffic paid media intent + survey context -> SQL survey",
+                filtersPatch: {
+                    artifact_kind: "project",
+                    source_table: ["traffic_projects", "tasks", "activity_logs"],
+                },
+            });
+        }
+
+        return makeDecision(input, {
+            artifact_kind: "project",
+            task_kind: "analysis",
+            risk_level: "medium",
+            agent: "Agent_MarketingTraffic",
+            retrieval_policy: "STRICT_DOCS_ONLY",
+            top_k: 12,
+            tools_allowed: ["rag_search", "db_read"],
+            tool_hint: "rag_search",
+            confidence: 0.88,
+            reason: "Heuristic: traffic paid media strategic intent -> marketing specialist",
+            filtersPatch: {
+                artifact_kind: "project",
+                source_table: ["traffic_projects", "tasks", "activity_logs"],
+            },
+        });
+    }
+
     // Survey / Briefing responses
     if (hasAny(msg, ["pesquisa", "survey", "formulário", "formulario", "briefing", "questionário", "questionario"])) {
         const projectType = inferSurveyProjectType(msg);
         const isBroadListing = hasAny(msg, ["todos", "todas", "liste", "listar", "mostrar", "quais"]);
 
+        const surveyAgent = projectType === "traffic"
+            ? "Agent_MarketingTraffic"
+            : "Agent_Projects";
+
         return makeDecision(input, {
             artifact_kind: "project",
             task_kind: "factual_lookup",
             risk_level: "medium",
-            agent: "Agent_Projects",
+            agent: surveyAgent,
             retrieval_policy: "STRICT_DOCS_ONLY",
             top_k: 0,
             tools_allowed: ["rag_search", "db_read"],
@@ -517,7 +581,7 @@ export function routeHeuristic(msg: string, input: RouterInput): RouteDecision {
         "cargo", "função", "funcao", "papel",
         "presidente", "fundador", "dono", "diretor executivo"
     ])) {
-        const isAccessQuery = hasAny(msg, ["acesso", "acessos", "acessou", "logou", "entrou"]);
+        const isAccessQuery = hasAny(msg, ["acesso", "acessos", "acessou", "acessaram", "logou", "logaram", "entrou", "entraram", "acessou hoje", "acessaram hoje", "online hoje"]);
 
         return makeDecision(input, {
             artifact_kind: "ops",

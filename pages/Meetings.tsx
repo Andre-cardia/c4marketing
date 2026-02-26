@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { Calendar, Clock, User, Video, ExternalLink, Loader2, RefreshCw, Plus, X, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
@@ -8,7 +7,7 @@ import BookingModal from '../components/projects/BookingModal';
 
 interface Booking {
     id: number;
-    uid: string; // Required for API v2 cancel endpoint
+    uid: string;
     title: string;
     description: string;
     startTime: string;
@@ -29,20 +28,12 @@ const Meetings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6'; // Hardcoded for MVP as per request context
-
-    // Hardcode the shared team link to match Projects and ensure it works
-    // This bypasses any user configuration issues until the DB is verified
+    const API_KEY = 'cal_live_dce1007edad18303ba5dedbb992d83e6';
     const cleanCalLink = "grupo-c4/reuniao-grupo-c4";
-
-
 
     useEffect(() => {
         fetchBookings();
     }, []);
-    // ... (keep fetchBookings same)
-
-    // ... (keep helper functions same)
 
     const handleScheduleClick = () => {
         setIsSchedulingModalOpen(true);
@@ -57,7 +48,7 @@ const Meetings: React.FC = () => {
                 headers: {
                     'Authorization': `Bearer ${API_KEY}`,
                     'Content-Type': 'application/json',
-                    'cal-api-version': '2024-08-13' // Required for API v2
+                    'cal-api-version': '2024-08-13'
                 },
                 body: JSON.stringify({
                     cancellationReason: 'Cancelado pelo sistema C4'
@@ -70,7 +61,6 @@ const Meetings: React.FC = () => {
                 throw new Error('Falha ao cancelar agendamento');
             }
 
-            // Refresh the list
             fetchBookings();
         } catch (err) {
             console.error('Error cancelling booking:', err);
@@ -96,8 +86,6 @@ const Meetings: React.FC = () => {
             }
 
             const data = await response.json();
-            console.log('Cal.com API Response:', data);
-
             let bookingsArray: any[] = [];
             if (data.data && Array.isArray(data.data)) {
                 bookingsArray = data.data;
@@ -112,7 +100,6 @@ const Meetings: React.FC = () => {
                 }));
                 setBookings(mappedBookings);
             } else {
-                bookingsArray = []; // fallback
                 setBookings([]);
             }
 
@@ -140,143 +127,123 @@ const Meetings: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-            <Header />
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Calendar className="text-brand-coral" /> Agenda da Equipe
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">Próximas reuniões agendadas via Cal.com</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {!roleLoading && userRole === 'gestor' && (
-                            <button
-                                onClick={handleScheduleClick}
-                                disabled={!cleanCalLink}
-                                title={!cleanCalLink ? "Configure o link do Cal.com em Minha Conta" : `Agendar Reunião (${cleanCalLink})`}
-                                className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-xl transition-all shadow-lg shadow-brand-dark/10 ${!cleanCalLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
-                            >
-                                <Plus size={20} /> Agendar Reunião Interna
-                            </button>
-                        )}
-                        <button
-                            onClick={fetchBookings}
-
-                            className="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-colors text-slate-500 shadow-sm"
-                            title="Atualizar"
-                        >
-                            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-                        </button>
-                    </div>
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Calendar className="text-brand-coral" /> Agenda da Equipe
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Próximas reuniões agendadas via Cal.com</p>
                 </div>
+                <div className="flex items-center gap-3">
+                    {!roleLoading && userRole === 'gestor' && (
+                        <button
+                            onClick={handleScheduleClick}
+                            disabled={!cleanCalLink}
+                            className={`flex items-center gap-2 px-6 py-2.5 font-bold rounded-c4 transition-all shadow-lg shadow-brand-dark/10 ${!cleanCalLink ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed text-slate-500' : 'bg-brand-dark hover:bg-slate-800 text-white'}`}
+                        >
+                            <Plus size={20} /> Agendar Reunião Interna
+                        </button>
+                    )}
+                    <button
+                        onClick={fetchBookings}
+                        className="p-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800 rounded-c4 transition-colors text-slate-500 shadow-sm"
+                    >
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                    </button>
+                </div>
+            </div>
 
-                {loading ? (
-                    <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
-                        <Loader2 className="animate-spin w-8 h-8 text-brand-coral" />
-                        <p>Sincronizando com Cal.com...</p>
-                    </div>
-                ) : error ? (
-                    <div className="p-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl text-center text-red-600 dark:text-red-400">
-                        <p>{error}</p>
-                        <button onClick={fetchBookings} className="mt-4 text-sm underline font-bold">Tentar Novamente</button>
-                    </div>
-                ) : bookings.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700">
-                        <Calendar className="w-12 h-12 mb-4 mx-auto opacity-20" />
-                        <p>Nenhuma reunião agendada para os próximos dias.</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-4">
-                        {bookings.map((booking) => (
-                            <div key={booking.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-6">
-
-                                {/* Date & Time */}
-                                <div className="flex flex-col md:w-48 flex-shrink-0 border-l-4 border-brand-coral pl-4">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">{formatDate(booking.startTime)}</span>
-                                    <div className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-white mt-1">
-                                        <Clock size={20} className="text-brand-coral" />
-                                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                                    </div>
+            {loading ? (
+                <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
+                    <Loader2 className="animate-spin w-8 h-8 text-brand-coral" />
+                    <p>Sincronizando com Cal.com...</p>
+                </div>
+            ) : error ? (
+                <div className="p-8 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-c4 text-center text-red-600 dark:text-red-400">
+                    <p>{error}</p>
+                    <button onClick={fetchBookings} className="mt-4 text-sm underline font-bold">Tentar Novamente</button>
+                </div>
+            ) : bookings.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 bg-white dark:bg-neutral-900 rounded-c4 border border-slate-200 dark:border-neutral-800">
+                    <Calendar className="w-12 h-12 mb-4 mx-auto opacity-20" />
+                    <p>Nenhuma reunião agendada para os próximos dias.</p>
+                </div>
+            ) : (
+                <div className="grid gap-4">
+                    {bookings.map((booking) => (
+                        <div key={booking.id} className="bg-white dark:bg-neutral-900 p-6 rounded-c4 border border-slate-200 dark:border-neutral-800 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="flex flex-col md:w-48 flex-shrink-0 border-l-4 border-brand-coral pl-4">
+                                <span className="text-xs font-bold text-slate-500 uppercase">{formatDate(booking.startTime)}</span>
+                                <div className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-white mt-1">
+                                    <Clock size={20} className="text-brand-coral" />
+                                    {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
                                 </div>
-
-                                {/* Details */}
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{booking.title}</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{booking.description}</p>
-
-                                    <div className="flex flex-wrap gap-4 mt-4">
-                                        {booking.attendees && booking.attendees.map((attendee, idx) => (
-                                            <div key={idx} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-                                                <User size={14} />
-                                                <span className="font-medium">{attendee.name}</span>
-                                                <span className="text-xs opacity-70">({attendee.email})</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-3">
-                                    {booking.status === 'CANCELLED' ? (
-                                        <span className="px-4 py-2 bg-red-100 text-red-600 rounded-xl font-bold text-sm">Cancelado</span>
-                                    ) : (
-                                        <>
-                                            {booking.meetingUrl && (
-                                                <a
-                                                    href={booking.meetingUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="px-5 py-2.5 bg-brand-coral hover:bg-red-500 text-white font-bold rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-brand-coral/20"
-                                                >
-                                                    <Video size={18} /> Entrar
-                                                </a>
-                                            )}
-                                            <button
-                                                onClick={() => handleCancelBooking(booking.uid)}
-                                                className="px-4 py-2.5 bg-slate-100 hover:bg-red-100 dark:bg-slate-700 dark:hover:bg-red-900/30 text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400 font-bold rounded-xl flex items-center gap-2 transition-colors border border-slate-200 dark:border-slate-600"
-                                                title="Cancelar Reunião"
-                                            >
-                                                <Trash2 size={18} /> Cancelar
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-
                             </div>
-                        ))}
-                    </div>
-                )}
-            </main>
 
-            {/* Inline Booking Modal for flexibility */}
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{booking.title}</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{booking.description}</p>
+                                <div className="flex flex-wrap gap-4 mt-4">
+                                    {booking.attendees && booking.attendees.map((attendee, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-neutral-800 px-3 py-1 rounded-full">
+                                            <User size={14} />
+                                            <span className="font-medium">{attendee.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                {booking.status === 'CANCELLED' ? (
+                                    <span className="px-4 py-2 bg-red-100 text-red-600 rounded-c4 font-bold text-sm">Cancelado</span>
+                                ) : (
+                                    <>
+                                        {booking.meetingUrl && (
+                                            <a
+                                                href={booking.meetingUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-5 py-2.5 bg-brand-coral hover:bg-red-500 text-white font-bold rounded-c4 flex items-center gap-2 transition-colors shadow-lg shadow-brand-coral/20"
+                                            >
+                                                <Video size={18} /> Entrar
+                                            </a>
+                                        )}
+                                        <button
+                                            onClick={() => handleCancelBooking(booking.uid)}
+                                            className="px-4 py-2.5 bg-slate-100 hover:bg-red-100 dark:bg-neutral-800 dark:hover:bg-red-900/30 text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400 font-bold rounded-c4 flex items-center gap-2 transition-colors border border-slate-200 dark:border-neutral-800"
+                                        >
+                                            <Trash2 size={18} /> Cancelar
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {isSchedulingModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full h-[90vh] max-w-5xl rounded-2xl overflow-hidden flex flex-col shadow-2xl relative">
-                        {/* Header */}
-                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 z-10">
+                    <div className="bg-white dark:bg-neutral-900 w-full h-[90vh] max-w-5xl rounded-c4 overflow-hidden flex flex-col shadow-2xl relative">
+                        <div className="p-4 border-b border-slate-100 dark:border-neutral-800 flex justify-between items-center bg-white dark:bg-neutral-900 z-10">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
                                     <Calendar size={20} />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                                        Agendar Reunião
-                                    </h2>
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">Agendar Reunião</h2>
                                     <p className="text-xs text-slate-500">Reunião Interna ({cleanCalLink})</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setIsSchedulingModalOpen(false)}
-                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-full text-slate-400 transition-colors"
                             >
                                 <X size={24} />
                             </button>
                         </div>
-
-                        {/* Content */}
-                        <div className="flex-1 w-full h-full overflow-hidden bg-white dark:bg-slate-900">
+                        <div className="flex-1 w-full h-full overflow-hidden bg-white dark:bg-neutral-900">
                             <Cal
                                 calLink={cleanCalLink}
                                 style={{ width: "100%", height: "100%", overflow: "scroll" }}

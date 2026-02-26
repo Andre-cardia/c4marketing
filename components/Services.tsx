@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { LineChart, Layout, ShoppingCart, Users, Globe } from 'lucide-react';
-import { TRAFFIC_MANAGEMENT_CONFIG, SERVICES_CONFIG } from '../lib/constants';
+import { LineChart, Layout, ShoppingCart, Users, Globe, Bot, CheckCircle2, Server, Cpu, MessageCircle } from 'lucide-react';
+import { TRAFFIC_MANAGEMENT_CONFIG, AI_AGENTS_CONFIG, SERVICES_CONFIG } from '../lib/constants';
 import { ServiceCard } from './ServiceCard';
 
 interface ServicesProps {
@@ -25,6 +25,9 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
   const coreWork = TRAFFIC_MANAGEMENT_CONFIG.coreWork;
   const trafficData = getServiceData('traffic_management');
   const showTraffic = hasService('traffic_management');
+
+  const aiData = getServiceData('ai_agents');
+  const showAiAgents = hasService('ai_agents');
 
   return (
     <section className="py-20 bg-slate-50">
@@ -96,8 +99,73 @@ const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }
           </div>
         )}
 
+        {/* AI Agents Section */}
+        {showAiAgents && (
+          <div className="mb-16">
+            <div className="flex items-center gap-3 mb-8 justify-center">
+              <div className="p-3 bg-brand-coral/10 text-brand-coral rounded-full">
+                <Bot className="w-6 h-6" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 text-center">{AI_AGENTS_CONFIG.title}</h3>
+            </div>
+            <p className="text-center text-slate-500 mb-10 max-w-2xl mx-auto">
+              Desenvolvemos agentes de inteligência artificial personalizados para atendimento, qualificação de leads e automação de processos, integrando NLP avançado com os sistemas e canais da sua empresa.
+            </p>
+
+            {/* Roadmap */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              {AI_AGENTS_CONFIG.phases.map((phase) => (
+                <div key={phase.number} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-brand-coral/10 text-brand-coral rounded-xl flex items-center justify-center font-black text-sm">
+                      {phase.number}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm leading-tight">{phase.title}</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest">{phase.duration}</p>
+                    </div>
+                  </div>
+                  <ul className="space-y-2">
+                    {phase.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-brand-coral mt-0.5 flex-shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            {/* Included Infrastructure */}
+            <div className="bg-slate-900 rounded-3xl p-8 text-white">
+              <h4 className="font-bold text-lg mb-6 flex items-center gap-2">
+                <Server className="w-5 h-5 text-brand-coral" />
+                Infraestrutura e Manutenção Incluídas na Recorrência
+              </h4>
+              <div className="grid md:grid-cols-2 gap-3">
+                {AI_AGENTS_CONFIG.included.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 text-slate-300 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-brand-coral mt-0.5 flex-shrink-0" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+              {aiData && typeof aiData !== 'string' && (aiData as any).details && (
+                <div className="mt-6 p-4 bg-white/5 rounded-2xl border border-white/10 text-sm italic text-slate-300">
+                  <strong className="text-brand-coral block mb-1">Detalhamento do Agente:</strong>
+                  {(aiData as any).details}
+                </div>
+              )}
+              <p className="mt-4 text-[11px] text-slate-500 italic">
+                * Caso o volume de tokens ultrapasse o limite incluído (2M/mês), poderá ser necessário ajuste no valor mensal conforme demanda.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {SERVICES_CONFIG.map((config) => (
+          {SERVICES_CONFIG.filter(c => c.id !== 'ai_agents').map((config) => (
             hasService(config.id) && (
               <ServiceCard
                 key={config.id}

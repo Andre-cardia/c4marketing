@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Header from '../components/Header';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2 } from 'lucide-react';
+import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2, Bot, KeyRound } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 import CreateProjectModal from '../components/projects/CreateProjectModal';
+import ProjectCredentialsModal from '../components/projects/ProjectCredentialsModal';
 
 interface Project {
     id: number;
@@ -37,22 +37,7 @@ const Projects: React.FC = () => {
     const [selectedProjectForKanban, setSelectedProjectForKanban] = useState<Project | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectToEdit, setProjectToEdit] = useState<Project | undefined>(undefined);
-    const [darkMode, setDarkMode] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('darkMode') === 'true';
-        }
-        return false;
-    });
-
-    useEffect(() => {
-        if (darkMode) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('darkMode', 'true');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('darkMode', 'false');
-        }
-    }, [darkMode]);
+    const [credentialProject, setCredentialProject] = useState<Project | null>(null);
 
     useEffect(() => {
         fetchProjects();
@@ -187,6 +172,7 @@ const Projects: React.FC = () => {
             case 'website': return <Globe className="w-4 h-4 text-cyan-500" />;
             case 'ecommerce': return <ShoppingCart className="w-4 h-4 text-orange-500" />;
             case 'consulting': return <Activity className="w-4 h-4 text-red-500" />;
+            case 'ai_agents': return <Bot className="w-4 h-4 text-indigo-500" />;
             default: return <Folder className="w-4 h-4 text-slate-400" />;
         }
     };
@@ -199,6 +185,7 @@ const Projects: React.FC = () => {
             case 'website': return 'Website';
             case 'ecommerce': return 'E-commerce';
             case 'consulting': return 'Consultoria';
+            case 'ai_agents': return 'Agentes de IA';
             default: return 'Serviço';
         }
     };
@@ -211,6 +198,7 @@ const Projects: React.FC = () => {
             case 'website': return `/projects/${projectId}/website`;
             case 'ecommerce': return `/projects/${projectId}/ecommerce`;
             case 'consulting': return `/projects/${projectId}/consulting`;
+            case 'ai_agents': return `/projects/${projectId}/ai-agents`;
             default: return `/projects/${projectId}`;
         }
     };
@@ -242,164 +230,167 @@ const Projects: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-            <Header />
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Projetos Ativos</h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">Gerencie os serviços contratados pelos seus clientes.</p>
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Projetos Ativos</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Gerencie os serviços contratados pelos seus clientes.</p>
+                </div>
+                <div className="flex gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar projeto..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
+                        />
                     </div>
-                    <div className="flex gap-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar projeto..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
-                            />
-                        </div>
-                        <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-coral/10"
-                        >
-                            <Plus size={20} />
-                            <span className="hidden sm:inline">Novo Projeto</span>
-                        </button>
+                    <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="bg-transparent border-2 border-brand-coral text-brand-coral hover:bg-brand-coral hover:text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-coral/10"
+                    >
+                        <Plus size={20} />
+                        <span className="hidden sm:inline">Novo Projeto</span>
+                    </button>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="p-12 text-center text-slate-400">Carregando projetos...</div>
+            ) : projects.length === 0 ? (
+                <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+                    <Folder className="w-12 h-12 mb-4 mx-auto opacity-20" />
+                    <p>Nenhum projeto ativo encontrado.</p>
+                    <p className="text-xs mt-2">Certifique-se de que os contratos foram aceitos e marcados como 'Ativo'.</p>
+                </div>
+            ) : (
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 dark:bg-neutral-950/50 border-b border-slate-100 dark:border-neutral-800 text-xs text-slate-400 uppercase tracking-wider">
+                                    <th
+                                        className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors group"
+                                        onClick={() => handleSort('company_name')}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            Empresa
+                                            {getSortIcon('company_name')}
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="p-5 font-bold hidden md:table-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                        onClick={() => handleSort('responsible_name')}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            Responsável
+                                            {getSortIcon('responsible_name')}
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors group"
+                                        onClick={() => handleSort('created_at')}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            Início
+                                            {getSortIcon('created_at')}
+                                        </div>
+                                    </th>
+                                    <th className="p-5 font-bold">Serviços Contratados</th>
+                                    <th className="p-5 font-bold text-center">Ações</th>
+                                    <th className="p-5 font-bold text-center">Tarefas</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
+                                {sortedProjects.map((project) => (
+                                    <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                        <td className="p-5">
+                                            <div
+                                                className="font-bold text-slate-800 dark:text-white cursor-pointer hover:text-brand-coral transition-colors"
+                                                onClick={() => setSelectedProjectForKanban(project)}
+                                            >
+                                                {project.company_name}
+                                            </div>
+                                            <div className="md:hidden text-xs text-slate-400">{project.responsible_name}</div>
+                                        </td>
+                                        <td className="p-5 hidden md:table-cell">
+                                            <div className="flex items-center gap-2">
+                                                <User className="w-4 h-4 text-slate-300" />
+                                                {project.responsible_name}
+                                            </div>
+                                        </td>
+                                        <td className="p-5">
+                                            <div className="flex items-center gap-2">
+                                                <Calendar className="w-4 h-4 text-slate-300" />
+                                                {new Date(project.created_at).toLocaleDateString('pt-BR')}
+                                            </div>
+                                        </td>
+                                        <td className="p-5">
+                                            <div className="flex flex-wrap gap-2">
+                                                {project.services && project.services.length > 0 ? (
+                                                    project.services.map((service: any, index: number) => {
+                                                        const serviceId = typeof service === 'string' ? service : service.id;
+                                                        return (
+                                                            <button
+                                                                key={index}
+                                                                onClick={() => navigate(getServiceRoute(serviceId, project.id))}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-c4 bg-slate-100 dark:bg-neutral-800 hover:bg-white dark:hover:bg-neutral-700 border border-slate-200 dark:border-neutral-800 hover:border-brand-coral dark:hover:border-brand-coral transition-all text-xs font-medium group"
+                                                                title={getServiceLabel(serviceId)}
+                                                            >
+                                                                {getServiceIcon(serviceId)}
+                                                                <span className="hidden lg:inline">{getServiceLabel(serviceId)}</span>
+                                                                <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-coral" />
+                                                            </button>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <span className="text-slate-400 italic text-xs">Nenhum serviço</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => setCredentialProject(project)}
+                                                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-brand-coral transition-colors"
+                                                    title="Dados de Acesso"
+                                                >
+                                                    <KeyRound size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditProject(project)}
+                                                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                                                    title="Editar Projeto"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteProject(project)}
+                                                    className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-red-500 transition-colors"
+                                                    title="Excluir Projeto"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            <button
+                                                onClick={() => setSelectedProjectForKanban(project)}
+                                                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 hover:bg-brand-coral hover:text-white text-brand-coral rounded-lg transition-all font-bold text-xs"
+                                            >
+                                                <LayoutDashboard size={16} />
+                                                <span className="hidden xl:inline">Ver Tarefas</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                {loading ? (
-                    <div className="p-12 text-center text-slate-400">Carregando projetos...</div>
-                ) : projects.length === 0 ? (
-                    <div className="p-12 text-center text-slate-400 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
-                        <Folder className="w-12 h-12 mb-4 mx-auto opacity-20" />
-                        <p>Nenhum projeto ativo encontrado.</p>
-                        <p className="text-xs mt-2">Certifique-se de que os contratos foram aceitos e marcados como 'Ativo'.</p>
-                    </div>
-                ) : (
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
-                                        <th
-                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
-                                            onClick={() => handleSort('company_name')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Empresa
-                                                {getSortIcon('company_name')}
-                                            </div>
-                                        </th>
-                                        <th
-                                            className="p-5 font-bold hidden md:table-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
-                                            onClick={() => handleSort('responsible_name')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Responsável
-                                                {getSortIcon('responsible_name')}
-                                            </div>
-                                        </th>
-                                        <th
-                                            className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
-                                            onClick={() => handleSort('created_at')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Início
-                                                {getSortIcon('created_at')}
-                                            </div>
-                                        </th>
-                                        <th className="p-5 font-bold">Serviços Contratados</th>
-                                        <th className="p-5 font-bold text-center">Ações</th>
-                                        <th className="p-5 font-bold text-center">Tarefas</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    {sortedProjects.map((project) => (
-                                        <tr key={project.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                            <td className="p-5">
-                                                <div
-                                                    className="font-bold text-slate-800 dark:text-white cursor-pointer hover:text-brand-coral transition-colors"
-                                                    onClick={() => setSelectedProjectForKanban(project)}
-                                                >
-                                                    {project.company_name}
-                                                </div>
-                                                <div className="md:hidden text-xs text-slate-400">{project.responsible_name}</div>
-                                            </td>
-                                            <td className="p-5 hidden md:table-cell">
-                                                <div className="flex items-center gap-2">
-                                                    <User className="w-4 h-4 text-slate-300" />
-                                                    {project.responsible_name}
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="w-4 h-4 text-slate-300" />
-                                                    {new Date(project.created_at).toLocaleDateString('pt-BR')}
-                                                </div>
-                                            </td>
-                                            <td className="p-5">
-                                                <div className="flex flex-wrap gap-2">
-                                                    {project.services && project.services.length > 0 ? (
-                                                        project.services.map((service: any, index: number) => {
-                                                            const serviceId = typeof service === 'string' ? service : service.id;
-                                                            return (
-                                                                <button
-                                                                    key={index}
-                                                                    onClick={() => navigate(getServiceRoute(serviceId, project.id))}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-800 hover:border-brand-coral dark:hover:border-brand-coral transition-all text-xs font-medium group"
-                                                                    title={getServiceLabel(serviceId)}
-                                                                >
-                                                                    {getServiceIcon(serviceId)}
-                                                                    <span className="hidden lg:inline">{getServiceLabel(serviceId)}</span>
-                                                                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-coral" />
-                                                                </button>
-                                                            );
-                                                        })
-                                                    ) : (
-                                                        <span className="text-slate-400 italic text-xs">Nenhum serviço</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="p-5 text-center">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditProject(project)}
-                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-500 transition-colors"
-                                                        title="Editar Projeto"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteProject(project)}
-                                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                                                        title="Excluir Projeto"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="p-5 text-center">
-                                                <button
-                                                    onClick={() => setSelectedProjectForKanban(project)}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand-coral/10 hover:bg-brand-coral hover:text-white text-brand-coral rounded-lg transition-all font-bold text-xs"
-                                                >
-                                                    <LayoutDashboard size={16} />
-                                                    <span className="hidden xl:inline">Ver Tarefas</span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-            </main>
-
+            )}
             <KanbanBoardModal
                 isOpen={!!selectedProjectForKanban}
                 onClose={() => setSelectedProjectForKanban(null)}
@@ -419,6 +410,15 @@ const Projects: React.FC = () => {
                     setProjectToEdit(undefined);
                 }}
             />
+
+            {credentialProject && (
+                <ProjectCredentialsModal
+                    isOpen={!!credentialProject}
+                    onClose={() => setCredentialProject(null)}
+                    projectId={credentialProject.id}
+                    companyName={credentialProject.company_name}
+                />
+            )}
         </div>
     );
 };

@@ -24,9 +24,25 @@ const Home: React.FC = () => {
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      navigate('/dashboard');
+    if (!session) return;
+
+    // If browser has stale auth state, clear it instead of redirecting in loop.
+    const firstUserCheck = await supabase.auth.getUser();
+    if (firstUserCheck.error || !firstUserCheck.data?.user) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshed.session) {
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const secondUserCheck = await supabase.auth.getUser();
+      if (secondUserCheck.error || !secondUserCheck.data?.user) {
+        await supabase.auth.signOut();
+        return;
+      }
     }
+
+    navigate('/dashboard');
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -109,10 +125,12 @@ const Home: React.FC = () => {
         <div className="p-10 lg:p-14 flex flex-col justify-between relative">
           {/* Logo */}
           <div className="mb-12">
-            <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" alt="C4 Marketing" className="h-14 brightness-0 invert opacity-90" />
+            <div className="flex items-center gap-6 mb-2">
+              <img src="/logo.png" alt="C4 Marketing" className="h-10 brightness-0 invert opacity-90" />
+              <div className="w-px h-8 bg-white/20"></div>
+              <img src="/assets/C4-Lab-todobranco.png" alt="C4 Lab" className="h-14 brightness-0 invert opacity-90" />
             </div>
-            <div className="h-0.5 w-12 bg-gradient-to-r from-brand-coral to-transparent mt-4"></div>
+            <div className="h-0.5 w-16 bg-gradient-to-r from-brand-coral to-transparent mt-4"></div>
           </div>
 
           {/* Headline */}
@@ -154,7 +172,7 @@ const Home: React.FC = () => {
               System Online
             </div>
             <span className="text-slate-700">•</span>
-            <span className="text-slate-700 font-mono">v3.0.0</span>
+            <span className="text-slate-700 font-mono">v8.0.0</span>
           </div>
         </div>
 
@@ -337,7 +355,7 @@ const Home: React.FC = () => {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
         </span>
-        v3.0.0
+        v8.0.0
       </div>
     </div>
   );

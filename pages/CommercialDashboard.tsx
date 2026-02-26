@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import Header from '../components/Header';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '../lib/UserRoleContext';
 import {
@@ -58,16 +57,16 @@ const MRRLineChart: React.FC<{ months: MonthlyMetrics[]; comparisonMonths?: Mont
             {gridValues.map((val, i) => (
                 <g key={i}>
                     <line x1={padding.left} y1={getY(val)} x2={width - padding.right} y2={getY(val)}
-                        stroke="currentColor" className="text-slate-800" strokeDasharray="4 4" strokeWidth={0.5} />
+                        stroke="currentColor" className="text-neutral-800" strokeDasharray="4 4" strokeWidth={0.5} />
                     <text x={padding.left - 8} y={getY(val) + 4} textAnchor="end"
-                        className="fill-slate-500 text-[10px]">{formatCompact(val)}</text>
+                        className="fill-neutral-500 text-[10px]">{formatCompact(val)}</text>
                 </g>
             ))}
 
             {/* Month labels */}
             {months.map((m, i) => (
                 <text key={i} x={getX(i)} y={height - 8} textAnchor="middle"
-                    className="fill-slate-500 text-[10px] font-medium">{m.monthLabel}</text>
+                    className="fill-neutral-500 text-[10px] font-medium">{m.monthLabel}</text>
             ))}
 
             {/* Comparison line */}
@@ -122,9 +121,9 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
                 return (
                     <g key={i}>
                         <line x1={padding.left} y1={y} x2={width - padding.right} y2={y}
-                            stroke="currentColor" className="text-slate-800" strokeDasharray="4 4" strokeWidth={0.5} />
+                            stroke="currentColor" className="text-neutral-800" strokeDasharray="4 4" strokeWidth={0.5} />
                         <text x={padding.left - 8} y={y + 4} textAnchor="end"
-                            className="fill-slate-500 text-[10px]">{formatCompact(val)}</text>
+                            className="fill-neutral-500 text-[10px]">{formatCompact(val)}</text>
                     </g>
                 );
             })}
@@ -151,7 +150,7 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
                         </rect>
                         {/* Month label */}
                         <text x={x + barWidth / 2} y={height - 8} textAnchor="middle"
-                            className="fill-slate-500 text-[10px] font-medium">{m.monthLabel}</text>
+                            className="fill-neutral-500 text-[10px] font-medium">{m.monthLabel}</text>
                     </g>
                 );
             })}
@@ -201,7 +200,7 @@ const ConversionFunnelChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months 
                         )}
                         {/* Month */}
                         <text x={groupX + barWidth + 2} y={height - 8} textAnchor="middle"
-                            className="fill-slate-500 text-[10px] font-medium">{m.monthLabel}</text>
+                            className="fill-neutral-500 text-[10px] font-medium">{m.monthLabel}</text>
                     </g>
                 );
             })}
@@ -246,7 +245,7 @@ const ChurnChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => {
                         </rect>
                         {/* Month */}
                         <text x={groupX + barWidth + 2} y={height - 8} textAnchor="middle"
-                            className="fill-slate-500 text-[10px] font-medium">{m.monthLabel}</text>
+                            className="fill-neutral-500 text-[10px] font-medium">{m.monthLabel}</text>
                     </g>
                 );
             })}
@@ -269,7 +268,7 @@ const KPICard: React.FC<{
     icon: React.ReactNode;
     subtitle?: string;
 }> = ({ title, value, change, icon, subtitle }) => (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden group hover:border-slate-700 transition-all">
+    <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-5 relative overflow-hidden group hover:border-neutral-700 transition-all">
         <div className="flex items-start justify-between mb-3">
             <div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700 transition-colors">
                 {icon}
@@ -360,7 +359,7 @@ const CommercialChatbot: React.FC<{
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 w-[420px] h-[600px] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-6 right-6 z-50 w-[420px] h-[600px] bg-neutral-950 border border-neutral-800 rounded-c4 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/50">
                 <div className="flex items-center gap-3">
@@ -496,34 +495,30 @@ const CommercialDashboard: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 transition-colors duration-200">
-            <Header />
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                <div>
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="flex items-center gap-2 text-slate-500 hover:text-brand-coral mb-4 transition-colors group"
+                    >
+                        <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                        Voltar ao Dashboard
+                    </button>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <BarChart3 className="w-8 h-8 text-brand-coral" />
+                        Dashboard Financeiro
+                    </h1>
+                    <p className="text-slate-400 mt-1">
+                        Métricas de evolução comercial — Exercício {selectedYear}
+                    </p>
+                </div>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                    <div>
-                        <button
-                            onClick={() => navigate('/dashboard')}
-                            className="flex items-center gap-2 text-slate-500 hover:text-brand-coral mb-4 transition-colors group"
-                        >
-                            <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-                            Voltar ao Dashboard
-                        </button>
-                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                            <BarChart3 className="w-8 h-8 text-brand-coral" />
-                            Dashboard Financeiro
-                        </h1>
-                        <p className="text-slate-400 mt-1">
-                            Métricas de evolução comercial — Exercício {selectedYear}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={async () => {
-                                if (!context) return;
-                                const content = `
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={async () => {
+                            if (!context) return;
+                            const content = `
 Relatório Financeiro - ${selectedYear}
 MRR Atual: ${formatCompact(context.currentMRR)} (Crescimento: ${context.mrrGrowth}%)
 Receita Acumulada: ${formatCompact(context.accumulatedRevenue)}
@@ -534,270 +529,266 @@ Clientes Ativos: ${context.currentActiveClients}
 
 Detalhamento Mensal:
 ${context.months.map(m =>
-                                    `- ${m.monthLabel}: MRR ${formatCurrency(m.mrr)}, Receita ${formatCurrency(m.totalRevenue)}, Novos ${m.newContracts}, Churn ${m.churnedContracts}`
-                                ).join('\n')}
+                                `- ${m.monthLabel}: MRR ${formatCurrency(m.mrr)}, Receita ${formatCurrency(m.totalRevenue)}, Novos ${m.newContracts}, Churn ${m.churnedContracts}`
+                            ).join('\n')}
                                 `.trim();
 
-                                try {
-                                    alert('Salvando dados no cérebro... Aguarde.');
-                                    await import('../lib/brain').then(m => m.addToBrain(content, {
-                                        source: 'CommercialDashboard',
-                                        year: selectedYear,
-                                        type: 'report'
-                                    }));
-                                    alert('✅ Dados salvos no Cérebro com sucesso!');
-                                } catch (e) {
-                                    alert('❌ Erro ao salvar no cérebro.');
-                                    console.error(e);
-                                }
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all text-sm font-bold"
-                        >
-                            <Bot size={16} />
-                            Salvar no Cérebro
-                        </button>
+                            try {
+                                alert('Salvando dados no cérebro... Aguarde.');
+                                await import('../lib/brain').then(m => m.addToBrain(content, {
+                                    source: 'CommercialDashboard',
+                                    year: selectedYear,
+                                    type: 'report'
+                                }));
+                                alert('✅ Dados salvos no Cérebro com sucesso!');
+                            } catch (e) {
+                                alert('❌ Erro ao salvar no cérebro.');
+                                console.error(e);
+                            }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all text-sm font-bold"
+                    >
+                        <Bot size={16} />
+                        Salvar no Cérebro
+                    </button>
+                </div>
+
+                {/* Year selectors */}
+                <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Exercício</label>
+                        <div className="relative">
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                className="appearance-none bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 pr-8 text-sm font-bold text-white cursor-pointer focus:border-brand-coral outline-none transition-colors"
+                            >
+                                {years.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        </div>
                     </div>
 
-                    {/* Year selectors */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Exercício</label>
-                            <div className="relative">
-                                <select
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                    className="appearance-none bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 pr-8 text-sm font-bold text-white cursor-pointer focus:border-brand-coral outline-none transition-colors"
-                                >
-                                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Comparar com</label>
-                            <div className="relative">
-                                <select
-                                    value={comparisonYear || ''}
-                                    onChange={(e) => setComparisonYear(e.target.value ? Number(e.target.value) : undefined)}
-                                    className="appearance-none bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 pr-8 text-sm font-bold text-white cursor-pointer focus:border-brand-coral outline-none transition-colors"
-                                >
-                                    <option value="">Nenhum</option>
-                                    {years.filter(y => y !== selectedYear).map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                            </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Comparar com</label>
+                        <div className="relative">
+                            <select
+                                value={comparisonYear || ''}
+                                onChange={(e) => setComparisonYear(e.target.value ? Number(e.target.value) : undefined)}
+                                className="appearance-none bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 pr-8 text-sm font-bold text-white cursor-pointer focus:border-brand-coral outline-none transition-colors"
+                            >
+                                <option value="">Nenhum</option>
+                                {years.filter(y => y !== selectedYear).map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         </div>
                     </div>
                 </div>
+            </div>
 
-                {loading ? (
-                    <div className="flex items-center justify-center py-32">
-                        <div className="text-center">
-                            <Loader2 className="w-10 h-10 text-brand-coral animate-spin mx-auto mb-4" />
-                            <p className="text-slate-500 text-sm">Calculando métricas comerciais...</p>
-                        </div>
+            {loading ? (
+                <div className="flex items-center justify-center py-32">
+                    <div className="text-center">
+                        <Loader2 className="w-10 h-10 text-brand-coral animate-spin mx-auto mb-4" />
+                        <p className="text-slate-500 text-sm">Calculando métricas comerciais...</p>
                     </div>
-                ) : context ? (
-                    <>
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
-                            <KPICard
-                                title="MRR"
-                                value={formatCompact(context.currentMRR)}
-                                change={context.mrrGrowth}
-                                icon={<DollarSign size={18} className="text-emerald-400" />}
-                                subtitle="Receita Mensal Recorrente"
-                            />
-                            <KPICard
-                                title="Rec. Acumulada"
-                                value={formatCompact(context.accumulatedRevenue)}
-                                icon={<DollarSign size={18} className="text-emerald-400" />}
-                                subtitle="Faturamento YTD (Realizado)"
-                            />
-                            <KPICard
-                                title="ARR (Run Rate)"
-                                value={formatCompact(context.actualARR)}
-                                icon={<TrendingUp size={18} className="text-amber-400" />}
-                                subtitle="Escala Anual (MRR x 12)"
-                            />
-                            <KPICard
-                                title="Previsão Total"
-                                value={formatCompact(context.predictedARR)}
-                                icon={<BarChart3 size={18} className="text-blue-400" />}
-                                subtitle="Projeção p/ fim do ano"
-                            />
-                            <KPICard
-                                title="Conversão"
-                                value={`${context.averageConversionRate}%`}
-                                icon={<Percent size={18} className="text-cyan-400" />}
-                                subtitle="Média do exercício"
-                            />
-                            <KPICard
-                                title="Churn"
-                                value={`${context.averageChurnRate}%`}
-                                icon={<TrendingDown size={18} className="text-red-400" />}
-                                subtitle="Média mensal"
-                            />
-                            <KPICard
-                                title="Clientes Ativos"
-                                value={String(context.currentActiveClients)}
-                                icon={<Users size={18} className="text-emerald-400" />}
-                            />
+                </div>
+            ) : context ? (
+                <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
+                        <KPICard
+                            title="MRR"
+                            value={formatCompact(context.currentMRR)}
+                            change={context.mrrGrowth}
+                            icon={<DollarSign size={18} className="text-emerald-400" />}
+                            subtitle="Receita Mensal Recorrente"
+                        />
+                        <KPICard
+                            title="Rec. Acumulada"
+                            value={formatCompact(context.accumulatedRevenue)}
+                            icon={<DollarSign size={18} className="text-emerald-400" />}
+                            subtitle="Faturamento YTD (Realizado)"
+                        />
+                        <KPICard
+                            title="ARR (Run Rate)"
+                            value={formatCompact(context.actualARR)}
+                            icon={<TrendingUp size={18} className="text-amber-400" />}
+                            subtitle="Escala Anual (MRR x 12)"
+                        />
+                        <KPICard
+                            title="Previsão Total"
+                            value={formatCompact(context.predictedARR)}
+                            icon={<BarChart3 size={18} className="text-blue-400" />}
+                            subtitle="Projeção p/ fim do ano"
+                        />
+                        <KPICard
+                            title="Conversão"
+                            value={`${context.averageConversionRate}%`}
+                            icon={<Percent size={18} className="text-cyan-400" />}
+                            subtitle="Média do exercício"
+                        />
+                        <KPICard
+                            title="Churn"
+                            value={`${context.averageChurnRate}%`}
+                            icon={<TrendingDown size={18} className="text-red-400" />}
+                            subtitle="Média mensal"
+                        />
+                        <KPICard
+                            title="Clientes Ativos"
+                            value={String(context.currentActiveClients)}
+                            icon={<Users size={18} className="text-emerald-400" />}
+                        />
+                    </div>
+
+                    {/* Charts Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        {/* MRR Evolution */}
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <TrendingUp size={16} className="text-emerald-400" />
+                                    Evolução do MRR
+                                </h3>
+                                {comparisonYear && (
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                        — Linha tracejada: {comparisonYear}
+                                    </span>
+                                )}
+                            </div>
+                            <MRRLineChart months={context.months} comparisonMonths={context.comparisonMonths} />
                         </div>
 
-                        {/* Charts Grid */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                            {/* MRR Evolution */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                                        <TrendingUp size={16} className="text-emerald-400" />
-                                        Evolução do MRR
-                                    </h3>
-                                    {comparisonYear && (
-                                        <span className="text-[10px] text-slate-500 font-medium">
-                                            — Linha tracejada: {comparisonYear}
-                                        </span>
-                                    )}
-                                </div>
-                                <MRRLineChart months={context.months} comparisonMonths={context.comparisonMonths} />
-                            </div>
-
-                            {/* Revenue Bars */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                                    <BarChart3 size={16} className="text-blue-400" />
-                                    Receita Mensal (Recorrente + Setup)
-                                </h3>
-                                <RevenueBarChart months={context.months} />
-                            </div>
-
-                            {/* Conversion Funnel */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                                    <Percent size={16} className="text-emerald-400" />
-                                    Funil de Conversão
-                                </h3>
-                                <ConversionFunnelChart months={context.months} />
-                            </div>
-
-                            {/* Churn vs New */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                                    <Activity size={16} className="text-red-400" />
-                                    Churn vs. Novas Aquisições
-                                </h3>
-                                <ChurnChart months={context.months} />
-                            </div>
-                        </div>
-
-                        {/* Monthly Detail Table */}
-                        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-hidden">
+                        {/* Revenue Bars */}
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6">
                             <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                                <MessageSquare size={16} className="text-slate-400" />
-                                Detalhamento Mensal — {selectedYear}
+                                <BarChart3 size={16} className="text-blue-400" />
+                                Receita Mensal (Recorrente + Setup)
                             </h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
-                                            <th className="py-3 px-3">Mês</th>
-                                            <th className="py-3 px-3 text-right">Fat. Recorrente</th>
-                                            <th className="py-3 px-3 text-right">MRR (Contratos)</th>
-                                            <th className="py-3 px-3 text-right">Setup</th>
-                                            <th className="py-3 px-3 text-right">Receita Total</th>
-                                            <th className="py-3 px-3 text-center">Propostas</th>
-                                            <th className="py-3 px-3 text-center">Aceitas</th>
-                                            <th className="py-3 px-3 text-center">Conversão</th>
-                                            <th className="py-3 px-3 text-center">Novos</th>
-                                            <th className="py-3 px-3 text-center">Churn</th>
-                                            <th className="py-3 px-3 text-center">Ativos</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-xs">
-                                        {context.months.map((m, i) => (
-                                            <tr key={i} className={`border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors ${m.isForecast ? 'opacity-60' : ''}`}>
-                                                <td className="py-3 px-3 font-bold text-white">
-                                                    {m.monthLabel}
-                                                    {m.isForecast && (
-                                                        <span className="ml-2 text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-bold">PREV</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-emerald-400 font-medium">
-                                                    {m.isForecast ? '—' : formatCurrency(m.mrr)}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-amber-400 font-medium">
-                                                    {formatCurrency(m.forecastMRR)}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-blue-400 font-medium">
-                                                    {m.isForecast ? '—' : formatCurrency(m.setupRevenue)}
-                                                </td>
-                                                <td className="py-3 px-3 text-right text-white font-bold">
-                                                    {m.isForecast ? formatCurrency(m.forecastMRR) : formatCurrency(m.totalRevenue)}
-                                                </td>
-                                                <td className="py-3 px-3 text-center text-slate-400">{m.isForecast ? '—' : m.totalProposals}</td>
-                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.acceptedProposals}</td>
-                                                <td className="py-3 px-3 text-center">
-                                                    {m.isForecast ? '—' : (
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.conversionRate >= 50 ? 'text-emerald-400 bg-emerald-400/10' :
-                                                            m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
-                                                                'text-slate-500 bg-slate-800'
-                                                            }`}>
-                                                            {m.conversionRate}%
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.newContracts}</td>
-                                                <td className="py-3 px-3 text-center text-red-400 font-medium">{m.isForecast ? '—' : m.churnedContracts}</td>
-                                                <td className="py-3 px-3 text-center text-white font-bold">{m.isForecast ? '—' : m.activeClients}</td>
-                                            </tr>
-                                        ))}
-                                        {/* Totals row */}
-                                        <tr className="border-t-2 border-slate-700 bg-slate-800/30 font-bold">
-                                            <td className="py-3 px-3 text-white">TOTAL</td>
-                                            <td className="py-3 px-3 text-right text-emerald-400">
-                                                {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.mrr, 0))}
-                                            </td>
-                                            <td className="py-3 px-3 text-right text-amber-400">
-                                                {formatCurrency(context.months.reduce((s, m) => s + m.forecastMRR, 0))}
-                                            </td>
-                                            <td className="py-3 px-3 text-right text-blue-400">
-                                                {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.setupRevenue, 0))}
-                                            </td>
-                                            <td className="py-3 px-3 text-right text-white">
-                                                {formatCurrency(context.months.reduce((s, m) => s + (m.isForecast ? m.forecastMRR : m.totalRevenue), 0))}
-                                            </td>
-                                            <td className="py-3 px-3 text-center text-slate-400">
-                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.totalProposals, 0)}
-                                            </td>
-                                            <td className="py-3 px-3 text-center text-emerald-400">
-                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.acceptedProposals, 0)}
-                                            </td>
-                                            <td className="py-3 px-3 text-center text-slate-500">—</td>
-                                            <td className="py-3 px-3 text-center text-emerald-400">
-                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.newContracts, 0)}
-                                            </td>
-                                            <td className="py-3 px-3 text-center text-red-400">
-                                                {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.churnedContracts, 0)}
-                                            </td>
-                                            <td className="py-3 px-3 text-center text-white">{context.currentActiveClients}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <RevenueBarChart months={context.months} />
                         </div>
-                    </>
-                ) : (
-                    <div className="text-center py-32">
-                        <BarChart3 size={48} className="mx-auto text-slate-700 mb-4" />
-                        <p className="text-slate-500">Não foi possível carregar os dados comerciais.</p>
-                    </div>
-                )}
-            </main>
 
-            {/* Chatbot */}
-            <CommercialChatbot context={context} isGestor={userRole === 'gestor' || userRole === 'admin'} />
+                        {/* Conversion Funnel */}
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                <Percent size={16} className="text-emerald-400" />
+                                Funil de Conversão
+                            </h3>
+                            <ConversionFunnelChart months={context.months} />
+                        </div>
+
+                        {/* Churn vs New */}
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                <Activity size={16} className="text-red-400" />
+                                Churn vs. Novas Aquisições
+                            </h3>
+                            <ChurnChart months={context.months} />
+                        </div>
+                    </div>
+
+                    {/* Monthly Detail Table */}
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6 overflow-hidden">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                            <MessageSquare size={16} className="text-slate-400" />
+                            Detalhamento Mensal — {selectedYear}
+                        </h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
+                                        <th className="py-3 px-3">Mês</th>
+                                        <th className="py-3 px-3 text-right">Fat. Recorrente</th>
+                                        <th className="py-3 px-3 text-right">MRR (Contratos)</th>
+                                        <th className="py-3 px-3 text-right">Setup</th>
+                                        <th className="py-3 px-3 text-right">Receita Total</th>
+                                        <th className="py-3 px-3 text-center">Propostas</th>
+                                        <th className="py-3 px-3 text-center">Aceitas</th>
+                                        <th className="py-3 px-3 text-center">Conversão</th>
+                                        <th className="py-3 px-3 text-center">Novos</th>
+                                        <th className="py-3 px-3 text-center">Churn</th>
+                                        <th className="py-3 px-3 text-center">Ativos</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs">
+                                    {context.months.map((m, i) => (
+                                        <tr key={i} className={`border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors ${m.isForecast ? 'opacity-60' : ''}`}>
+                                            <td className="py-3 px-3 font-bold text-white">
+                                                {m.monthLabel}
+                                                {m.isForecast && (
+                                                    <span className="ml-2 text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-bold">PREV</span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-emerald-400 font-medium">
+                                                {m.isForecast ? '—' : formatCurrency(m.mrr)}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-amber-400 font-medium">
+                                                {formatCurrency(m.forecastMRR)}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-blue-400 font-medium">
+                                                {m.isForecast ? '—' : formatCurrency(m.setupRevenue)}
+                                            </td>
+                                            <td className="py-3 px-3 text-right text-white font-bold">
+                                                {m.isForecast ? formatCurrency(m.forecastMRR) : formatCurrency(m.totalRevenue)}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-slate-400">{m.isForecast ? '—' : m.totalProposals}</td>
+                                            <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.acceptedProposals}</td>
+                                            <td className="py-3 px-3 text-center">
+                                                {m.isForecast ? '—' : (
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.conversionRate >= 50 ? 'text-emerald-400 bg-emerald-400/10' :
+                                                        m.conversionRate >= 25 ? 'text-amber-400 bg-amber-400/10' :
+                                                            'text-slate-500 bg-slate-800'
+                                                        }`}>
+                                                        {m.conversionRate}%
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.newContracts}</td>
+                                            <td className="py-3 px-3 text-center text-red-400 font-medium">{m.isForecast ? '—' : m.churnedContracts}</td>
+                                            <td className="py-3 px-3 text-center text-white font-bold">{m.isForecast ? '—' : m.activeClients}</td>
+                                        </tr>
+                                    ))}
+                                    {/* Totals row */}
+                                    <tr className="border-t-2 border-slate-700 bg-slate-800/30 font-bold">
+                                        <td className="py-3 px-3 text-white">TOTAL</td>
+                                        <td className="py-3 px-3 text-right text-emerald-400">
+                                            {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.mrr, 0))}
+                                        </td>
+                                        <td className="py-3 px-3 text-right text-amber-400">
+                                            {formatCurrency(context.months.reduce((s, m) => s + m.forecastMRR, 0))}
+                                        </td>
+                                        <td className="py-3 px-3 text-right text-blue-400">
+                                            {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.setupRevenue, 0))}
+                                        </td>
+                                        <td className="py-3 px-3 text-right text-white">
+                                            {formatCurrency(context.months.reduce((s, m) => s + (m.isForecast ? m.forecastMRR : m.totalRevenue), 0))}
+                                        </td>
+                                        <td className="py-3 px-3 text-center text-slate-400">
+                                            {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.totalProposals, 0)}
+                                        </td>
+                                        <td className="py-3 px-3 text-center text-emerald-400">
+                                            {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.acceptedProposals, 0)}
+                                        </td>
+                                        <td className="py-3 px-3 text-center text-slate-500">—</td>
+                                        <td className="py-3 px-3 text-center text-emerald-400">
+                                            {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.newContracts, 0)}
+                                        </td>
+                                        <td className="py-3 px-3 text-center text-red-400">
+                                            {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.churnedContracts, 0)}
+                                        </td>
+                                        <td className="py-3 px-3 text-center text-white">{context.currentActiveClients}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <div className="text-center py-32">
+                    <BarChart3 size={48} className="mx-auto text-slate-700 mb-4" />
+                    <p className="text-slate-500">Não foi possível carregar os dados comerciais.</p>
+                </div>
+            )}
         </div>
     );
 };

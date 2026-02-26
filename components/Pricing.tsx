@@ -2,7 +2,7 @@
 import React from 'react';
 
 interface PricingProps {
-  services?: { id: string; price: number }[] | string[];
+  services?: { id: string; price: number; recurringPrice?: number; setupPrice?: number }[] | string[];
 }
 
 const Pricing: React.FC<PricingProps> = ({
@@ -14,16 +14,29 @@ const Pricing: React.FC<PricingProps> = ({
 
   // Helper to normalize services input
   const normalizedServices = Array.isArray(services)
-    ? services.map(s => typeof s === 'string' ? { id: s, price: 0 } : s)
+    ? services.map(s => typeof s === 'string' ? { id: s, price: 0, recurringPrice: 0, setupPrice: 0 } : s)
     : [];
 
-  // Calculate Recurring Total (Traffic + Hosting)
-  const recurringServices = normalizedServices.filter(s => ['traffic_management', 'hosting'].includes(s.id));
-  const recurringTotal = recurringServices.reduce((acc, curr) => acc + curr.price, 0);
+  const recurringServiceIds = ['traffic_management', 'hosting', 'ai_agents'];
+  const isRecurringService = (serviceId: string) => recurringServiceIds.includes(serviceId);
 
-  // Calculate One-Time Total (Website, LP, etc)
-  const oneTimeServices = normalizedServices.filter(s => !['traffic_management', 'hosting'].includes(s.id));
-  const oneTimeTotal = oneTimeServices.reduce((acc, curr) => acc + curr.price, 0);
+  const getRecurringAmount = (service: { id: string; price: number; recurringPrice?: number }) => {
+    if (service.id === 'ai_agents') return service.recurringPrice || 0;
+    return isRecurringService(service.id) ? service.price : 0;
+  };
+
+  const getSetupAmount = (service: { id: string; price: number; setupPrice?: number }) => {
+    if (service.id === 'ai_agents') return service.setupPrice || 0;
+    return isRecurringService(service.id) ? 0 : service.price;
+  };
+
+  // Calculate Recurring Total (Traffic + Hosting + AI Agents)
+  const recurringServices = normalizedServices.filter(s => isRecurringService(s.id));
+  const recurringTotal = recurringServices.reduce((acc, curr) => acc + getRecurringAmount(curr), 0);
+
+  // Calculate One-Time Total (Website, LP, etc + AI Agents setup)
+  const oneTimeServices = normalizedServices.filter(s => !isRecurringService(s.id) || s.id === 'ai_agents');
+  const oneTimeTotal = oneTimeServices.reduce((acc, curr) => acc + getSetupAmount(curr), 0);
 
   const recurringFormatted = formatCurrency(recurringTotal);
   const [currencySymbol, amount] = recurringFormatted.split(/\s(.+)/);
@@ -36,7 +49,8 @@ const Pricing: React.FC<PricingProps> = ({
     'landing_page': 'Landing Page',
     'website': 'Web Site',
     'ecommerce': 'E-commerce',
-    'consulting': 'Consultoria'
+    'consulting': 'Consultoria',
+    'ai_agents': 'Agentes de IA'
   };
 
   return (
@@ -93,8 +107,10 @@ const Pricing: React.FC<PricingProps> = ({
                   {recurringServices.length > 0 ? (
                     recurringServices.map(service => (
                       <div key={service.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
-                        <span className="text-slate-600 font-medium">{serviceLabels[service.id]}</span>
-                        <span className="font-bold text-slate-900">{formatCurrency(service.price)}</span>
+                        <span className="text-slate-600 font-medium">
+                          {service.id === 'ai_agents' ? 'Agentes de IA (Recorrência)' : (serviceLabels[service.id] || service.id)}
+                        </span>
+                        <span className="font-bold text-slate-900">{formatCurrency(getRecurringAmount(service))}</span>
                       </div>
                     ))
                   ) : (
@@ -113,8 +129,10 @@ const Pricing: React.FC<PricingProps> = ({
                     {oneTimeServices.length > 0 ? (
                       oneTimeServices.map(service => (
                         <div key={service.id} className="flex justify-between items-center text-xs">
-                          <span className="text-slate-500">{serviceLabels[service.id]}</span>
-                          <span className="font-semibold text-slate-700">{formatCurrency(service.price)}</span>
+                          <span className="text-slate-500">
+                            {service.id === 'ai_agents' ? 'Agentes de IA (Setup)' : (serviceLabels[service.id] || service.id)}
+                          </span>
+                          <span className="font-semibold text-slate-700">{formatCurrency(getSetupAmount(service))}</span>
                         </div>
                       ))
                     ) : (

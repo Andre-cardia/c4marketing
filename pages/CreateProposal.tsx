@@ -4,6 +4,35 @@ import { supabase } from '../lib/supabase';
 import Header from '../components/Header';
 import { ArrowLeft, Check, DollarSign, Calendar, Target } from 'lucide-react';
 
+type ProposalService = {
+    id: string;
+    price: number;
+    details?: string;
+    recurringPrice?: number;
+    setupPrice?: number;
+};
+
+const RECURRING_SERVICE_IDS = ['traffic_management', 'hosting', 'ai_agents'];
+const HYBRID_SERVICE_IDS = ['ai_agents'];
+
+const isHybridService = (serviceId: string) => HYBRID_SERVICE_IDS.includes(serviceId);
+const isRecurringService = (serviceId: string) => RECURRING_SERVICE_IDS.includes(serviceId);
+
+const getRecurringAmount = (service: ProposalService) => {
+    if (service.id === 'ai_agents') return service.recurringPrice || 0;
+    return isRecurringService(service.id) ? service.price || 0 : 0;
+};
+
+const getSetupAmount = (service: ProposalService) => {
+    if (service.id === 'ai_agents') return service.setupPrice || 0;
+    return isRecurringService(service.id) ? 0 : service.price || 0;
+};
+
+const getDisplayLabel = (serviceLabel: string, context: 'recurring' | 'setup') => {
+    if (serviceLabel !== 'Agentes de IA') return serviceLabel;
+    return context === 'recurring' ? 'Agentes de IA (Recorrência)' : 'Agentes de IA (Setup)';
+};
+
 const CreateProposal: React.FC = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -12,26 +41,25 @@ const CreateProposal: React.FC = () => {
         responsibleName: '',
         mediaLimit: 5000,
         contractDuration: 6,
-        services: [] as { id: string; price: number; details?: string }[]
+        services: [] as ProposalService[]
     });
 
     const servicesList = [
-        { id: 'traffic_management', label: 'Gestão de Tráfego', type: 'mensal' },
-        { id: 'hosting', label: 'Hospedagem', type: 'mensal' },
-        { id: 'landing_page', label: 'Landing Page', type: 'unico' },
-        { id: 'website', label: 'Web Site Institucional', type: 'unico' },
-        { id: 'ecommerce', label: 'E-commerce', type: 'unico' },
-        { id: 'consulting', label: 'Consultoria de Mkt', type: 'unico' }
+        { id: 'traffic_management', label: 'Gestão de Tráfego', billingType: 'recurring' },
+        { id: 'hosting', label: 'Hospedagem', billingType: 'recurring' },
+        { id: 'landing_page', label: 'Landing Page', billingType: 'one_time' },
+        { id: 'website', label: 'Web Site Institucional', billingType: 'one_time' },
+        { id: 'ecommerce', label: 'E-commerce', billingType: 'one_time' },
+        { id: 'consulting', label: 'Consultoria de Mkt', billingType: 'one_time' },
+        { id: 'ai_agents', label: 'Agentes de IA', billingType: 'hybrid' }
     ];
 
     // Calculate totals on the fly
     const monthlyTotal = newProposal.services
-        .filter(s => ['traffic_management', 'hosting'].includes(s.id))
-        .reduce((acc, curr) => acc + curr.price, 0);
+        .reduce((acc, curr) => acc + getRecurringAmount(curr), 0);
 
     const oneTimeTotal = newProposal.services
-        .filter(s => !['traffic_management', 'hosting'].includes(s.id))
-        .reduce((acc, curr) => acc + curr.price, 0);
+        .reduce((acc, curr) => acc + getSetupAmount(curr), 0);
 
     const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -73,7 +101,7 @@ const CreateProposal: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-slate-50 text-slate-900">
             <Header />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -97,24 +125,28 @@ const CreateProposal: React.FC = () => {
                                 </h2>
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Nome da Empresa</label>
+                                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                            Nome da Empresa <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
                                             required
                                             value={newProposal.companyName}
                                             onChange={e => setNewProposal({ ...newProposal, companyName: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all text-slate-900 bg-white"
                                             placeholder="Ex: Tech Solutions"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Responsável</label>
+                                        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                            Responsável <span className="text-red-500">*</span>
+                                        </label>
                                         <input
                                             type="text"
                                             required
                                             value={newProposal.responsibleName}
                                             onChange={e => setNewProposal({ ...newProposal, responsibleName: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all text-slate-900 bg-white"
                                             placeholder="Ex: Maria Silva"
                                         />
                                     </div>
@@ -142,7 +174,19 @@ const CreateProposal: React.FC = () => {
                                                         onChange={e => {
                                                             const currentServices = newProposal.services;
                                                             if (e.target.checked) {
-                                                                setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0, details: '' }] });
+                                                                setNewProposal({
+                                                                    ...newProposal,
+                                                                    services: [
+                                                                        ...currentServices,
+                                                                        {
+                                                                            id: service.id,
+                                                                            price: 0,
+                                                                            recurringPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                            setupPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                            details: ''
+                                                                        }
+                                                                    ]
+                                                                });
                                                             } else {
                                                                 setNewProposal({ ...newProposal, services: currentServices.filter(s => s.id !== service.id) });
                                                             }
@@ -152,14 +196,32 @@ const CreateProposal: React.FC = () => {
                                                     <div className="flex-1 cursor-pointer" onClick={() => {
                                                         const currentServices = newProposal.services;
                                                         if (!isSelected) {
-                                                            setNewProposal({ ...newProposal, services: [...currentServices, { id: service.id, price: 0, details: '' }] });
+                                                            setNewProposal({
+                                                                ...newProposal,
+                                                                services: [
+                                                                    ...currentServices,
+                                                                    {
+                                                                        id: service.id,
+                                                                        price: 0,
+                                                                        recurringPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                        setupPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                        details: ''
+                                                                    }
+                                                                ]
+                                                            });
                                                         }
                                                     }}>
                                                         <span className="font-bold text-slate-900 block">{service.label}</span>
-                                                        <span className="text-xs text-slate-500 uppercase tracking-wider">{service.type === 'mensal' ? 'Recorrente' : 'Projeto Único'}</span>
+                                                        <span className="text-xs text-slate-500 uppercase tracking-wider">
+                                                            {service.billingType === 'hybrid'
+                                                                ? 'Setup + Recorrente'
+                                                                : service.billingType === 'recurring'
+                                                                    ? 'Recorrente'
+                                                                    : 'Projeto Único'}
+                                                        </span>
                                                     </div>
 
-                                                    {isSelected && (
+                                                    {isSelected && !isHybridService(service.id) && (
                                                         <div className="w-32 animate-in slide-in-from-right-4 duration-300">
                                                             <input
                                                                 type="number"
@@ -172,9 +234,48 @@ const CreateProposal: React.FC = () => {
                                                                         services: prev.services.map(s => s.id === service.id ? { ...s, price } : s)
                                                                     }));
                                                                 }}
-                                                                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-right font-medium focus:border-brand-coral outline-none"
+                                                                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-right font-medium focus:border-brand-coral outline-none text-slate-900 bg-white"
                                                                 autoFocus
                                                             />
+                                                        </div>
+                                                    )}
+
+                                                    {isSelected && isHybridService(service.id) && (
+                                                        <div className="w-full sm:w-80 animate-in slide-in-from-right-4 duration-300">
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Recorrência</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        placeholder="R$ 0,00"
+                                                                        value={serviceData?.recurringPrice || ''}
+                                                                        onChange={e => {
+                                                                            const recurringPrice = parseFloat(e.target.value) || 0;
+                                                                            setNewProposal(prev => ({
+                                                                                ...prev,
+                                                                                services: prev.services.map(s => s.id === service.id ? { ...s, recurringPrice } : s)
+                                                                            }));
+                                                                        }}
+                                                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 text-right font-medium focus:border-brand-coral outline-none text-slate-900 bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Setup</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        placeholder="R$ 0,00"
+                                                                        value={serviceData?.setupPrice || ''}
+                                                                        onChange={e => {
+                                                                            const setupPrice = parseFloat(e.target.value) || 0;
+                                                                            setNewProposal(prev => ({
+                                                                                ...prev,
+                                                                                services: prev.services.map(s => s.id === service.id ? { ...s, setupPrice } : s)
+                                                                            }));
+                                                                        }}
+                                                                        className="w-full px-3 py-2 rounded-lg border border-slate-300 text-right font-medium focus:border-brand-coral outline-none text-slate-900 bg-white"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -193,7 +294,7 @@ const CreateProposal: React.FC = () => {
                                                                         services: prev.services.map(s => s.id === service.id ? { ...s, details } : s)
                                                                     }));
                                                                 }}
-                                                                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none"
+                                                                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none text-slate-900 bg-white"
                                                                 rows={2}
                                                             />
                                                         </div>
@@ -206,29 +307,35 @@ const CreateProposal: React.FC = () => {
                             </div>
 
                             {/* Section 3: Traffic Details (Conditional) */}
-                            {newProposal.services.some(s => s.id === 'traffic_management') && (
+                            {newProposal.services.some(s => isRecurringService(s.id)) && (
                                 <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 animate-in slide-in-from-bottom-4 duration-500">
                                     <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                                         <div className="w-8 h-8 bg-brand-coral/10 text-brand-coral rounded-lg flex items-center justify-center text-sm">3</div>
-                                        Detalhes de Tráfego
+                                        Detalhes de Contrato Recorrente
                                     </h2>
                                     <div className="grid md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Verba de Mídia (Ads)</label>
-                                            <div className="relative">
-                                                <Target className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                                                <input
-                                                    type="number"
-                                                    required
-                                                    value={newProposal.mediaLimit}
-                                                    onChange={e => setNewProposal({ ...newProposal, mediaLimit: parseFloat(e.target.value) })}
-                                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all"
-                                                />
+                                        {newProposal.services.some(s => s.id === 'traffic_management') && (
+                                            <div>
+                                                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                                    Verba de Mídia (Ads) <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <Target className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                                                    <input
+                                                        type="number"
+                                                        required
+                                                        value={newProposal.mediaLimit}
+                                                        onChange={e => setNewProposal({ ...newProposal, mediaLimit: parseFloat(e.target.value) })}
+                                                        className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:border-brand-coral outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-2">Valor sugerido para investimento nas plataformas.</p>
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-2">Valor sugerido para investimento nas plataformas.</p>
-                                        </div>
+                                        )}
                                         <div>
-                                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Tempo de Contrato (Meses)</label>
+                                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                                Tempo de Contrato (Meses) <span className="text-red-500">*</span>
+                                            </label>
                                             <div className="relative">
                                                 <Calendar className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                                                 <input
@@ -265,10 +372,10 @@ const CreateProposal: React.FC = () => {
                                         <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Mensalidade Total</p>
                                         <p className="text-4xl font-black font-montserrat">{formatCurrency(monthlyTotal)}</p>
                                         <div className="mt-2 space-y-1">
-                                            {newProposal.services.filter(s => ['traffic_management', 'hosting'].includes(s.id)).map(s => (
+                                            {newProposal.services.filter(s => isRecurringService(s.id)).map(s => (
                                                 <div key={s.id} className="flex justify-between text-xs text-slate-400">
-                                                    <span>{servicesList.find(i => i.id === s.id)?.label}</span>
-                                                    <span>{formatCurrency(s.price)}</span>
+                                                    <span>{getDisplayLabel(servicesList.find(i => i.id === s.id)?.label || s.id, 'recurring')}</span>
+                                                    <span>{formatCurrency(getRecurringAmount(s))}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -278,10 +385,10 @@ const CreateProposal: React.FC = () => {
                                         <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Investimento Pontual</p>
                                         <p className="text-2xl font-bold font-montserrat">{formatCurrency(oneTimeTotal)}</p>
                                         <div className="mt-2 space-y-1">
-                                            {newProposal.services.filter(s => !['traffic_management', 'hosting'].includes(s.id)).map(s => (
+                                            {newProposal.services.filter(s => !isRecurringService(s.id) || isHybridService(s.id)).map(s => (
                                                 <div key={s.id} className="flex justify-between text-xs text-slate-400">
-                                                    <span>{servicesList.find(i => i.id === s.id)?.label}</span>
-                                                    <span>{formatCurrency(s.price)}</span>
+                                                    <span>{getDisplayLabel(servicesList.find(i => i.id === s.id)?.label || s.id, 'setup')}</span>
+                                                    <span>{formatCurrency(getSetupAmount(s))}</span>
                                                 </div>
                                             ))}
                                         </div>

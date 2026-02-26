@@ -1,15 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import Header from '../components/Header';
 import NoticeCard from '../components/NoticeCard';
 import TaskModal from '../components/projects/TaskModal';
 import NoticeModal from '../components/NoticeModal';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Users, Building, FileText, Calendar, LogOut, Plus, Link as LinkIcon,
     ExternalLink, Trash2, Moon, Sun, Bell, LayoutDashboard, ListTodo,
     Briefcase, AlertTriangle, CheckCircle, Clock, Activity, Target,
-    X, ArrowRight, BarChart2
+    X, ArrowRight, BarChart2, ChevronRight
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 
@@ -85,6 +84,7 @@ interface AccessLog {
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { userRole, fullName, email, avatarUrl, loading: roleLoading } = useUserRole();
 
     const [totalUsers, setTotalUsers] = useState<number>(0);
@@ -109,10 +109,15 @@ const Dashboard: React.FC = () => {
     const [selectedTaskForEdit, setSelectedTaskForEdit] = useState<Task | undefined>(undefined);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+    const [pendingTaskIdFromQuery, setPendingTaskIdFromQuery] = useState<string | null>(null);
 
     // Notice Modal
     const [showNoticeModal, setShowNoticeModal] = useState(false);
     const [showAccessReportModal, setShowAccessReportModal] = useState(false);
+    const [noticesCollapsed, setNoticesCollapsed] = useState(() => {
+        const saved = localStorage.getItem('notices-collapsed');
+        return saved === 'true';
+    });
 
     // User Avatar Map
     const [userAvatars, setUserAvatars] = useState<{ [email: string]: string }>({});
@@ -151,6 +156,32 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const taskId = params.get('task_id');
+        setPendingTaskIdFromQuery(taskId);
+    }, [location.search]);
+
+    useEffect(() => {
+        if (!pendingTaskIdFromQuery || loading) return;
+
+        const targetTask = tasks.find((task) => String(task.id) === pendingTaskIdFromQuery);
+        if (!targetTask) return;
+
+        setSelectedTaskForEdit(targetTask);
+        setSelectedProjectId(targetTask.project_id);
+        setShowTaskModal(true);
+
+        const params = new URLSearchParams(location.search);
+        params.delete('task_id');
+        const search = params.toString();
+        navigate(
+            { pathname: location.pathname, search: search ? `?${search}` : '' },
+            { replace: true }
+        );
+        setPendingTaskIdFromQuery(null);
+    }, [pendingTaskIdFromQuery, loading, tasks, location.pathname, location.search, navigate]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -356,6 +387,7 @@ const Dashboard: React.FC = () => {
         if (data) {
             setNotices([data[0], ...notices]);
             setShowNoticeModal(false);
+            setNoticesCollapsed(false); // Auto-open when a new notice is created
         }
     };
 
@@ -393,46 +425,104 @@ const Dashboard: React.FC = () => {
     }), [tasks]);
 
     if (roleLoading) return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-coral"></div>
         </div>
     );
 
+    const toggleNotices = () => {
+        const newState = !noticesCollapsed;
+        setNoticesCollapsed(newState);
+        localStorage.setItem('notices-collapsed', String(newState));
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-            <Header />
+        <div className="space-y-6">
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Top Row: Avisos (NEW POSITION) & Stats */}
+            <div className="space-y-6">
+                {/* Notices (Highlights) - NOW AT TOP AND COLLAPSIBLE */}
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden transition-all duration-300">
+                    <div className="p-4 px-6 flex justify-between items-center bg-neutral-50/50 dark:bg-neutral-800/30 border-b border-neutral-100 dark:border-neutral-800">
+                        <div
+                            className="flex items-center gap-3 cursor-pointer group"
+                            onClick={toggleNotices}
+                        >
+                            <Bell className={`w-5 h-5 transition-colors ${noticesCollapsed ? 'text-neutral-400' : 'text-brand-coral'}`} />
+                            <h3 className="text-base font-black text-neutral-800 dark:text-white uppercase tracking-tighter flex items-center gap-2">
+                                Avisos da Equipe
+                                <span className="bg-brand-coral/10 text-brand-coral text-[10px] px-2 py-0.5 rounded-full border border-brand-coral/20">
+                                    {notices.length}
+                                </span>
+                            </h3>
+                            <ChevronRight className={`w-4 h-4 text-neutral-400 transition-transform duration-300 ${noticesCollapsed ? '' : 'rotate-90'}`} />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {userRole === 'gestor' && (
+                                <button
+                                    onClick={() => setShowNoticeModal(true)}
+                                    className="p-1.5 bg-brand-coral text-white rounded-lg hover:bg-brand-coral/90 transition-colors shadow-sm"
+                                    title="Novo Aviso"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
-                {/* Top Stats Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {!noticesCollapsed && (
+                        <div className="p-4 px-6 space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar animate-in slide-in-from-top-2 duration-300">
+                            {notices.length === 0 ? (
+                                <div className="text-center py-6 opacity-50">
+                                    <p className="text-neutral-400 text-xs font-bold uppercase tracking-widest">Nenhum aviso importante</p>
+                                </div>
+                            ) : (
+                                notices.map(notice => (
+                                    <NoticeCard
+                                        key={notice.id}
+                                        id={notice.id}
+                                        message={notice.message}
+                                        authorName={notice.author_name}
+                                        authorAvatar={userAvatars[notice.author_email]}
+                                        timestamp={notice.created_at}
+                                        priority={notice.priority}
+                                        canDelete={userRole === 'gestor'}
+                                        onDelete={handleDeleteNotice}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     {/* Active Projects */}
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-slate-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-slate-500/10"></div>
+                    <div className="bg-white dark:bg-neutral-900 p-4 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-neutral-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-neutral-500/10"></div>
                         <div className="relative flex items-center gap-4">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl">
+                            <div className="p-3 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-c4">
                                 <Briefcase size={24} />
                             </div>
                             <div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400 block">Projetos Ativos</span>
-                                <div className="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">
-                                    {clientStatusCounts.active} <span className="text-xs font-normal text-slate-400 align-middle ml-1">em andamento</span>
+                                <span className="text-sm font-bold text-neutral-500 dark:text-neutral-400 block">Projetos Ativos</span>
+                                <div className="text-2xl font-black text-neutral-800 dark:text-white leading-none mt-1">
+                                    {clientStatusCounts.active} <span className="text-xs font-normal text-neutral-400 align-middle ml-1">em andamento</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Deliveries This Week */}
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-slate-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-slate-500/10"></div>
+                    <div className="bg-white dark:bg-neutral-900 p-4 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm relative overflow-hidden group hover:border-brand-coral/50 transition-all flex items-center justify-between">
+                        <div className="absolute right-0 top-0 w-32 h-32 bg-neutral-500/5 rounded-full blur-2xl -mr-16 -mt-16 transition-all group-hover:bg-neutral-500/10"></div>
                         <div className="relative flex items-center gap-4">
-                            <div className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl">
+                            <div className="p-3 bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 rounded-c4">
                                 <Target size={24} />
                             </div>
                             <div>
-                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400 block">Entregas (7 dias)</span>
-                                <div className="text-2xl font-black text-slate-800 dark:text-white leading-none mt-1">
+                                <span className="text-sm font-bold text-neutral-500 dark:text-neutral-400 block">Entregas (7 dias)</span>
+                                <div className="text-2xl font-black text-neutral-800 dark:text-white leading-none mt-1">
                                     {deliveriesThisWeek} <span className="text-xs font-bold text-amber-600 align-middle ml-1">prazo curto!</span>
                                 </div>
                             </div>
@@ -447,18 +537,18 @@ const Dashboard: React.FC = () => {
                     <div className="lg:col-span-2 space-y-8">
 
                         {/* Global Status Bar Chart (Vertical & Monthly) */}
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-neutral-900 p-8 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <h3 className="text-xl font-bold text-neutral-800 dark:text-white flex items-center gap-2">
                                     <BarChart2 className="w-5 h-5 text-brand-coral" />
                                     Volume de Tarefas (Por Mês)
                                 </h3>
                                 {/* Legend */}
                                 <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-slate-400"></div><span className="text-slate-500">Backlog</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-600"></div><span className="text-slate-500">Exec.</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div><span className="text-slate-500">Aprov.</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-slate-500">Final.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-neutral-400"></div><span className="text-neutral-500">Backlog</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-brand-coral"></div><span className="text-neutral-500">Exec.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-500"></div><span className="text-neutral-500">Aprov.</span></div>
+                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div><span className="text-neutral-500">Final.</span></div>
                                 </div>
                             </div>
 
@@ -488,8 +578,8 @@ const Dashboard: React.FC = () => {
                                     const maxVal = Math.max(...data.flatMap(d => [d.backlog, d.in_progress, d.approval, d.done]), 1);
 
                                     const barConfig = [
-                                        { key: 'backlog', color: 'bg-slate-400', hoverColor: 'hover:bg-slate-500', label: 'B' },
-                                        { key: 'in_progress', color: 'bg-blue-600', hoverColor: 'hover:bg-blue-700', label: 'E' },
+                                        { key: 'backlog', color: 'bg-neutral-400', hoverColor: 'hover:bg-neutral-500', label: 'B' },
+                                        { key: 'in_progress', color: 'bg-brand-coral', hoverColor: 'hover:bg-brand-coral/80', label: 'E' },
                                         { key: 'approval', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600', label: 'A' },
                                         { key: 'done', color: 'bg-emerald-500', hoverColor: 'hover:bg-emerald-600', label: 'F' },
                                     ];
@@ -497,11 +587,11 @@ const Dashboard: React.FC = () => {
                                     return data.map((d, index) => (
                                         <div key={index} className="flex-1 flex flex-col items-center group relative">
                                             {/* Tooltip */}
-                                            <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs p-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-10">
+                                            <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-800 text-white text-xs p-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-10">
                                                 <div className="font-bold mb-1">{d.monthLabel} - {d.total} Tarefas</div>
                                                 <div className="flex gap-2">
-                                                    <span className="text-slate-300">B: {d.backlog}</span>
-                                                    <span className="text-blue-300">E: {d.in_progress}</span>
+                                                    <span className="text-neutral-400">B: {d.backlog}</span>
+                                                    <span className="text-brand-coral">E: {d.in_progress}</span>
                                                     <span className="text-amber-300">A: {d.approval}</span>
                                                     <span className="text-emerald-300">F: {d.done}</span>
                                                 </div>
@@ -520,7 +610,7 @@ const Dashboard: React.FC = () => {
                                                             title={`${bar.label}: ${value}`}
                                                         >
                                                             {value > 0 && (
-                                                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-slate-400 dark:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-neutral-400 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                     {value}
                                                                 </span>
                                                             )}
@@ -530,10 +620,10 @@ const Dashboard: React.FC = () => {
                                             </div>
 
                                             {/* Label */}
-                                            <div className="mt-3 text-xs font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                            <div className="mt-3 text-xs font-bold text-neutral-500 dark:text-neutral-400 capitalize">
                                                 {d.monthLabel}
                                             </div>
-                                            <div className="text-[10px] font-bold text-slate-300 dark:text-slate-600">
+                                            <div className="text-[10px] font-bold text-neutral-300 dark:text-neutral-600">
                                                 {d.total}
                                             </div>
                                         </div>
@@ -543,9 +633,9 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Service Progress Tracking */}
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-neutral-900 p-8 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <h3 className="text-xl font-bold text-neutral-800 dark:text-white flex items-center gap-2">
                                     <LayoutDashboard className="w-5 h-5 text-brand-coral" />
                                     Acompanhamento de Tarefas
                                 </h3>
@@ -558,7 +648,7 @@ const Dashboard: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
+                                            <tr className="text-xs font-bold text-neutral-500 uppercase border-b border-neutral-100 dark:border-neutral-800">
                                                 <th className="py-3 pl-2">Cliente</th>
                                                 <th className="py-3">Tarefas Ativas</th>
                                                 <th className="py-3">Alerta de Prazo</th>
@@ -619,12 +709,12 @@ const Dashboard: React.FC = () => {
                                                     }
 
                                                     return (
-                                                        <tr key={project.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                                            <td className="py-4 pl-2 font-bold text-slate-800 dark:text-white">
+                                                        <tr key={project.id} className="border-b border-neutral-50 dark:border-neutral-800/50 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+                                                            <td className="py-4 pl-2 font-bold text-neutral-800 dark:text-white">
                                                                 {project.company_name}
                                                             </td>
                                                             <td className="py-4">
-                                                                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-full border border-slate-200 dark:border-slate-700">
+                                                                <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-bold rounded-full border border-neutral-200 dark:border-neutral-700">
                                                                     {activeCount} tarefas
                                                                 </span>
                                                             </td>
@@ -643,7 +733,7 @@ const Dashboard: React.FC = () => {
                                                             <td className="py-4 text-right pr-2">
                                                                 <button
                                                                     onClick={() => navigate(`/projects?kanban=${project.id}`)}
-                                                                    className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors group"
+                                                                    className="p-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-c4 text-neutral-500 transition-colors group"
                                                                     title="Ver Kanban"
                                                                 >
                                                                     <LayoutDashboard size={16} className="text-brand-coral group-hover:scale-110 transition-transform" />
@@ -660,54 +750,14 @@ const Dashboard: React.FC = () => {
 
 
 
-                        {/* Notices (Highlights) */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Bell className="w-5 h-5 text-brand-coral" />
-                                    Avisos da Equipe
-                                </h3>
-                                {userRole === 'gestor' && (
-                                    <button
-                                        onClick={() => setShowNoticeModal(true)}
-                                        className="p-2 bg-brand-coral text-white rounded-full hover:bg-brand-coral/90 transition-colors shadow-md shadow-brand-coral/20"
-                                        title="Novo Aviso"
-                                    >
-                                        <Plus size={18} />
-                                    </button>
-                                )}
-                            </div>
-                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                                {notices.length === 0 ? (
-                                    <div className="text-center py-10 opacity-50">
-                                        <Bell size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-2" />
-                                        <p className="text-slate-400 text-sm">Nenhum aviso importante no momento.</p>
-                                    </div>
-                                ) : (
-                                    notices.map(notice => (
-                                        <NoticeCard
-                                            key={notice.id}
-                                            id={notice.id}
-                                            message={notice.message}
-                                            authorName={notice.author_name}
-                                            authorAvatar={userAvatars[notice.author_email]}
-                                            timestamp={notice.created_at}
-                                            priority={notice.priority}
-                                            canDelete={userRole === 'gestor'}
-                                            onDelete={handleDeleteNotice}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        </div>
                     </div>
 
                     {/* Right Column: Agenda & Priorities */}
                     <div className="space-y-8">
                         {/* Recent Critical Tasks (Moved Here) */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-neutral-900 p-6 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-neutral-800 dark:text-white flex items-center gap-2">
                                     <ListTodo className="w-5 h-5 text-red-500" />
                                     Prioridades
                                 </h3>
@@ -715,21 +765,21 @@ const Dashboard: React.FC = () => {
                             </div>
 
                             {criticalTasks.length === 0 ? (
-                                <p className="text-slate-400 text-center py-6 text-sm">Nenhuma tarefa crítica pendente.</p>
+                                <p className="text-neutral-400 text-center py-6 text-sm">Nenhuma tarefa crítica pendente.</p>
                             ) : (
                                 <div className="space-y-3">
                                     {criticalTasks.slice(0, 5).map(task => (
                                         <div
                                             key={task.id}
-                                            className="flex flex-col gap-2 p-3 bg-red-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl cursor-pointer hover:border-red-200 dark:hover:border-red-900/50 transition-colors group"
+                                            className="flex flex-col gap-2 p-3 bg-red-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-800 rounded-c4 cursor-pointer hover:border-red-200 dark:hover:border-red-900/50 transition-colors group"
                                             onClick={() => handleOpenTask(task)}
                                         >
                                             <div className="flex items-start justify-between">
-                                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs line-clamp-2 leading-tight">{task.title}</h4>
-                                                <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <h4 className="font-bold text-neutral-800 dark:text-neutral-200 text-xs line-clamp-2 leading-tight">{task.title}</h4>
+                                                <ExternalLink className="w-3 h-3 text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
-                                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                                                <span className="font-semibold text-slate-600 dark:text-slate-400 truncate max-w-[80px]">{task.project_name}</span>
+                                            <div className="flex items-center gap-2 text-[10px] text-neutral-500">
+                                                <span className="font-semibold text-neutral-600 dark:text-neutral-400 truncate max-w-[80px]">{task.project_name}</span>
                                                 <span>•</span>
                                                 <Clock size={10} className={new Date(task.due_date) < new Date() ? 'text-red-500' : ''} />
                                                 <span className={new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}>
@@ -743,9 +793,9 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Upcoming Meetings (Next 7 Days) */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-neutral-900 p-6 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-neutral-800 dark:text-white flex items-center gap-2">
                                     <Calendar className="w-5 h-5 text-brand-coral" />
                                     Agenda (7 dias)
                                 </h3>
@@ -753,15 +803,15 @@ const Dashboard: React.FC = () => {
                             </div>
 
                             {upcomingBookings.length === 0 ? (
-                                <div className="text-center py-6 text-slate-400">
+                                <div className="text-center py-6 text-neutral-400">
                                     <p className="text-sm">Nenhuma reunião prevista para esta semana.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {upcomingBookings.slice(0, 5).map(booking => (
-                                        <div key={booking.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm shrink-0">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                        <div key={booking.id} className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800/30 rounded-c4 border border-neutral-100 dark:border-neutral-800">
+                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-white dark:bg-neutral-900 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-sm shrink-0">
+                                                <span className="text-[10px] font-bold text-neutral-500 uppercase">
                                                     {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
                                                 </span>
                                                 <span className="text-sm font-bold text-brand-coral leading-none">
@@ -769,8 +819,8 @@ const Dashboard: React.FC = () => {
                                                 </span>
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <h4 className="font-bold text-slate-800 dark:text-white text-xs truncate" title={booking.title}>{booking.title}</h4>
-                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                <h4 className="font-bold text-neutral-800 dark:text-white text-xs truncate" title={booking.title}>{booking.title}</h4>
+                                                <div className="flex items-center gap-2 text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">
                                                     <Clock size={10} />
                                                     {new Date(booking.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(booking.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                                 </div>
@@ -791,16 +841,16 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Recent Access & Report */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-neutral-900 p-6 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm">
                             <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-neutral-800 dark:text-white flex items-center gap-2">
                                     <Activity className="w-5 h-5 text-brand-coral" />
                                     Acessos Recentes
                                 </h3>
                                 {userRole === 'gestor' && (
                                     <button
                                         onClick={() => setShowAccessReportModal(true)}
-                                        className="text-xs flex items-center gap-1 text-slate-500 hover:text-brand-coral transition-colors font-bold"
+                                        className="text-xs flex items-center gap-1 text-neutral-500 hover:text-brand-coral transition-colors font-bold"
                                     >
                                         <FileText size={12} /> Relatório
                                     </button>
@@ -825,13 +875,13 @@ const Dashboard: React.FC = () => {
                                             <div key={log.id} className="flex items-center gap-3">
                                                 <div className="relative">
                                                     {log.user?.avatar_url ? (
-                                                        <img src={log.user.avatar_url} alt={log.user.full_name} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700" />
+                                                        <img src={log.user.avatar_url} alt={log.user.full_name} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800" />
                                                     ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
+                                                        <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border border-slate-200 dark:border-neutral-800">
                                                             <Users size={14} className="text-slate-400" />
                                                         </div>
                                                     )}
-                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-neutral-950 rounded-full"></span>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-baseline">
@@ -850,53 +900,11 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Quick Actions / Navigation */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <button
-                        onClick={() => navigate('/projects')}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
-                    >
-                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
-                            <Briefcase className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <span className="block text-lg font-bold text-slate-800 dark:text-white">Projetos</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">Gerenciar entregas</span>
-                        </div>
-                    </button>
-                    {/* ... other buttons ... */}
-                    <button
-                        onClick={() => navigate('/proposals')}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
-                    >
-                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
-                            <FileText className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <span className="block text-lg font-bold text-slate-800 dark:text-white">Propostas</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">Novo contrato</span>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => navigate('/users')}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:border-brand-coral dark:hover:border-brand-coral transition-all group shadow-sm hover:shadow-md text-left flex items-center gap-4"
-                    >
-                        <div className="bg-slate-100 dark:bg-slate-800 w-12 h-12 flex items-center justify-center rounded-2xl text-slate-600 dark:text-slate-400 group-hover:bg-brand-coral group-hover:text-white transition-colors">
-                            <Users className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <span className="block text-lg font-bold text-slate-800 dark:text-white">Equipe</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400">Gerenciar acessos</span>
-                        </div>
-                    </button>
-                </div>
-
                 {/* Critical Tasks List Modal */}
                 {showCriticalListModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                        <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-2xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
-                            <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                        <div className="bg-neutral-50 dark:bg-neutral-950 w-full max-w-2xl max-h-[80vh] rounded-c4 overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200 border border-neutral-800">
+                            <div className="bg-white dark:bg-neutral-900 px-8 py-5 border-b border-slate-200 dark:border-neutral-800 flex justify-between items-center">
                                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                     <AlertTriangle className="text-red-500" />
                                     Tarefas Críticas
@@ -914,7 +922,7 @@ const Dashboard: React.FC = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {tasksToView.map(task => (
-                                            <div key={task.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex justify-between items-center group">
+                                            <div key={task.id} className="bg-white dark:bg-neutral-900 p-4 rounded-c4 shadow-sm border border-slate-200 dark:border-neutral-800 flex justify-between items-center group">
                                                 <div>
                                                     <h4 className="font-bold text-slate-800 dark:text-slate-200 text-lg">{task.title}</h4>
                                                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm text-slate-500 mt-1">
@@ -933,7 +941,7 @@ const Dashboard: React.FC = () => {
                                                 </div>
                                                 <button
                                                     onClick={() => handleOpenTask(task)}
-                                                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-brand-coral hover:text-white text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm transition-all flex items-center gap-2 whitespace-nowrap"
+                                                    className="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-brand-coral hover:text-white text-slate-600 dark:text-neutral-300 rounded-c4 font-bold text-sm transition-all flex items-center gap-2 whitespace-nowrap"
                                                 >
                                                     Visualizar <ExternalLink size={16} />
                                                 </button>
@@ -970,8 +978,8 @@ const Dashboard: React.FC = () => {
                 {/* Monthly Access Report Modal */}
                 {showAccessReportModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                        <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
-                            <div className="bg-white dark:bg-slate-900 px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                        <div className="bg-neutral-50 dark:bg-neutral-950 w-full max-w-4xl max-h-[90vh] rounded-c4 overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200 border border-neutral-800">
+                            <div className="bg-white dark:bg-neutral-900 px-8 py-5 border-b border-slate-200 dark:border-neutral-800 flex justify-between items-center">
                                 <div>
                                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                         <FileText className="text-brand-coral" />
@@ -1008,16 +1016,10 @@ const Dashboard: React.FC = () => {
                                                     const matchesEmail = l.user_email && user.email && l.user_email === user.email;
                                                     return isSameMonth && (matchesId || matchesEmail);
                                                 }).length;
-                                                // Note: Tasks normally don't have assignee_id linked clearly in this demo interface (it was assignee name string). 
-                                                // We will match by Name fuzzy or assume we can't fully link without ID.
-                                                // For this demo, we will try to match by name if user.full_name is in task.assignee
                                                 const userTasks = tasks.filter(t => t.assignee && t.assignee.includes(user.full_name || '')); // Fuzzy match
-
                                                 const totalTasks = userTasks.length;
                                                 const completed = userTasks.filter(t => t.status === 'done').length;
                                                 const overdue = userTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
-
-                                                // If no logs and no tasks, skip? No, show all users.
                                                 return { user, userLogs, totalTasks, completed, overdue };
                                             }).sort((a, b) => b.userLogs - a.userLogs); // Sort by visibility
 
@@ -1028,7 +1030,7 @@ const Dashboard: React.FC = () => {
                                                             {user.avatar_url ? (
                                                                 <img src={user.avatar_url} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
                                                             ) : (
-                                                                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold">
+                                                                <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-slate-500 font-bold">
                                                                     {user.full_name?.charAt(0) || '?'}
                                                                 </div>
                                                             )}
@@ -1038,12 +1040,12 @@ const Dashboard: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 text-center text-slate-600 dark:text-slate-300">
-                                                        <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full font-bold">
+                                                    <td className="py-4 text-center text-slate-600 dark:text-neutral-300">
+                                                        <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full font-bold">
                                                             {userLogs}
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 text-center text-slate-600 dark:text-slate-300">{totalTasks}</td>
+                                                    <td className="py-4 text-center text-slate-600 dark:text-neutral-300">{totalTasks}</td>
                                                     <td className="py-4 text-center font-bold text-emerald-500">{completed}</td>
                                                     <td className="py-4 text-center font-bold text-red-500">{overdue}</td>
                                                 </tr>
@@ -1055,8 +1057,7 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 )}
-
-            </main>
+            </div>
         </div>
     );
 };

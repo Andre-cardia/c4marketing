@@ -12,11 +12,11 @@ export const BrainWidgetWrapper: React.FC = () => {
     }
 
     return (
-        <div className="fixed bottom-6 left-6 z-[60]">
+        <div className="fixed bottom-6 right-6 z-[60]">
             {!isBrainOpen && (
                 <button
                     onClick={() => setIsBrainOpen(true)}
-                    className="p-4 bg-slate-900 border border-slate-700 text-indigo-400 rounded-full shadow-2xl hover:scale-105 transition-all group flex items-center gap-0 overflow-hidden hover:pr-4 hover:w-auto w-14 h-14"
+                    className="p-4 bg-neutral-900 border border-neutral-800 text-brand-coral rounded-full shadow-2xl hover:scale-105 transition-all group flex items-center gap-0 overflow-hidden hover:pr-4 hover:w-auto w-14 h-14"
                     title="Segundo Cérebro"
                 >
                     <svg
@@ -44,7 +44,7 @@ export const BrainWidgetWrapper: React.FC = () => {
             )}
 
             {isBrainOpen && (
-                <div className="fixed bottom-6 left-6 w-[400px] h-[600px] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 z-[9999]">
+                <div className="fixed bottom-6 right-6 w-[400px] h-[600px] shadow-2xl animate-in slide-in-from-bottom-4 duration-300 z-[9999]">
                     <BrainChat onClose={() => setIsBrainOpen(false)} />
                 </div>
             )}

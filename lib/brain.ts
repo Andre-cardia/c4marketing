@@ -10,6 +10,7 @@ export interface BrainDocument {
 export interface AskBrainResponse {
     answer: string;
     documents: BrainDocument[];
+    meta?: Record<string, any>;
 }
 
 export interface ChatSession {
@@ -27,7 +28,12 @@ export interface ChatMessage {
 }
 
 function isInvalidJwtMessage(message: string): boolean {
-    return (message || '').toLowerCase().includes('invalid jwt');
+    const normalized = (message || '').toLowerCase();
+    return normalized.includes('invalid jwt')
+        || normalized.includes('jwt expired')
+        || normalized.includes('token is expired')
+        || normalized.includes('jwt malformed')
+        || normalized.includes('session from session_id claim in jwt does not exist');
 }
 
 type TokenDebug = {
@@ -92,6 +98,7 @@ type ChatBrainPayload = {
     session_id: string | null;
     client_today?: string;
     client_tz?: string;
+    forced_agent?: string;
 }
 
 async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: string): Promise<AskBrainResponse> {
@@ -121,6 +128,27 @@ async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: strin
     return {
         answer: body?.answer || 'Não consegui gerar resposta neste momento. Tente novamente.',
         documents: Array.isArray(body?.documents) ? body.documents : [],
+        meta: body?.meta && typeof body.meta === 'object' ? body.meta : undefined,
+    };
+}
+
+async function callChatBrainInvoke(payload: ChatBrainPayload, bearerToken?: string | null): Promise<AskBrainResponse> {
+    const headers = bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined;
+    const { data, error } = await supabase.functions.invoke('chat-brain', {
+        body: payload,
+        headers,
+    });
+
+    if (error) {
+        const details = await parseInvokeError(error, 'Falha ao consultar o Segundo Cérebro');
+        throw new Error(details);
+    }
+
+    const body = (data && typeof data === 'object') ? (data as Record<string, any>) : {};
+    return {
+        answer: body?.answer || 'Não consegui gerar resposta neste momento. Tente novamente.',
+        documents: Array.isArray(body?.documents) ? body.documents : [],
+        meta: body?.meta && typeof body.meta === 'object' ? body.meta : undefined,
     };
 }
 
@@ -129,7 +157,23 @@ async function getValidAccessToken(): Promise<string | null> {
     let session = sessionData.session;
     if (!session?.access_token) return null;
 
-    const initialDebug = getTokenDebug(session.access_token);
+    const ensureTokenIsUsable = async (candidateToken: string): Promise<boolean> => {
+        const { error } = await supabase.auth.getUser(candidateToken);
+        return !error;
+    };
+
+    const initialToken = session.access_token;
+    const initialValid = await ensureTokenIsUsable(initialToken);
+    if (!initialValid) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshed.session?.access_token) return null;
+        session = refreshed.session;
+        const refreshedValid = await ensureTokenIsUsable(session.access_token);
+        if (!refreshedValid) return null;
+        return session.access_token;
+    }
+
+    const initialDebug = getTokenDebug(initialToken);
     const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
     const isNearExpiry = !!expiresAtMs && (expiresAtMs - Date.now()) < 60_000;
     const hasSubMismatch = !!(session.user?.id && initialDebug.sub && session.user.id !== initialDebug.sub);
@@ -139,6 +183,13 @@ async function getValidAccessToken(): Promise<string | null> {
         const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
         if (!refreshError && refreshed.session?.access_token) {
             session = refreshed.session;
+            const refreshedValid = await ensureTokenIsUsable(session.access_token);
+            if (!refreshedValid) return null;
+        } else {
+            // If token is already invalid/expired and refresh failed, do not reuse a stale token.
+            if (hasSubMismatch || isExpired(initialDebug.exp)) {
+                return null;
+            }
         }
     }
 
@@ -194,7 +245,11 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
     return data;
 }
 
-export async function askBrain(query: string, sessionId?: string): Promise<AskBrainResponse> {
+export async function askBrain(
+    query: string,
+    sessionId?: string,
+    options?: { forcedAgent?: string }
+): Promise<AskBrainResponse> {
     const now = new Date();
     const clientToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -204,6 +259,10 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
         client_today: clientToday,
         client_tz: clientTimezone,
     };
+
+    if (options?.forcedAgent) {
+        payload.forced_agent = options.forcedAgent;
+    }
     const expectedRef = getProjectRefFromSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 
     let token = await getValidAccessToken();
@@ -214,11 +273,26 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
         }
     }
 
+    if (token) {
+        const { error: tokenValidationError } = await supabase.auth.getUser(token);
+        if (tokenValidationError) {
+            token = null;
+        }
+    }
+
     if (!token) {
         return {
             answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão expirada. Faça login novamente.',
             documents: [],
         };
+    }
+
+    // Para agentes especializados (forced_agent), faz refresh proativo do token.
+    if (options?.forcedAgent) {
+        const { data: preRefreshed, error: preRefreshError } = await supabase.auth.refreshSession();
+        if (!preRefreshError && preRefreshed?.session?.access_token) {
+            token = preRefreshed.session.access_token;
+        }
     }
 
     const tokenInfo = getTokenDebug(token);
@@ -249,7 +323,7 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
     }
 
     try {
-        return await callChatBrainDirect(payload, token);
+        return await callChatBrainInvoke(payload, token);
     } catch (firstError: any) {
         const firstMessage = firstError?.message || String(firstError);
         console.error('askBrain first attempt failed:', firstMessage);
@@ -260,7 +334,7 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
             const retryToken = refreshed?.session?.access_token;
             if (!refreshError && retryToken) {
                 try {
-                    return await callChatBrainDirect(payload, retryToken);
+                    return await callChatBrainInvoke(payload, retryToken);
                 } catch (secondError: any) {
                     const secondMessage = secondError?.message || String(secondError);
                     console.error('askBrain second attempt (refreshed token) failed:', secondMessage);
@@ -270,10 +344,24 @@ export async function askBrain(query: string, sessionId?: string): Promise<AskBr
                             documents: [],
                         };
                     }
+
+                    // Fallback final para contornar possíveis inconsistências de header no invoke.
+                    try {
+                        return await callChatBrainDirect(payload, retryToken);
+                    } catch (thirdError: any) {
+                        const thirdMessage = thirdError?.message || String(thirdError);
+                        console.error('askBrain third attempt (direct fetch) failed:', thirdMessage);
+                        if (!isInvalidJwtMessage(thirdMessage)) {
+                            return {
+                                answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${thirdMessage}`,
+                                documents: [],
+                            };
+                        }
+                    }
                 }
             }
             return {
-                answer: `Falha de integração com o Segundo Cérebro. Detalhes: Sessão inválida (JWT). Projeto esperado: ${expectedRef || 'desconhecido'}; token: ${tokenInfo.ref || 'não identificado'}; role: ${tokenInfo.role || 'n/a'}; sub: ${tokenInfo.sub || 'n/a'}.`,
+                answer: 'Sua sessão expirou ou ficou inválida. Por favor, atualize a página ou faça login novamente para continuar usando o agente.',
                 documents: [],
             };
         }
@@ -330,4 +418,79 @@ export async function addChatMessage(sessionId: string, role: 'user' | 'assistan
 
     if (error) throw error;
     return data;
+}
+
+// --- Helper functions for session segregation ---
+
+export const TRAFFIC_SESSION_PREFIX = 'TrafficAgent:';
+export const LEGACY_TRAFFIC_SESSION_MARKERS = [
+    'agente de trafego - chat dedicado',
+    'agente de tráfego - chat dedicado',
+    'agente de gestao de trafego',
+    'agente especialista em gestao de trafego',
+];
+
+export function normalizeText(value: string): string {
+    return (value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+export function isTrafficSession(session: ChatSession): boolean {
+    const normalizedTitle = normalizeText(session.title || '');
+    if (normalizedTitle.startsWith(normalizeText(TRAFFIC_SESSION_PREFIX))) return true;
+    return LEGACY_TRAFFIC_SESSION_MARKERS.some((marker) => normalizedTitle.includes(normalizeText(marker)));
+}
+
+export function formatTrafficSessionTitle(session: ChatSession): string {
+    const title = session.title || '';
+    if (title.startsWith(TRAFFIC_SESSION_PREFIX)) {
+        return title.slice(TRAFFIC_SESSION_PREFIX.length).trim() || 'Conversa sem titulo';
+    }
+    return title;
+}
+
+export function buildTrafficSessionTitle(): string {
+    const now = new Date();
+    const date = now.toLocaleDateString('pt-BR');
+    const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `${TRAFFIC_SESSION_PREFIX} ${date} ${time}`;
+}
+
+export async function deleteChatSession(sessionId: string) {
+    const { data, error } = await supabase.rpc('delete_chat_session', {
+        p_session_id: sessionId,
+    });
+
+    if (error) throw error;
+    return data;
+}
+
+/**
+ * Persists an AI-generated session title to the database.
+ * Acts as a reliable client-side fallback in case the backend's own update fails.
+ */
+export async function updateChatSessionTitle(sessionId: string, title: string): Promise<void> {
+    const { error } = await supabase.rpc('update_chat_session_title', {
+        p_session_id: sessionId,
+        p_title: title,
+    });
+    if (error) throw error;
+}
+
+export async function getProjectCredentials(acceptanceId: number): Promise<string | null> {
+    const { data, error } = await supabase.rpc('get_project_credentials', {
+        p_acceptance_id: acceptanceId,
+    });
+    if (error) throw error;
+    return data as string | null;
+}
+
+export async function upsertProjectCredentials(acceptanceId: number, credentials: string): Promise<void> {
+    const { error } = await supabase.rpc('upsert_project_credentials', {
+        p_acceptance_id: acceptanceId,
+        p_credentials: credentials,
+    });
+    if (error) throw error;
 }

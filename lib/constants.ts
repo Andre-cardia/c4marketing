@@ -5,10 +5,10 @@ export interface ServiceConfig {
     id: string;
     title: string;
     description: string;
-    icon: 'Layout' | 'Globe' | 'ShoppingCart' | 'Users' | 'LineChart';
+    icon: 'Layout' | 'Globe' | 'ShoppingCart' | 'Users' | 'LineChart' | 'Bot';
     colorTheme: 'brand' | 'blue' | 'purple' | 'amber';
     priceLabel?: string; // Optional label e.g., "Item Adicional", "Status"
-    priceType?: 'currency' | 'status'; // How to display the bottom value
+    priceType?: 'currency' | 'status' | 'hybrid'; // How to display the bottom value
     statusText?: string; // If status type, what text to show (e.g. "Selecionado")
     detailsLabel?: string; // Label for details box
     bgClass?: string; // Optional custom background class for special cards like LP
@@ -62,7 +62,76 @@ export const SERVICES_CONFIG: ServiceConfig[] = [
         detailsLabel: 'Detalhamento:',
         bgClass: 'bg-white border border-slate-200 shadow-sm relative overflow-hidden',
     },
+    {
+        id: 'ai_agents',
+        title: 'Agentes de IA',
+        description: 'Implementação de agentes inteligentes para atendimento, qualificação e operações internas, com setup inicial, treinamento e otimizações recorrentes.',
+        icon: 'Bot',
+        colorTheme: 'blue',
+        priceLabel: 'Investimento',
+        priceType: 'hybrid',
+        detailsLabel: 'Detalhamento:',
+        bgClass: 'bg-white border border-slate-200 shadow-sm relative overflow-hidden',
+    },
 ];
+
+export const AI_AGENTS_CONFIG = {
+    id: 'ai_agents',
+    title: 'Agentes de IA',
+    subtitle: 'Implementação, Operação & Infraestrutura',
+    phases: [
+        {
+            number: '01',
+            title: 'Planejamento',
+            duration: '2 semanas',
+            items: [
+                'Reunião de alinhamento inicial: objetivos, expectativas e desafios',
+                'Mapeamento dos fluxos de atendimento e pontos de integração',
+                'Definição dos critérios de qualificação e automações necessárias',
+                'Seleção de tecnologias, canais (WhatsApp/Web) e integrações',
+            ]
+        },
+        {
+            number: '02',
+            title: 'Desenvolvimento',
+            duration: '3 semanas',
+            items: [
+                'Criação do Product Requirement Document (PRD)',
+                'Construção do modelo de NLP para interpretação e geração de respostas',
+                'Desenvolvimento da interface do agente (WhatsApp e/ou Web)',
+                'Integração com CRM, planilha de acompanhamento ou sistemas via API',
+            ]
+        },
+        {
+            number: '03',
+            title: 'Testes e Validação',
+            duration: '1 semana',
+            items: [
+                'Testes de funcionalidade e desempenho do agente',
+                'Ajuste do modelo de NLP com base no feedback dos testes',
+                'Validação da precisão de qualificação e coleta de informações',
+            ]
+        },
+        {
+            number: '04',
+            title: 'Implantação',
+            duration: '2 semanas',
+            items: [
+                'Implementação do agente no ambiente de produção',
+                'Definição de métricas de desempenho para avaliação contínua',
+                'Handoff técnico e alinhamento com a equipe do cliente',
+            ]
+        }
+    ],
+    included: [
+        'VPS – Servidor Virtual Privado (infraestrutura dedicada)',
+        'API OpenAI – 2 milhões de tokens/mês inclusos',
+        'API WhatsApp – integração com número da empresa',
+        'Monitoramento e suporte técnico contínuo',
+        'Atualizações do modelo de IA conforme novas demandas de negócio',
+        'Relatórios periódicos de performance dos agentes',
+    ]
+};
 
 export const TRAFFIC_MANAGEMENT_CONFIG = {
     id: 'traffic_management',

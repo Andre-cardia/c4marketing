@@ -12,14 +12,15 @@ const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
     ? services.map((s: any) => typeof s === 'string' ? s : s.id)
     : [];
 
-  const hasRecurring = serviceIds.includes('traffic_management') || serviceIds.includes('hosting');
-  const hasOneTime = serviceIds.includes('website') || serviceIds.includes('landing_page') || serviceIds.includes('ecommerce') || serviceIds.includes('consulting');
+  const hasRecurring = serviceIds.includes('traffic_management') || serviceIds.includes('hosting') || serviceIds.includes('ai_agents');
+  const hasOneTime = serviceIds.includes('website') || serviceIds.includes('landing_page') || serviceIds.includes('ecommerce') || serviceIds.includes('consulting') || serviceIds.includes('ai_agents');
 
   // Calculate specific deadlines
   const deadlines: string[] = [];
   if (serviceIds.includes('landing_page')) deadlines.push("Landing Page: 7 dias úteis");
   if (serviceIds.includes('website')) deadlines.push("Web Site: 30 dias úteis");
   if (serviceIds.includes('ecommerce')) deadlines.push("E-commerce: 60 dias úteis");
+  if (serviceIds.includes('ai_agents')) deadlines.push("Agentes de IA (setup): até 15 dias úteis");
 
   const deadlineText = deadlines.length > 0
     ? `Prazos estimados após recebimento do material: ${deadlines.join('; ')}.`

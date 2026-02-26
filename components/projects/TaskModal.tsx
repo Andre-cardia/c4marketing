@@ -38,8 +38,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
         project_id: projectId,
         title: '',
         description: '',
-        status: 'backlog',
-        priority: 'medium',
+        status: '' as any,
+        priority: '' as any,
         assignee: '',
         due_date: '',
         attachments: []
@@ -83,8 +83,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                 project_id: projectId,
                 title: '',
                 description: '',
-                status: 'backlog',
-                priority: 'medium',
+                status: '' as any,
+                priority: '' as any,
                 assignee: '',
                 due_date: '',
                 attachments: []
@@ -272,9 +272,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
             onSave();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving task:', error);
-            alert('Erro ao salvar tarefa');
+            const msg = error?.message || error?.details || JSON.stringify(error);
+            alert('Erro ao salvar tarefa:\n' + msg);
         } finally {
             setLoading(false);
         }
@@ -286,13 +287,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-neutral-900 rounded-c4 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200 dark:border-neutral-800">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
 
                     {/* Header */}
-                    <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+                    <div className="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center bg-white dark:bg-neutral-950">
                         <div>
-                            <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-3">
                                 {task ? 'Editar Tarefa' : 'Nova Tarefa'}
                             </h2>
                             {projectName && (
@@ -302,7 +303,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             )}
 
                         </div>
-                        <button type="button" onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-400">
+                        <button type="button" onClick={onClose} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-c4 transition-colors text-neutral-400">
                             <X size={20} />
                         </button>
                     </div>
@@ -312,20 +313,22 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                         {/* Title */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tarefa</label>
+                            <label className="block text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2">
+                                Tarefa <span className="text-red-500">*</span>
+                            </label>
                             <input
                                 type="text"
                                 required
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
+                                className="w-full px-4 py-2 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none"
                                 placeholder="Título da tarefa..."
                             />
                         </div>
 
                         {/* Creation Date & Author (Read-only) */}
                         {task?.created_at && (
-                            <div className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-3">
+                            <div className="text-xs text-neutral-400 dark:text-neutral-500 flex items-center gap-3">
                                 <span className="flex items-center gap-1">
                                     <Calendar size={12} />
                                     Criado em: {new Date(task.created_at).toLocaleDateString('pt-BR')} às {new Date(task.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -342,14 +345,18 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                             {/* Priority */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prioridade</label>
+                                <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase mb-1 tracking-wider">
+                                    Prioridade <span className="text-red-500">*</span>
+                                </label>
                                 <div className="relative">
-                                    <Flag className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                    <Flag className="absolute left-3 top-2.5 w-4 h-4 text-neutral-400" />
                                     <select
                                         value={formData.priority}
                                         onChange={e => setFormData({ ...formData, priority: e.target.value as any })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none appearance-none"
+                                        required
+                                        className="w-full pl-10 pr-4 py-2 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none appearance-none"
                                     >
+                                        <option value="">Selecione...</option>
                                         <option value="low">Baixa</option>
                                         <option value="medium">Média</option>
                                         <option value="high">Alta</option>
@@ -359,12 +366,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                             {/* Status */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                                <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase mb-1 tracking-wider">
+                                    Status <span className="text-red-500">*</span>
+                                </label>
                                 <select
                                     value={formData.status}
                                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                                    className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
+                                    required
+                                    className="w-full px-4 py-2 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none"
                                 >
+                                    <option value="">Selecione...</option>
                                     <option value="backlog">Backlog</option>
                                     <option value="in_progress">Em Execução</option>
                                     <option value="approval">Aprovação</option>
@@ -375,13 +386,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                             {/* Assignee - Modified to Select */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Responsável</label>
+                                <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase mb-1 tracking-wider">
+                                    Responsável <span className="text-red-500">*</span>
+                                </label>
                                 <div className="relative">
-                                    <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                    <User className="absolute left-3 top-2.5 w-4 h-4 text-neutral-400" />
                                     <select
                                         value={formData.assignee}
                                         onChange={e => setFormData({ ...formData, assignee: e.target.value })}
-                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none appearance-none"
+                                        required
+                                        className="w-full pl-10 pr-4 py-2 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none appearance-none"
                                     >
                                         <option value="">Selecione...</option>
                                         {assigneeOptions.map(user => (
@@ -401,17 +415,20 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                                 return (
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prazo</label>
+                                        <label className="block text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase mb-1 tracking-wider">
+                                            Prazo <span className="text-red-500">*</span>
+                                        </label>
                                         <div className="relative">
-                                            <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                                            <Calendar className="absolute left-3 top-2.5 w-4 h-4 text-neutral-400 pointer-events-none" />
                                             <input
                                                 type="date"
+                                                required
                                                 value={formData.due_date}
                                                 onChange={e => canEditDueDate && setFormData({ ...formData, due_date: e.target.value })}
                                                 onClick={(e) => canEditDueDate && (e.target as HTMLInputElement).showPicker?.()}
                                                 disabled={!canEditDueDate}
                                                 title={!canEditDueDate ? `Somente o autor (${task?.created_by}) pode alterar o prazo` : ''}
-                                                className={`w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none ${canEditDueDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                                                className={`w-full pl-10 pr-4 py-2 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white outline-none ${canEditDueDate ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                                             />
                                             {!canEditDueDate && (
                                                 <p className="text-[10px] text-amber-500 mt-1">🔒 Apenas o criador ({task?.created_by}) pode alterar o prazo</p>
@@ -424,14 +441,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
                         {/* Description */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                                <AlignLeft size={16} /> Descrição
+                            <label className="block text-sm font-bold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+                                <AlignLeft size={16} /> Descrição <span className="text-red-500">*</span>
                             </label>
                             <textarea
                                 rows={6}
+                                required
                                 value={formData.description}
                                 onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full p-4 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
+                                className="w-full p-4 rounded-c4 border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none resize-none"
                                 placeholder="Detalhes da tarefa..."
                             />
                         </div>
@@ -451,17 +469,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             {formData.attachments && formData.attachments.length > 0 && (
                                 <div className="space-y-2">
                                     {formData.attachments.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-800">
+                                        <div key={index} className="flex items-center justify-between p-3 rounded-c4 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
                                             <div className="flex items-center gap-2 overflow-hidden">
                                                 <Paperclip size={18} className="text-brand-coral flex-shrink-0" />
-                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 dark:text-slate-200 truncate hover:underline" title={file.name}>
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-sm text-neutral-700 dark:text-neutral-200 truncate hover:underline" title={file.name}>
                                                     {file.name}
                                                 </a>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveAttachment(index)}
-                                                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full text-red-500"
+                                                className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-full text-red-500"
                                                 title="Remover anexo"
                                             >
                                                 <Trash2 size={16} />
@@ -475,7 +493,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             {(!formData.attachments || formData.attachments.length < 6) && (
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
-                                    className={`border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-center text-slate-400 gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                    className={`border-2 border-dashed border-neutral-200 dark:border-neutral-700 rounded-c4 p-4 flex items-center justify-center text-neutral-400 gap-2 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
                                 >
                                     {uploading ? (
                                         <>
@@ -495,14 +513,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     </div>
 
                     {/* Footer */}
-                    <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+                    <div className="p-6 border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex items-center justify-between">
                         <div>
                             {task?.id && (
                                 <button
                                     type="button"
                                     onClick={handleDelete}
                                     disabled={loading || uploading}
-                                    className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors flex items-center gap-2 font-bold text-sm"
+                                    className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-c4 transition-colors flex items-center gap-2 font-bold text-sm"
                                 >
                                     <Trash2 size={18} />
                                     Excluir
@@ -514,14 +532,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 text-xs text-slate-500 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                className="px-4 py-2 text-xs text-neutral-500 font-bold hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-c4 transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading || uploading}
-                                className="px-4 py-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-lg border border-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 text-xs font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-c4 border border-brand-coral/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? 'Salvando...' : 'Salvar'}
                             </button>

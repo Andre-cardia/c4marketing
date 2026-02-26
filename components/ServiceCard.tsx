@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Layout, Globe, ShoppingCart, Users } from 'lucide-react';
+import { Layout, Globe, ShoppingCart, Users, Bot } from 'lucide-react';
 import { ServiceConfig } from '../lib/constants';
 
 interface ServiceCardProps {
@@ -13,6 +13,7 @@ const IconMap = {
     Globe: Globe,
     ShoppingCart: ShoppingCart,
     Users: Users,
+    Bot: Bot,
     LineChart: Layout, // Fallback, though line chart is usually separate
 };
 
@@ -32,8 +33,21 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ config, selectedServic
         return selectedService.price || 0;
     };
 
+    const getRecurringPrice = () => {
+        if (!selectedService || typeof selectedService === 'string') return 0;
+        return selectedService.recurringPrice || 0;
+    };
+
+    const getSetupPrice = () => {
+        if (!selectedService || typeof selectedService === 'string') return 0;
+        return selectedService.setupPrice || 0;
+    };
+
     const details = getDetails();
     const price = getPrice();
+    const recurringPrice = getRecurringPrice();
+    const setupPrice = getSetupPrice();
+    const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     // Theme colors mapping
     const themeClasses = {
@@ -97,10 +111,25 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ config, selectedServic
             <div className={`mt-auto pt-4 border-t ${config.id === 'landing_page' ? 'border-white/10' : 'border-slate-100'}`}>
                 <span className="text-xs text-slate-400 block mb-1">{config.priceLabel}</span>
 
-                {config.priceType === 'currency' ? (
+                {config.priceType === 'hybrid' ? (
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Mensalidade</span>
+                            <span className={`font-bold ${theme.pricePrimary}`}>
+                                {recurringPrice > 0 ? formatCurrency(recurringPrice) : 'A definir'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500">Setup Inicial</span>
+                            <span className="font-semibold text-slate-700">
+                                {setupPrice > 0 ? formatCurrency(setupPrice) : 'A definir'}
+                            </span>
+                        </div>
+                    </div>
+                ) : config.priceType === 'currency' ? (
                     <div className="flex items-baseline gap-2">
                         <span className={`text-2xl font-bold font-montserrat ${theme.pricePrimary}`}>
-                            {price > 0 ? price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Incluso'}
+                            {price > 0 ? formatCurrency(price) : 'Incluso'}
                         </span>
                     </div>
                 ) : (

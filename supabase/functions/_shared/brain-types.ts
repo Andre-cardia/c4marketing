@@ -35,6 +35,7 @@ export type RiskLevel = "low" | "medium" | "high";
 export type AgentName =
   | "Agent_Contracts"
   | "Agent_Proposals"
+  | "Agent_MarketingTraffic"
   | "Agent_Projects"
   | "Agent_Client360"
   | "Agent_GovernanceSecurity"

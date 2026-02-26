@@ -22,6 +22,9 @@ Deno.serve(async (req) => {
         const requestBody = await req.json()
         const query = typeof requestBody?.query === 'string' ? requestBody.query : ''
         const session_id = typeof requestBody?.session_id === 'string' ? requestBody.session_id : null
+        const forcedAgentRaw = typeof requestBody?.forced_agent === 'string'
+            ? requestBody.forced_agent.trim()
+            : null
 
         // Idempotency: Se recebido do frontend, evita duplicação de execução pesada em retentativa.
         const idempotencyKey = req.headers.get('x-idempotency-key') || null
@@ -58,6 +61,12 @@ Deno.serve(async (req) => {
         let userRole = 'anon'
         let userId = 'anon_user'
         let userProfile: any = null
+        const forcedAgent = forcedAgentRaw && Object.prototype.hasOwnProperty.call(AGENTS, forcedAgentRaw)
+            ? forcedAgentRaw
+            : null
+        const forcedAgentAllowedRoles: Record<string, string[]> = {
+            Agent_MarketingTraffic: ['gestor', 'operacional', 'admin'],
+        }
 
         const getProjectRefFromSupabaseUrl = () => {
             try {
@@ -182,15 +191,78 @@ Deno.serve(async (req) => {
             }
         }
 
+        // 1.1 Helper de Log Final unificado (v8.6)
+        const logFinalAgentExecution = async (params: {
+            agentName: string,
+            action: string,
+            status: string,
+            answer: string,
+            result?: any,
+            latencyMs?: number,
+            error?: string
+        }): Promise<string | null> => {
+            try {
+                const finalLatency = params.latencyMs || Math.round(performance.now() - startTime);
+                const { data } = await supabaseAdmin.rpc('log_agent_execution', {
+                    p_session_id: session_id,
+                    p_agent_name: params.agentName,
+                    p_action: params.action,
+                    p_status: params.status,
+                    p_params: {
+                        decision: effectiveDecision,
+                        idempotency_key: idempotencyKey,
+                        model_usage: modelUsage
+                    },
+                    p_result: params.result || {},
+                    p_latency_ms: finalLatency,
+                    p_cost_est: totalCostEst,
+                    p_error_message: params.error,
+                    p_tokens_input: totalInputTokens,
+                    p_tokens_output: totalOutputTokens,
+                    p_tokens_total: (totalInputTokens + totalOutputTokens)
+                });
+                return data as string;
+            } catch (logError) {
+                console.error('[v8.6] Centralized log failed:', logError);
+                return null;
+            }
+        };
+
         // O chat do /brain deve operar autenticado para preservar identidade/memória por usuário.
         if (userId === 'anon_user') {
             return new Response(JSON.stringify({
-                answer: 'Sessão inválida ou expirada. Faça login novamente para restaurar identidade e memória do agente.',
-                documents: [],
+                error: 'Sessão inválida ou expirada. Faça login novamente.',
                 meta: { auth: 'missing_or_invalid' }
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 401
             })
+        }
+
+        if (forcedAgentRaw && !forcedAgent) {
+            return new Response(JSON.stringify({
+                answer: `Agente forçado inválido: "${forcedAgentRaw}".`,
+                documents: [],
+                meta: { forced_agent_error: 'invalid_agent' }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400,
+            })
+        }
+
+        if (forcedAgent) {
+            const allowedRoles = forcedAgentAllowedRoles[forcedAgent] || ['admin']
+            const normalizedRole = (userRole || '').toLowerCase()
+            if (!allowedRoles.includes(normalizedRole)) {
+                return new Response(JSON.stringify({
+                    answer: `Acesso negado ao ${forcedAgent} para o perfil atual (${userRole}).`,
+                    documents: [],
+                    meta: { forced_agent_error: 'forbidden_role', forced_agent: forcedAgent, user_role: userRole }
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 403,
+                })
+            }
         }
 
         const normalizeText = (value: string) =>
@@ -301,6 +373,115 @@ Deno.serve(async (req) => {
             Deno.env.get('BRAIN_CANONICAL_MEMORY_ENABLED')
         )
 
+        // Baseline imutável do Tier-1: sempre presente no system prompt, mesmo sem retrieval canônico.
+        const canonicalTier1Baseline = `
+[TIER-1: MISSÃO]
+Acelerar o crescimento de empresas brasileiras com marketing de performance e IA, unindo dados, criatividade e tecnologia para gerar resultados mensuráveis e sustentáveis.
+
+[TIER-1: VISÃO]
+Ser a agência de performance mais recomendada do Brasil até 2029, com expansão para a América Latina mantendo excelência operacional.
+
+[TIER-1: VALORES]
+Foco no cliente, resultados mensuráveis, transparência e ética, inovação contínua, resiliência, colaboração e desenvolvimento humano.
+
+[TIER-1: END GAME]
+Liderar no Brasil em marketing de performance com IA, ajudando clientes a multiplicar resultados com execução disciplinada e previsível.
+        `.trim()
+
+        const trafficAllowedReadRpcs = new Set([
+            'query_survey_responses',
+            'query_all_clients',
+            'query_all_tasks',
+        ])
+
+        const isTrafficOutOfScopeIntent = (text: string) => hasAny(text, [
+            'mrr', 'arr', 'faturamento', 'receita', 'run rate', 'recorrente',
+            'mensalidade', 'ticket medio', 'ticket médio', 'financeiro', 'financeira',
+            'proposta', 'propostas', 'orcamento', 'orçamento', 'setup fee', 'media limit',
+            'comercial', 'pipeline comercial', 'funil comercial', 'taxa de fechamento', 'close rate',
+        ])
+
+        const isOpenTasksIntent = (text: string) =>
+            hasAny(text, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'pendente', 'pendentes'])
+            && hasAny(text, ['em aberto', 'aberto', 'abertas', 'abertos'])
+
+        const isOpenTaskStatus = (status: unknown) => {
+            const normalized = String(status || '').toLowerCase().trim()
+            return normalized !== 'done'
+                && normalized !== 'canceled'
+                && normalized !== 'cancelled'
+                && normalized !== 'cancelado'
+                && normalized !== 'concluido'
+                && normalized !== 'concluído'
+                && normalized !== 'finalizado'
+        }
+
+        const stripBareTypedJsonObjects = (value: string): string => {
+            if (!value) return value
+            let output = ''
+            let cursor = 0
+
+            while (cursor < value.length) {
+                const remaining = value.slice(cursor)
+                const match = remaining.match(/\{\s*"type"\s*:/)
+                if (!match || typeof match.index !== 'number') {
+                    output += remaining
+                    break
+                }
+
+                const start = cursor + match.index
+                output += value.slice(cursor, start)
+
+                let depth = 0
+                let inString = false
+                let escaped = false
+                let end = -1
+
+                for (let i = start; i < value.length; i++) {
+                    const ch = value[i]
+
+                    if (inString) {
+                        if (escaped) {
+                            escaped = false
+                        } else if (ch === '\\') {
+                            escaped = true
+                        } else if (ch === '"') {
+                            inString = false
+                        }
+                        continue
+                    }
+
+                    if (ch === '"') {
+                        inString = true
+                        continue
+                    }
+                    if (ch === '{') {
+                        depth += 1
+                        continue
+                    }
+                    if (ch === '}') {
+                        depth -= 1
+                        if (depth === 0) {
+                            end = i + 1
+                            break
+                        }
+                    }
+                }
+
+                if (end === -1) {
+                    output += value.slice(start)
+                    break
+                }
+
+                cursor = end
+                while (cursor < value.length && /\s/.test(value[cursor])) {
+                    cursor += 1
+                }
+            }
+
+            return output
+        }
+
         type DbQueryCall = {
             rpc_name: string
             params: Record<string, any>
@@ -353,6 +534,8 @@ Deno.serve(async (req) => {
         const inferSupplementalDbCalls = (text: string): DbQueryCall[] => {
             const calls: DbQueryCall[] = []
 
+            // Evita falso-positivo: "data de criação" isolado não implica consulta de tarefas.
+            // O contexto de tarefas deve ser explícito (tarefa/pendência/atraso).
             const mentionsTasks = hasAny(text, [
                 'tarefa', 'tarefas',
                 'pendencia', 'pendência', 'pendente', 'pendentes',
@@ -378,8 +561,12 @@ Deno.serve(async (req) => {
                 const wantsOverdueTasks = hasAny(text, [
                     'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline'
                 ])
+                const wantsOpenTasks = isOpenTasksIntent(text)
+                // Detect "criadas hoje/ontem/nesta semana" intent
+                const wantsCreatedOnDate = hasAny(text, ['criada', 'criadas', 'criado', 'criados', 'criação', 'criacao', 'data de criação', 'data de criacao', 'nova', 'novas', 'novo', 'novos', 'adicionada', 'adicionadas'])
                 let p_status: string | null = null
-                if (hasAny(text, ['pendente', 'pendentes', 'a fazer', 'em aberto'])) p_status = 'backlog'
+                if (wantsOpenTasks) p_status = null
+                else if (hasAny(text, ['pendente', 'pendentes', 'a fazer'])) p_status = 'backlog'
                 else if (hasAny(text, ['em andamento', 'andamento'])) p_status = 'in_progress'
                 else if (hasAny(text, ['aprovacao', 'aprovação', 'aguardando aprovacao', 'aguardando aprovação'])) p_status = 'approval'
                 else if (hasAny(text, ['pausada', 'pausadas', 'pausado', 'pausados'])) p_status = 'paused'
@@ -390,6 +577,12 @@ Deno.serve(async (req) => {
                     taskParams.p_overdue = true
                     taskParams.p_reference_date = clientToday || runtimeToday
                     if (clientTimezone) taskParams.p_reference_tz = clientTimezone
+                }
+                // Pass created_date filter when user asks about tasks created on a specific date
+                if (wantsCreatedOnDate && inferredReferenceDate) {
+                    taskParams.p_created_date = inferredReferenceDate
+                } else if (wantsCreatedOnDate && hasAny(text, ['hoje', 'today'])) {
+                    taskParams.p_created_date = clientToday || runtimeToday
                 }
                 calls.push({ rpc_name: 'query_all_tasks', params: taskParams })
             }
@@ -865,7 +1058,7 @@ Deno.serve(async (req) => {
                 type: "function" as const,
                 function: {
                     name: "query_all_tasks",
-                    description: "Consultar tarefas e pendências dos projetos/clientes. Use para: 'tem tarefa pendente?', 'quais as pendências?', 'tarefas em andamento', etc. Sempre use esta ferramenta quando o usuário perguntar sobre tarefas, pendências ou atividades.",
+                    description: "Consultar tarefas e pendências dos projetos/clientes. Use para: 'tem tarefa pendente?', 'quais as pendências?', 'tarefas em andamento', 'tarefas criadas hoje', etc. Sempre use esta ferramenta quando o usuário perguntar sobre tarefas, pendências ou atividades.",
                     parameters: {
                         type: "object",
                         properties: {
@@ -889,6 +1082,10 @@ Deno.serve(async (req) => {
                             p_reference_tz: {
                                 type: "string",
                                 description: "Timezone IANA opcional do usuário (ex: America/Sao_Paulo) para rastreabilidade."
+                            },
+                            p_created_date: {
+                                type: "string",
+                                description: "Filtrar tarefas pela data de criação (created_at). Formato YYYY-MM-DD. Use quando o usuário perguntar 'tarefas criadas hoje', 'tarefas criadas ontem', 'novas tarefas de hoje', etc."
                             }
                         }
                     }
@@ -1116,6 +1313,22 @@ Deno.serve(async (req) => {
             }
         ]
 
+        // Lógica de precificação centralizada (Ref: v8.6)
+        const MODEL_PRICES: Record<string, { input: number, output: number }> = {
+            'gpt-4o': { input: 0.0000025, output: 0.00001 },
+            'gpt-4o-mini': { input: 0.00000015, output: 0.0000006 },
+        };
+
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
+        let totalCostEst = 0;
+        let totalLatencyMs = 0;
+
+        const modelUsage: Record<string, { input_tokens: number, output_tokens: number, cost: number }> = {
+            'gpt-4o': { input_tokens: 0, output_tokens: 0, cost: 0 },
+            'gpt-4o-mini': { input_tokens: 0, output_tokens: 0, cost: 0 }
+        };
+
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
             // Classificação por Function Calling com GPT-4o-mini (rápido e barato)
             const completion = await openai.chat.completions.create({
@@ -1139,9 +1352,16 @@ Exemplos:
 - "gere um gráfico das tarefas" → query_task_distribution_chart(p_group_by: "status")
 - "gráfico por responsável" → query_task_distribution_chart(p_group_by: "assignee")
 - "quem acessou o sistema hoje?" → query_access_summary()
+- "que usuários acessaram a plataforma?" → query_access_summary()
+- "quem entrou no sistema hoje?" → query_access_summary()
+- "quais usuários logaram recentemente?" → query_access_summary()
 - "o que diz o contrato com a empresa X?" → rag_search()
 - "quais tarefas estão pendentes?" → query_all_tasks(p_status: "backlog")
 - "quais tarefas estão atrasadas?" → query_all_tasks(p_overdue: true)
+- "quais tarefas foram criadas hoje?" → query_all_tasks(p_created_date: "<data_de_hoje_YYYY-MM-DD>")
+- "que tarefas foram criadas ontem?" → query_all_tasks(p_created_date: "<data_de_ontem_YYYY-MM-DD>")
+- "novas tarefas de hoje" → query_all_tasks(p_created_date: "<data_de_hoje_YYYY-MM-DD>")
+- "tarefas adicionadas hoje no projeto X" → query_all_tasks(p_project_id: X, p_created_date: "<data_de_hoje_YYYY-MM-DD>")
 - "quantas propostas já foram aceitas?" → query_all_proposals(p_status_filter: "accepted")
 - "me fale sobre o cliente Amplexo" → rag_search() (busca semântica)
 - "o que a Amplexo respondeu na pesquisa?" → query_survey_responses(p_client_name: "Amplexo")
@@ -1172,6 +1392,7 @@ Exemplos:
 Quando a pergunta for sobre pessoas, cargos, funções, C-level (CEO/CTO/CFO/COO/CMO/CIO), fundador ou papéis internos, priorize query_all_users.
 Quando a pergunta envolver faturamento, MRR, ARR, receita recorrente ou run-rate, priorize query_financial_summary e evite usar query_all_projects/query_all_proposals para cálculo financeiro.
 Quando a pergunta citar um mês/ano específico (ex: janeiro/2026, fev 2026), defina p_reference_date no último dia do mês citado.
+Quando o usuário perguntar sobre tarefas CRIADAS em uma data específica (hoje, ontem, esta semana), use query_all_tasks com p_created_date no formato YYYY-MM-DD.
 Quando o usuário pedir para CRIAR tarefa/pendência/atividade, SEMPRE use execute_create_traffic_task. NÃO peça confirmação — execute diretamente.
 Quando o usuário pedir para DELETAR/APAGAR/EXCLUIR tarefa, SEMPRE use execute_delete_task.
 Quando o usuário pedir para MOVER tarefa ou MUDAR STATUS de tarefa, use execute_move_task. Mapeie: "em execução"→in_progress, "aprovação"→approval, "finalizado/concluído/feito"→done, "pausado"→paused, "backlog"→backlog.
@@ -1187,6 +1408,35 @@ Retorne apenas function calls (sem texto livre).`
             })
 
             const rawToolCalls = completion.choices[0].message.tool_calls ?? []
+
+            // Log tokens do Router (gpt-4o-mini) — fire and forget
+            // Preços (Fev 2026): Input $0.150/1M, Output $0.600/1M
+            const routerUsage = completion.usage
+            if (routerUsage) {
+                const miniPrices = MODEL_PRICES['gpt-4o-mini'];
+                const routerCost = (routerUsage.prompt_tokens * miniPrices.input) + (routerUsage.completion_tokens * miniPrices.output);
+
+                // Acumular totais da sessão
+                totalInputTokens += routerUsage.prompt_tokens;
+                totalOutputTokens += routerUsage.completion_tokens;
+                totalCostEst += routerCost;
+
+                // Breakdown por modelo
+                modelUsage['gpt-4o-mini'].input_tokens += routerUsage.prompt_tokens;
+                modelUsage['gpt-4o-mini'].output_tokens += routerUsage.completion_tokens;
+                modelUsage['gpt-4o-mini'].cost += routerCost;
+
+                supabaseAdmin.rpc('log_agent_execution', {
+                    p_session_id: session_id,
+                    p_agent_name: 'Router_GPT4oMini',
+                    p_action: 'route',
+                    p_status: 'success',
+                    p_cost_est: routerCost,
+                    p_tokens_input: routerUsage.prompt_tokens,
+                    p_tokens_output: routerUsage.completion_tokens,
+                    p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
+                }).catch(() => { })
+            }
 
             if (rawToolCalls.length > 0) {
                 const parsedCalls: Array<{ name: string; args: Record<string, any> }> = []
@@ -1213,7 +1463,7 @@ Retorne apenas function calls (sem texto livre).`
                     'query_all_users': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
-                    'query_survey_responses': { agent: 'Agent_Projects', artifact_kind: 'project' },
+                    'query_survey_responses': { agent: 'Agent_MarketingTraffic', artifact_kind: 'project' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                     'execute_create_traffic_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
@@ -1235,6 +1485,90 @@ Retorne apenas function calls (sem texto livre).`
                 // Complementa consultas em perguntas compostas para evitar respostas parciais.
                 const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
                 let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
+
+                // Guardrail de intenção: consultas de tarefas devem sempre executar query_all_tasks
+                // e priorizá-la como chamada principal para evitar GenUI de projetos indevido.
+                const isTaskQueryIntent = hasAny(input.user_message, [
+                    'tarefa', 'tarefas',
+                    'pendencia', 'pendência', 'pendente', 'pendentes',
+                    'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline',
+                    'criada', 'criadas', 'criado', 'criados',
+                    'criação', 'criacao', 'data de criação', 'data de criacao',
+                    'nova', 'novas', 'novo', 'novos', 'adicionada', 'adicionadas'
+                ])
+
+                if (isTaskQueryIntent) {
+                    const wantsCreatedOnDate = hasAny(input.user_message, [
+                        'criada', 'criadas', 'criado', 'criados',
+                        'criação', 'criacao', 'data de criação', 'data de criacao',
+                        'nova', 'novas', 'novo', 'novos', 'adicionada', 'adicionadas'
+                    ])
+                    const wantsOverdueTasks = hasAny(input.user_message, [
+                        'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline'
+                    ])
+                    const explicitlyWantsProjectListInTaskQuery = hasAny(input.user_message, [
+                        'liste os projetos', 'listar projetos', 'quais projetos', 'mostre os projetos',
+                        'nomes dos projetos', 'detalhar projetos', 'detalhe dos projetos'
+                    ])
+
+                    const taskParams: Record<string, any> = {}
+                    if (wantsCreatedOnDate) {
+                        taskParams.p_created_date = inferredReferenceDate || (clientToday || runtimeToday)
+                    }
+                    if (wantsOverdueTasks) {
+                        taskParams.p_overdue = true
+                        taskParams.p_reference_date = clientToday || runtimeToday
+                        if (clientTimezone) taskParams.p_reference_tz = clientTimezone
+                    }
+
+                    const taskIdx = dbCalls.findIndex((c) => c.rpc_name === 'query_all_tasks')
+                    if (taskIdx === -1) {
+                        dbCalls.unshift({ rpc_name: 'query_all_tasks', params: taskParams })
+                    } else {
+                        const existing = dbCalls[taskIdx]
+                        const mergedTaskCall: DbQueryCall = {
+                            rpc_name: 'query_all_tasks',
+                            params: cleanRpcParams({ ...(existing.params || {}), ...taskParams })
+                        }
+                        dbCalls.splice(taskIdx, 1)
+                        dbCalls.unshift(mergedTaskCall)
+                    }
+
+                    if (!explicitlyWantsProjectListInTaskQuery) {
+                        dbCalls = dbCalls.filter((c) => c.rpc_name !== 'query_all_projects')
+                    }
+
+                    dbCalls = dedupeDbCalls(enrichDbCalls(dbCalls))
+                }
+
+                if (forcedAgent === 'Agent_MarketingTraffic') {
+                    dbCalls = dbCalls.filter((c) => trafficAllowedReadRpcs.has(c.rpc_name))
+
+                    const hasSurveyCall = dbCalls.some((c) => c.rpc_name === 'query_survey_responses')
+                    const wantsTrafficStrategy = hasAny(input.user_message, [
+                        'estrategia', 'estratégia', 'campanha', 'campanhas',
+                        'google ads', 'meta ads', 'trafego pago', 'tráfego pago',
+                        'questionario', 'questionário', 'survey', 'briefing'
+                    ])
+
+                    if (!hasSurveyCall && wantsTrafficStrategy) {
+                        dbCalls.unshift({
+                            rpc_name: 'query_survey_responses',
+                            params: { p_project_type: 'traffic', p_limit: 10 }
+                        })
+                        dbCalls = dedupeDbCalls(enrichDbCalls(dbCalls))
+                    }
+
+                    const hasClientCall = dbCalls.some((c) => c.rpc_name === 'query_all_clients')
+                    const wantsClientData = hasAny(input.user_message, ['cliente', 'clientes'])
+                    if (!hasClientCall && wantsClientData) {
+                        dbCalls.unshift({
+                            rpc_name: 'query_all_clients',
+                            params: {}
+                        })
+                        dbCalls = dedupeDbCalls(enrichDbCalls(dbCalls))
+                    }
+                }
 
                 const hasFinancialIntent = hasAny(input.user_message, [
                     'mrr', 'arr', 'faturamento', 'receita', 'run rate', 'recorrente', 'recorrencia', 'recorrência'
@@ -1369,18 +1703,107 @@ Retorne apenas function calls (sem texto livre).`
         }
 
         const decision = await routeRequestHybrid(routerInput, { callRouterLLM })
+        let effectiveDecision = forcedAgent
+            ? {
+                ...decision,
+                agent: forcedAgent as any,
+                reason: `${decision.reason} | forced_agent=${forcedAgent}`,
+            }
+            : decision
 
-        console.log(`[Router] Decision: ${decision.agent} (Risk: ${decision.risk_level})`)
+        if (effectiveDecision.agent === 'Agent_MarketingTraffic') {
+            const sanitizeTrafficCalls = (calls: DbQueryCall[]) =>
+                dedupeDbCalls(enrichDbCalls(calls.filter((call) => trafficAllowedReadRpcs.has(call.rpc_name))))
+
+            if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
+                const plannedTrafficCalls: DbQueryCall[] = []
+                const rawDbParams: any = effectiveDecision.db_query_params
+
+                if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                    for (const call of rawDbParams.calls) {
+                        if (!call || typeof call !== 'object' || typeof call.rpc_name !== 'string') continue
+                        const { rpc_name, ...params } = call
+                        plannedTrafficCalls.push({ rpc_name, params })
+                    }
+                } else if (typeof rawDbParams.rpc_name === 'string') {
+                    const { rpc_name, ...params } = rawDbParams
+                    plannedTrafficCalls.push({ rpc_name, params })
+                }
+
+                const safeTrafficCalls = sanitizeTrafficCalls(plannedTrafficCalls)
+                if (safeTrafficCalls.length > 0) {
+                    const primary = safeTrafficCalls[0]
+                    effectiveDecision = {
+                        ...effectiveDecision,
+                        tool_hint: 'db_query',
+                        db_query_params: safeTrafficCalls.length > 1
+                            ? {
+                                rpc_name: '__batch__',
+                                calls: safeTrafficCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                            }
+                            : { rpc_name: primary.rpc_name, ...primary.params },
+                    }
+                } else {
+                    effectiveDecision = {
+                        ...effectiveDecision,
+                        tool_hint: 'rag_search',
+                        db_query_params: undefined,
+                    }
+                }
+            }
+
+            // Guardrail de domínio: tráfego consulta somente contexto de clientes + tarefas + survey.
+            effectiveDecision = {
+                ...effectiveDecision,
+                artifact_kind: 'project',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                top_k: Math.max(1, effectiveDecision.top_k || 8),
+                filters: {
+                    ...effectiveDecision.filters,
+                    artifact_kind: 'project',
+                    source_table: ['traffic_projects', 'project_tasks', 'acceptances', 'activity_logs'],
+                    type_allowlist: ['official_doc', 'session_summary', 'database_record'],
+                    type_blocklist: ['chat_log'],
+                    status: 'active',
+                    time_window_minutes: null,
+                },
+            }
+        }
+
+        const isTrafficAgentContext = effectiveDecision.agent === 'Agent_MarketingTraffic'
+
+        console.log(`[Router] Decision: ${effectiveDecision.agent} (Risk: ${effectiveDecision.risk_level})`)
+
+        if (isTrafficAgentContext && isTrafficOutOfScopeIntent(query)) {
+            const outOfScopeAnswer = 'Escopo restrito do Agente Especialista em Gestão de Tráfego: aqui eu só consulto dados de clientes, tarefas e respostas de questionário. Dados comerciais/financeiros (propostas, MRR, ARR, faturamento, pricing) não são acessados neste agente.'
+            await persistCognitiveMemorySafe('assistant', outOfScopeAnswer, 'assistant_traffic_scope_block')
+            return new Response(JSON.stringify({
+                answer: outOfScopeAnswer,
+                documents: [],
+                meta: { scope_blocked: true, agent: effectiveDecision.agent }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+        }
 
         // 3. Retrieval Step (Hybrid: RAG ou SQL direto)
         let contextText = ''
         let retrievedDocs: any[] = []
         let rawDbRecordsForGenUI: any[] | null = null;
         let rpcNameForGenUI: string = '';
+        const rawDbRecordsByRpcForGenUI: Record<string, any[]> = {}
         let cognitiveMemoryDocs: any[] = []
         let cognitiveMemoryContext = ''
         let explicitUserFacts: string[] = []
         let executedDbRpcs: string[] = []
+        const isTaskFocusedQueryForGenUi = hasAny(query, [
+            'tarefa', 'tarefas',
+            'pendencia', 'pendência', 'pendente', 'pendentes',
+            'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline',
+            'criada', 'criadas', 'criado', 'criados',
+            'criação', 'criacao', 'data de criação', 'data de criacao',
+            'nova', 'novas', 'novo', 'novos', 'adicionada', 'adicionadas'
+        ])
         const isLeadershipQuery = hasAny(query, [
             'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cio',
             'cargo', 'funcao', 'função', 'papel',
@@ -1487,7 +1910,10 @@ Retorne apenas function calls (sem texto livre).`
                             p_agent_name: 'Agent_Executor',
                             p_action: rpc_name,
                             p_status: 'error',
-                            p_params: cleanParams,
+                            p_params: {
+                                ...cleanParams,
+                                model_usage: modelUsage
+                            },
                             p_result: {},
                             p_latency_ms: rpcLatencyMs,
                             p_error_message: rpcError.message,
@@ -1504,6 +1930,45 @@ Retorne apenas function calls (sem texto livre).`
                     normalizedData = JSON.parse(normalizedData)
                 } catch {
                     // mantém string original se não for JSON válido
+                }
+            }
+
+            // Enriquecimento para navegação do frontend:
+            // query_all_projects retorna ids por tabela de projeto (traffic/website/lp),
+            // mas as rotas do app usam acceptance_id. Aqui anexamos acceptance_id por empresa.
+            if (rpc_name === 'query_all_projects' && Array.isArray(normalizedData) && normalizedData.length > 0) {
+                try {
+                    const companyNames = Array.from(
+                        new Set(
+                            normalizedData
+                                .map((row: any) => String(row?.company_name || '').trim())
+                                .filter((name: string) => name.length > 0)
+                        )
+                    )
+
+                    if (companyNames.length > 0) {
+                        const { data: acceptanceRows, error: acceptanceError } = await supabaseAdmin
+                            .from('acceptances')
+                            .select('id, company_name, timestamp')
+                            .in('company_name', companyNames)
+                            .order('timestamp', { ascending: false })
+
+                        if (!acceptanceError && Array.isArray(acceptanceRows)) {
+                            const acceptanceByCompany = new Map<string, number>()
+                            for (const acc of acceptanceRows as any[]) {
+                                const company = String(acc?.company_name || '').trim()
+                                if (!company || acceptanceByCompany.has(company)) continue
+                                acceptanceByCompany.set(company, Number(acc.id))
+                            }
+
+                            normalizedData = normalizedData.map((row: any) => ({
+                                ...row,
+                                acceptance_id: acceptanceByCompany.get(String(row?.company_name || '').trim()) ?? null,
+                            }))
+                        }
+                    }
+                } catch (enrichmentError) {
+                    console.error('query_all_projects enrichment failed:', enrichmentError)
                 }
             }
 
@@ -1544,6 +2009,7 @@ Retorne apenas function calls (sem texto livre).`
         // Tier-1: busca documentos canônicos corporativos via RPC dedicado.
         // Ignora isolamento por tenant do usuário — usa tenant 'c4_corporate_identity'.
         const runCanonicalRetrieval = async (): Promise<{ text: string; count: number }> => {
+            if (isTrafficAgentContext) return { text: '', count: 0 }
             if (!canonicalMemoryEnabled) return { text: '', count: 0 }
 
             try {
@@ -1583,12 +2049,12 @@ Retorne apenas function calls (sem texto livre).`
             retrievalLabel?: string
             forcedPolicy?: RetrievalPolicy
         }) => {
-            const topKToUse = typeof opts?.topK === 'number' ? opts.topK : decision.top_k
+            const topKToUse = typeof opts?.topK === 'number' ? opts.topK : effectiveDecision.top_k
             console.log(`[Tool] rag_search → top_k: ${topKToUse}`)
             try {
                 const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
                 const baseFilters = {
-                    ...decision.filters,
+                    ...effectiveDecision.filters,
                     ...(opts?.overrideFilters || {}),
                 }
                 const label = opts?.retrievalLabel || 'base vetorial'
@@ -1596,11 +2062,11 @@ Retorne apenas function calls (sem texto livre).`
                 const canUseNormative =
                     normativeGovernanceEnabled &&
                     !hasForcedPolicy &&
-                    decision.retrieval_policy === 'STRICT_DOCS_ONLY'
+                    effectiveDecision.retrieval_policy === 'STRICT_DOCS_ONLY'
 
                 const primaryPolicy: RetrievalPolicy = opts?.forcedPolicy
                     ? opts.forcedPolicy
-                    : (canUseNormative ? 'NORMATIVE_FIRST' : decision.retrieval_policy)
+                    : (canUseNormative ? 'NORMATIVE_FIRST' : effectiveDecision.retrieval_policy)
 
                 const primaryFilters = (primaryPolicy === 'NORMATIVE_FIRST')
                     ? {
@@ -1632,7 +2098,7 @@ Retorne apenas function calls (sem texto livre).`
                         filters: baseFilters as any,
                         options: {
                             topK: topKToUse,
-                            policy: decision.retrieval_policy
+                            policy: effectiveDecision.retrieval_policy
                         },
                         embedder
                     })
@@ -1726,29 +2192,49 @@ Retorne apenas function calls (sem texto livre).`
         // Canonical retrieval — executado ANTES de qualquer outra busca.
         const { text: canonicalBlock, count: canonicalDocsCount } = await runCanonicalRetrieval()
 
-        if (decision.tool_hint === 'db_query' && decision.db_query_params) {
+        if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
             const plannedCalls: DbQueryCall[] = []
 
-            if (decision.db_query_params.rpc_name === '__batch__' && Array.isArray(decision.db_query_params.calls)) {
-                for (const rawCall of decision.db_query_params.calls) {
+            if (effectiveDecision.db_query_params.rpc_name === '__batch__' && Array.isArray(effectiveDecision.db_query_params.calls)) {
+                for (const rawCall of effectiveDecision.db_query_params.calls) {
                     if (!rawCall || typeof rawCall !== 'object') continue
                     const { rpc_name, ...rpcParams } = rawCall
                     if (typeof rpc_name !== 'string' || !dbRpcNames.has(rpc_name)) continue
                     plannedCalls.push({ rpc_name, params: rpcParams })
                 }
             } else {
-                const { rpc_name, ...rpcParams } = decision.db_query_params
+                const { rpc_name, ...rpcParams } = effectiveDecision.db_query_params
                 if (typeof rpc_name === 'string' && dbRpcNames.has(rpc_name)) {
                     plannedCalls.push({ rpc_name, params: rpcParams })
                 }
             }
 
-            const finalCalls = dedupeDbCalls(enrichDbCalls(dedupeDbCalls(plannedCalls)))
+            let finalCalls = dedupeDbCalls(enrichDbCalls(dedupeDbCalls(plannedCalls)))
+            if (isTrafficAgentContext) {
+                finalCalls = finalCalls.filter((call) => trafficAllowedReadRpcs.has(call.rpc_name))
+            }
             if (finalCalls.length === 0) {
                 // Guardrail: sempre consultar alguma base antes de responder
                 contextText = await runVectorRetrieval()
             } else {
+                if (effectiveDecision.agent === 'Agent_MarketingTraffic' && finalCalls.some((call) => call.rpc_name.startsWith('execute_'))) {
+                    const writeBlockedAnswer = 'Este chat do Agente Especialista em Gestão de Tráfego é consultivo e estratégico. Não executo ações operacionais de escrita (criar, mover, editar ou excluir tarefas) aqui.'
+                    await persistCognitiveMemorySafe('assistant', writeBlockedAnswer, 'assistant_traffic_write_block')
+                    await logFinalAgentExecution({
+                        agentName: effectiveDecision.agent,
+                        action: 'write_blocked',
+                        status: 'error',
+                        answer: writeBlockedAnswer,
+                        error: 'Agent_MarketingTraffic restricted from writing'
+                    });
+                    return new Response(JSON.stringify({
+                        answer: writeBlockedAnswer,
+                        documents: [],
+                        meta: { write_blocked: true, forced_agent: forcedAgent, agent: effectiveDecision.agent }
+                    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+                }
+
                 // Confirmação inteligente: verificar RPCs destrutivas antes de executar
                 for (const call of finalCalls) {
                     if (destructiveRpcNames.has(call.rpc_name) && !hasAny(query, confirmationTokens)) {
@@ -1758,7 +2244,14 @@ Retorne apenas function calls (sem texto livre).`
                         const confirmAnswer = isBatch
                             ? `⚠️ Confirmação necessária: deseja deletar **todas as tarefas com status "${call.params.p_status}"**${projectInfo}? Esta ação não pode ser desfeita.\n\nResponda **"confirmar"** para prosseguir com a exclusão.`
                             : `⚠️ Confirmação necessária: deseja deletar a tarefa **"${taskInfo}"**${projectInfo}? Esta ação não pode ser desfeita.\n\nResponda **"confirmar"** para prosseguir com a exclusão.`
+
                         await persistCognitiveMemorySafe('assistant', confirmAnswer, 'assistant_confirmation_request')
+                        await logFinalAgentExecution({
+                            agentName: effectiveDecision.agent,
+                            action: call.rpc_name,
+                            status: 'waiting_confirmation',
+                            answer: confirmAnswer
+                        });
                         return new Response(JSON.stringify({
                             answer: confirmAnswer,
                             documents: [],
@@ -1774,9 +2267,39 @@ Retorne apenas function calls (sem texto livre).`
                     sections.push(section)
 
                     if (!executorRpcNames.has(call.rpc_name) && call.rpc_name !== '__batch__') {
-                        rawDbRecordsForGenUI = rawData;
-                        rpcNameForGenUI = call.rpc_name;
+                        const normalizedRows = Array.isArray(rawData)
+                            ? rawData
+                            : (rawData === null || rawData === undefined ? [] : [rawData])
+                        rawDbRecordsByRpcForGenUI[call.rpc_name] = normalizedRows
+
+                        if (!isTrafficAgentContext) {
+                            // PRIORIDADE: Captura apenas o primeiro resultado de listagem para o GenUI,
+                            // evitando que consultas de "enriquecimento" (como listar todos os usuários)
+                            // sobrescrevam a consulta principal (como logs de acesso).
+                            if (!rawDbRecordsForGenUI) {
+                                rawDbRecordsForGenUI = normalizedRows
+                                rpcNameForGenUI = call.rpc_name
+                            }
+                        } else if (call.rpc_name === 'query_all_tasks') {
+                            const taskRows = normalizedRows
+                            const currentTaskRows = Array.isArray(rawDbRecordsForGenUI)
+                                ? rawDbRecordsForGenUI
+                                : []
+                            rawDbRecordsForGenUI = [...currentTaskRows, ...taskRows]
+                            rpcNameForGenUI = call.rpc_name
+                        }
                     }
+                }
+
+                // Se a pergunta é de tarefas, forçamos o GenUI a usar query_all_tasks
+                // (mesmo quando o LLM executa chamadas adicionais como query_all_projects).
+                if (
+                    !isTrafficAgentContext
+                    && isTaskFocusedQueryForGenUi
+                    && Object.prototype.hasOwnProperty.call(rawDbRecordsByRpcForGenUI, 'query_all_tasks')
+                ) {
+                    rawDbRecordsForGenUI = rawDbRecordsByRpcForGenUI['query_all_tasks']
+                    rpcNameForGenUI = 'query_all_tasks'
                 }
 
                 // Guardrail adicional para perguntas de liderança/cargo:
@@ -1807,7 +2330,14 @@ Retorne apenas function calls (sem texto livre).`
         cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
 
         // 4. Generation Step — com identidade do usuário e histórico
-        const agentConfig = AGENTS[decision.agent] || AGENTS["Agent_Projects"]
+        const agentName = (effectiveDecision.agent as any) || "Agent_Projects"
+        const agentConfig = (AGENTS as any)[agentName]
+        const allowTrafficGenUi = isTrafficAgentContext && rpcNameForGenUI === 'query_all_tasks'
+        const disableAutoGenUi = rpcNameForGenUI === 'query_access_summary'
+        const hasGenUiData = !!(rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0)
+            && (!isTrafficAgentContext || allowTrafficGenUi)
+            && !disableAutoGenUi
+        const isMarketingTrafficAgent = effectiveDecision.agent === 'Agent_MarketingTraffic'
 
         const responseStyleBlock = `
 ESTILO DE RESPOSTA (OBRIGATÓRIO):
@@ -1827,14 +2357,21 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Se a consulta financeira indicar contratos ativos sem mensalidade cadastrada, destaque essa limitação e informe que o MRR/ARR pode estar subestimado.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
-
-FORMATO DE RESPOSTA (GenUI) - REGRA ABSOLUTA:
+${hasGenUiData
+                ? `FORMATO DE RESPOSTA (GenUI):
 O sistema AUTOMATICAMENTE anexará a interface visual (GenUI) dos resultados da consulta ao final da sua mensagem.
-Portanto, NÃO crie listas textuais (ex: 1. Tarefa X, - Projeto Y) e NÃO gere blocos JSON na sua resposta sob nenhuma hipótese.
-Apenas escreva uma frase introdutória amigável confirmando os dados encontrados.
-
-EXEMPLO DE RESPOSTA ESPERADA:
-"Aqui estão as suas tarefas atuais:" ou "Encontrei as seguintes propostas no sistema:"
+Portanto, NÃO gere blocos JSON manualmente.
+Para respostas com GenUI, escreva apenas uma frase introdutória curta confirmando os dados encontrados.
+EXEMPLO: "Aqui estão os dados solicitados:"`
+                : `FORMATO DE RESPOSTA:
+Quando não houver bloco GenUI automático, entregue resposta completa em texto estruturado e objetivo.
+Você pode usar títulos, subtítulos e listas para organizar a resposta.`}
+${isMarketingTrafficAgent
+                ? `
+EXCEÇÃO DO AGENTE DE TRÁFEGO:
+Para o Agent_MarketingTraffic, priorize relatório executivo bem formatado para apresentação ao cliente.
+Inclua seções claras de diagnóstico, estratégia por canal (Google/Meta), estrutura de campanhas, métricas alvo, riscos e próximos passos.`
+                : ''}
 `.trim()
 
         // Montar bloco de identidade
@@ -1867,15 +2404,17 @@ EXEMPLO DE RESPOSTA ESPERADA:
         const cognitiveMemoryBlock = `\nMEMÓRIA COGNITIVA RELEVANTE:\n${cognitiveMemoryContext}`
 
         // v8.0 Estratificação de Memória (Tier 3: Base Canônica)
-        const canonicalSystemBlock = canonicalBlock
-            ? `=== CAMADA 3: BASE DOCUMENTAL CANÔNICA (AUTORIDADE MÁXIMA) ===
-Os princípios abaixo representam a identidade e as políticas inegociáveis da C4 Marketing. 
+        const effectiveCanonicalBlock = isTrafficAgentContext ? '' : canonicalBlock
+        const canonicalSystemBlock = `=== CAMADA 3: BASE DOCUMENTAL CANÔNICA (AUTORIDADE MÁXIMA) ===
+Os princípios abaixo representam a identidade e as políticas inegociáveis da C4 Marketing.
 Eles têm precedência absoluta sobre qualquer outra fonte de informação.
 
 GUARDRAIL ABSOLUTO: Nenhuma resposta pode contradizer ou ignorar estes princípios.
-${canonicalBlock}
+${canonicalTier1Baseline}
+${effectiveCanonicalBlock
+                ? `\nDIRETRIZES CANÔNICAS RECUPERADAS DA BASE:\n${effectiveCanonicalBlock}`
+                : '\nDIRETRIZES CANÔNICAS RECUPERADAS DA BASE: indisponíveis nesta consulta (mantendo Tier-1 baseline obrigatório).'}
 === FIM DA CAMADA 3 ===`
-            : ''
 
         // v8.0 Estratificação de Memória (Tier 2: Memória Consolidada e Contexto)
         const consolidatedMemoryBlock = `
@@ -1925,19 +2464,43 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         })
 
         const endTime = performance.now()
-        const totalLatencyMs = Math.round(endTime - startTime)
+        totalLatencyMs = Math.round(endTime - startTime)
         const usage = chatResponse.usage
+        if (usage) {
+            const mainModel = 'gpt-4o'; // Modelo principal dos agentes
+            const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
+                (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
 
-        // Cálculo de custo estimado (GPT-4o)
-        // Preços (Fev 2026): Input $2.50/1M, Output $10.00/1M
-        const inputTokens = usage?.prompt_tokens || 0
-        const outputTokens = usage?.completion_tokens || 0
-        const costEst = (inputTokens * 0.0000025) + (outputTokens * 0.00001)
+            totalInputTokens += usage.prompt_tokens;
+            totalOutputTokens += usage.completion_tokens;
+            totalCostEst += chatCost;
+
+            modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
+            modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
+            modelUsage['gpt-4o'].cost += chatCost;
+        }
 
         let answer = chatResponse.choices[0].message.content || ''
+        let suggestedSessionTitle: string | null = null
 
-        // FORÇA BRUTA: Injetar componente UI na resposta final via backend
-        if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
+        const llmGeneratedGenUi = /"type"\s*:\s*"(?:task_list|project_list|client_list|proposal_list|user_list|access_list)"/.test(answer);
+
+        if (isTrafficAgentContext && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && rpcNameForGenUI === 'query_all_tasks') {
+            // Traffic Agent: filtrar tasks pelo cliente/projeto mencionado na query antes de injetar GenUI.
+            const normalizedQuery = normalizeText(query)
+            const trafficFilteredTasks = rawDbRecordsForGenUI.filter((task: any) => {
+                const clientName = normalizeText(task?.client_name || '')
+                return clientName && normalizedQuery.includes(clientName.split(' ')[0])
+            })
+
+            // Substitui resposta de texto pelo GenUI visual (sem duplicar texto + cards)
+            if (trafficFilteredTasks.length > 0) {
+                answer = `\`\`\`json\n${JSON.stringify({ type: 'task_list', items: trafficFilteredTasks })}\n\`\`\``
+            }
+        }
+
+        // FORÇA BRUTA: Injetar componente UI na resposta final via backend (apenas para agentes não-Traffic)
+        if (hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && !isTrafficAgentContext) {
             // ANTI-DUPLICAÇÃO: Remover blocos ```json que o LLM já tenha gerado por conta própria
             // ou blocos de json truncados, para evitar duplicação com a injenção do GenUI
             answer = answer.replace(/```json[\s\S]*?(?:```|$)/g, '').trim();
@@ -1947,7 +2510,16 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
 
             // 1. Lógica para Listas Clássicas
             if (rpcNameForGenUI === 'query_all_tasks') {
-                genUiPayload = { type: 'task_list', items: rawDbRecordsForGenUI };
+                const filteredTaskItems = isOpenTasksIntent(query)
+                    ? rawDbRecordsForGenUI.filter((task: any) => isOpenTaskStatus(task?.status))
+                    : rawDbRecordsForGenUI
+
+                if (filteredTaskItems.length === 0 && isOpenTasksIntent(query)) {
+                    genUiPayload = null
+                    answer = 'Não encontrei tarefas em aberto no sistema neste momento.'
+                } else {
+                    genUiPayload = { type: 'task_list', items: filteredTaskItems }
+                }
             }
             else if (rpcNameForGenUI === 'query_all_projects') {
                 genUiPayload = { type: 'project_list', items: rawDbRecordsForGenUI };
@@ -1980,6 +2552,26 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 });
                 genUiPayload = { type: 'access_list', items: sanitizedAccess };
             }
+
+            // --- FILTRAGEM INTELIGENTE (Pós-Processamento GenUI) ---
+            // Se o usuário mencionar um nome ou email específico, filtramos os dados do GenUI
+            // para mostrar apenas o que é relevante, evitando mostrar a lista completa desnecessariamente.
+            if (rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0) {
+                const normalizedQuery = normalizeText(query);
+                const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
+
+                // Somente filtrar se houver palavras de busca relevantes (excluindo verbos comuns de listagem)
+                const searchKeywords = queryWords.filter(w => !['listar', 'quais', 'quem', 'mostrar', 'todos', 'tudo', 'acesso', 'acessos'].includes(w));
+
+                if (searchKeywords.length > 0) {
+                    rawDbRecordsForGenUI = rawDbRecordsForGenUI.filter((item: any) => {
+                        const searchableText = normalizeText(JSON.stringify(item));
+                        return searchKeywords.some(kw => searchableText.includes(kw));
+                    });
+                }
+            }
+            // --------------------------------------------------------
+
             // 2. Lógica para Relatórios (Métricas Financeiras Mapeadas)
             else if (rpcNameForGenUI === 'query_financial_summary') {
                 try {
@@ -2025,8 +2617,26 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             }
 
             if (genUiPayload) {
-                const genUiBlock = `\n\n\`\`\`json\n${JSON.stringify(genUiPayload)}\n\`\`\``;
-                answer += genUiBlock;
+                const genUiBlock = `\`\`\`json\n${JSON.stringify(genUiPayload)}\n\`\`\``;
+
+                // CLEAN UI: Se for uma listagem pura e o LLM não gerou GenUI próprio,
+                // substituímos o texto (que costuma ser repetitivo) pelo bloco visual.
+                // REGRAS: 
+                // 1. Deve ser um RPC de listagem pura.
+                // 2. Não deve ser uma intenção analítica.
+                // 3. Só substituímos se houver MAIS de um registro (listagem geral).
+                //    Se houver apenas um registro (específico), mantemos o texto do LLM que é mais preciso.
+                const pureListingRpcs = ['query_all_tasks', 'query_all_projects', 'query_all_proposals', 'query_all_clients', 'query_all_users', 'query_access_summary'];
+                const isListingRpc = pureListingRpcs.includes(rpcNameForGenUI);
+
+                const isAnalyticalIntent = hasAny(query, ['analise', 'avalie', 'compare', 'por que', 'motivo', 'explique', 'causa', 'entenda']);
+                const hasMultipleResults = rawDbRecordsForGenUI && rawDbRecordsForGenUI.length > 1;
+
+                if (isListingRpc && !isAnalyticalIntent && hasMultipleResults) {
+                    answer = genUiBlock
+                } else {
+                    answer += `\n\n${genUiBlock}`
+                }
             }
         }
 
@@ -2056,6 +2666,140 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             }
         }
 
+        // Respostas de logs de acesso devem ser sempre textuais (sem GenUI/JSON).
+        const isAccessSummaryContext = executedDbRpcs.includes('query_access_summary')
+        if (isAccessSummaryContext) {
+            const accessRows = Array.isArray(rawDbRecordsForGenUI) ? rawDbRecordsForGenUI : []
+            const extractedEmail = query.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() || null
+            const sortedRows = [...accessRows].sort((a: any, b: any) => {
+                const aTime = a?.last_access ? new Date(a.last_access).getTime() : 0
+                const bTime = b?.last_access ? new Date(b.last_access).getTime() : 0
+                return bTime - aTime
+            })
+            const formatAccessDate = (value: any) => {
+                if (!value) return 'sem registro de acesso'
+                const date = new Date(value)
+                if (Number.isNaN(date.getTime())) return String(value)
+                return date.toLocaleString('pt-BR')
+            }
+            const formatDisplayName = (email: string) => {
+                const prefix = (email || '').split('@')[0] || 'Usuário'
+                return prefix
+                    .replace(/[._-]+/g, ' ')
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase())
+            }
+
+            if (extractedEmail) {
+                const target = sortedRows.find((row: any) =>
+                    String(row?.user_email || '').toLowerCase() === extractedEmail
+                )
+                if (target) {
+                    const total = Number(target?.total_accesses || 0)
+                    answer = `O último acesso do usuário ${extractedEmail} foi em ${formatAccessDate(target?.last_access)}.`
+                    answer += ` Total de acessos registrados: ${total}.`
+                } else {
+                    answer = `Não encontrei registros de acesso para ${extractedEmail}.`
+                }
+            } else if (sortedRows.length > 0) {
+                const lines = sortedRows.slice(0, 10).map((row: any) => {
+                    const email = String(row?.user_email || '').toLowerCase()
+                    const name = formatDisplayName(email)
+                    const total = Number(row?.total_accesses || 0)
+                    const last = formatAccessDate(row?.last_access)
+                    return `- ${name} (${email}): total de acessos ${total}, último acesso em ${last}.`
+                })
+                answer = `Os seguintes usuários acessaram a plataforma:\n${lines.join('\n')}`
+            } else {
+                answer = 'Não encontrei registros de acesso no período consultado.'
+            }
+
+            // Remove qualquer bloco JSON residual para evitar renderização indevida no frontend.
+            answer = answer.replace(/```json[\s\S]*?```/gi, '').trim()
+        }
+
+        const sanitizeSessionTitle = (raw: string): string | null => {
+            if (!raw) return null
+            const cleaned = raw
+                .replace(/[`*_#"]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+            if (!cleaned) return null
+            return cleaned.slice(0, 80).trim()
+        }
+
+        const fallbackSessionTitle = () => {
+            const base = query
+                .replace(/\s+/g, ' ')
+                .trim()
+                .split(' ')
+                .slice(0, 8)
+                .join(' ')
+            return sanitizeSessionTitle(base)
+        }
+
+        const shouldSuggestSessionTitle = !!session_id && sessionMessages.length <= 1 && query.trim().length >= 8
+        if (shouldSuggestSessionTitle) {
+            try {
+                const titleResponse = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    temperature: 0.2,
+                    max_tokens: 24,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Gere um título curto em português para a conversa. Regras: até 7 palavras, direto ao ponto, sem aspas, sem ponto final, sem markdown.',
+                        },
+                        {
+                            role: 'user',
+                            content: `Pergunta inicial:\n${query}\n\nResumo da resposta:\n${answer.slice(0, 300)}`,
+                        },
+                    ],
+                })
+                suggestedSessionTitle = sanitizeSessionTitle(titleResponse.choices[0]?.message?.content || '')
+
+                // LOG: Acumular tokens e custo do GPT-4o-mini usado no título
+                const titleUsage = titleResponse.usage;
+                if (titleUsage) {
+                    const miniPrices = MODEL_PRICES['gpt-4o-mini'];
+                    totalInputTokens += titleUsage.prompt_tokens;
+                    totalOutputTokens += titleUsage.completion_tokens;
+                    totalCostEst += (titleUsage.prompt_tokens * miniPrices.input) +
+                        (titleUsage.completion_tokens * miniPrices.output);
+
+                    modelUsage['gpt-4o-mini'].input_tokens += titleUsage.prompt_tokens;
+                    modelUsage['gpt-4o-mini'].output_tokens += titleUsage.completion_tokens;
+                    modelUsage['gpt-4o-mini'].cost += (titleUsage.prompt_tokens * miniPrices.input) +
+                        (titleUsage.completion_tokens * miniPrices.output);
+                }
+            } catch (titleError: any) {
+                console.warn('chat-brain title generation failed:', titleError?.message || titleError)
+            }
+
+            if (!suggestedSessionTitle) {
+                suggestedSessionTitle = fallbackSessionTitle()
+            }
+        }
+
+        if (suggestedSessionTitle && session_id) {
+            try {
+                const { error: updateTitleError } = await supabaseAdmin
+                    .schema('brain')
+                    .from('chat_sessions')
+                    .update({
+                        title: suggestedSessionTitle,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', session_id)
+                    .eq('user_id', userId)
+
+                if (updateTitleError) {
+                    console.error('chat-brain failed to persist suggested title:', updateTitleError.message)
+                }
+            } catch (persistTitleError: any) {
+                console.error('chat-brain exception persisting suggested title:', persistTitleError?.message || persistTitleError)
+            }
+        }
+
         await persistCognitiveMemorySafe('assistant', answer, 'assistant_answer_outbound')
 
         // v9.0 Agent_Autonomy: pós-execução de ações do Executor → sugestões proativas
@@ -2076,35 +2820,24 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             }
         }
 
-        // Registro de telemetria e auditoria (v8.0)
-        let logId = null
-        try {
-            const { data } = await supabaseAdmin.rpc('log_agent_execution', {
-                p_session_id: session_id,
-                p_agent_name: agentConfig.name,
-                p_action: decision.tool_hint === 'db_query' ? 'sql_query' : 'rag_search',
-                p_status: 'success',
-                p_params: {
-                    decision,
-                    idempotency_key: idempotencyKey,
-                    token_usage: usage
-                },
-                p_result: { doc_count: retrievedDocs.length },
-                p_latency_ms: totalLatencyMs,
-                p_cost_est: costEst,
-                p_message_id: chatResponse.id
-            })
-            logId = data
-        } catch (logError) {
-            console.error('[v8.0] Failed to log execution:', logError)
-        }
+        // Registro de telemetria e auditoria (v8.6 unificado)
+        totalLatencyMs = Math.round(performance.now() - startTime);
+        const logId = await logFinalAgentExecution({
+            agentName: agentConfig.name,
+            action: effectiveDecision.tool_hint === 'db_query' ? 'sql_query' : 'rag_search',
+            status: 'success',
+            answer: answer,
+            result: { doc_count: retrievedDocs.length },
+            latencyMs: totalLatencyMs
+        });
 
         // 5. Return
         return new Response(JSON.stringify({
             answer,
             documents: retrievedDocs,
             meta: {
-                decision: decision,
+                decision: effectiveDecision,
+                raw_router_decision: decision,
                 agent: agentConfig.name,
                 executed_db_rpcs: executedDbRpcs,
                 cognitive_memory_docs: cognitiveMemoryDocs.length,
@@ -2113,8 +2846,9 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 canonical_docs_loaded: canonicalDocsCount,
                 memory_write_events: memoryWriteEvents,
                 latency_ms: totalLatencyMs,
-                cost_est: costEst,
-                log_id: logId
+                cost_est: totalCostEst,
+                log_id: logId,
+                ...(suggestedSessionTitle ? { suggested_session_title: suggestedSessionTitle } : {})
             }
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -405,13 +405,25 @@ export interface SmartFeedback {
     isPersistent: boolean;
 }
 
+// How long before a feedback message is considered stale and needs regeneration (ms)
+const FEEDBACK_STALE_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 /**
- * Gets feedback intelligently.
- * If user has OVERDUE tasks, returns the latest feedback (even if read) and marks as persistent.
- * If user has NO overdue tasks, returns latest UNREAD feedback (standard behavior).
+ * Returns true if the feedback message was generated before the overdue condition
+ * existed, or is simply older than FEEDBACK_STALE_MS.
+ */
+function isFeedbackStale(feedback: AiFeedback | undefined): boolean {
+    if (!feedback) return true;
+    return Date.now() - new Date(feedback.created_at).getTime() > FEEDBACK_STALE_MS;
+}
+
+/**
+ * Gets feedback intelligently:
+ * - Overdue tasks → always show latest; regenerate if stale (> 6 h) so message reflects real state.
+ * - No overdue tasks → show latest UNREAD; generate positive reinforcement if none.
  */
 export async function getSmartUserFeedback(userEmail: string, userName: string): Promise<SmartFeedback> {
-    const { overdueTasks } = await getUserTaskStats(userName);
+    const { overdueTasks, activeTasks } = await getUserTaskStats(userName);
     const hasOverdue = overdueTasks.length > 0;
 
     // 1. Fetch latest feedback (read or unread)
@@ -428,26 +440,27 @@ export async function getSmartUserFeedback(userEmail: string, userName: string):
 
     // 2. Logic
     if (hasOverdue) {
-        // If overdue, we want to show the latest feedback IF it exists.
-        // If it's old (e.g. > 24h), maybe we want to generate new?
-        // For now, let's just use the latest if it matches the "overdue" context generally.
-        // Or simplified: if overdue, ALWAYS show latest feedback.
-
-        if (latest) {
-            return { feedback: latest, isPersistent: true };
-        } else {
-            // Generate new because we have overdue but no message
+        // If feedback is stale (older than 6 h or missing), regenerate so the
+        // message reflects the CURRENT overdue state — not a past "all clear" message.
+        if (isFeedbackStale(latest)) {
             const newFeedback = await generateUserFeedback(userEmail, userName);
             return { feedback: newFeedback, isPersistent: true };
         }
+        return { feedback: latest!, isPersistent: true };
     } else {
-        // No overdue. Only show if unread.
+        // No overdue tasks.
         if (latest && !latest.is_read) {
+            // Has unread feedback → show it
             return { feedback: latest, isPersistent: false };
         }
 
-        // If everything read, maybe generate positive reinforcement if long time?
-        // For now, return null to show "All good" default message in UI.
-        return { feedback: null, isPersistent: false };
+        // All messages read and no overdue: generate positive reinforcement
+        // only if we haven't already done so in the last 6 h.
+        if (isFeedbackStale(latest)) {
+            const newFeedback = await generateUserFeedback(userEmail, userName);
+            return { feedback: newFeedback, isPersistent: false };
+        }
+
+        return { feedback: latest ?? null, isPersistent: false };
     }
 }

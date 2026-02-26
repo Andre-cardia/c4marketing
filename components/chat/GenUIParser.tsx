@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Loader2, Calendar, User, Clock, CheckCircle2, Circle, AlertCircle, PlayCircle, PauseCircle, TrendingUp, TrendingDown, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Calendar, User, Clock, CheckCircle2, Circle, AlertCircle, PlayCircle, PauseCircle, TrendingUp, TrendingDown, Image as ImageIcon, Briefcase, FileText, Building2, DollarSign, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
@@ -29,125 +29,51 @@ const getPriorityColor = (p: string) => {
     }
 };
 
+const getProjectKanbanRouteFromGenUi = (project: any): string => {
+    const acceptanceId = project?.acceptance_id
+        ? String(project.acceptance_id)
+        : (project?.id ? String(project.id) : '');
+    if (!acceptanceId) return '/projects';
+    return `/projects?kanban=${encodeURIComponent(acceptanceId)}`;
+};
+
 export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     if (!content || typeof content !== 'string') return null;
 
-    // Use console.log to debug browser execution
-    console.log('[GenUIParser] Receiving Content Length:', content.length);
-
-    // Advanced Extractor: Looks for standard markdown or bare JSON payloads
+    // Parseia apenas blocos markdown explícitos ```json ... ```
     const parts = [];
-    let remaining = content;
+    const startTag = '```json';
+    const endTag = '```';
+    let cursor = 0;
 
-    while (remaining.length > 0) {
-        // Tenta achar com a tag markdown padrão (que pode estar minificada)
-        let startIndex = remaining.indexOf('```json');
-        let isBareJson = false;
-
+    while (cursor < content.length) {
+        const startIndex = content.indexOf(startTag, cursor);
         if (startIndex === -1) {
-            // Se não achar a tag, tenta achar o padrão identificador do nosso payload
-            const possibleBareJsonStart = remaining.search(/\{\s*"type"\s*:/);
-            if (possibleBareJsonStart !== -1) {
-                startIndex = possibleBareJsonStart;
-                isBareJson = true;
-            }
-        }
-
-        if (startIndex === -1) {
-            // Nenhum payload encontrado ou tag detectada no resto do texto
-            parts.push({ type: 'text', content: remaining });
+            parts.push({ type: 'text', content: content.slice(cursor) });
             break;
         }
 
-        // Push do texto normal que veio antes do JSON
-        if (startIndex > 0) {
-            parts.push({ type: 'text', content: remaining.slice(0, startIndex) });
+        if (startIndex > cursor) {
+            parts.push({ type: 'text', content: content.slice(cursor, startIndex) });
         }
 
-        let jsonStr = '';
-        let endIndex = -1;
-        let consumedLength = 0;
-
-        if (isBareJson) {
-            // Modo 1: Bare JSON string scanning (brace balancing algorithm)
-            let blockRemaining = remaining.slice(startIndex);
-            let openBraces = 0;
-            let foundEnd = false;
-
-            for (let i = 0; i < blockRemaining.length; i++) {
-                if (blockRemaining[i] === '{') openBraces++;
-                if (blockRemaining[i] === '}') {
-                    openBraces--;
-                    if (openBraces === 0) {
-                        endIndex = i + 1;
-                        foundEnd = true;
-                        break;
-                    }
-                }
-            }
-
-            if (foundEnd) {
-                jsonStr = blockRemaining.slice(0, endIndex).trim();
-                consumedLength = endIndex; // Relative to startIndex
-            } else {
-                // Bracket not matched (LLM parou no meio ou corrupto)
-                parts.push({ type: 'text', content: blockRemaining });
-                break;
-            }
-
-        } else {
-            // Modo 2: Tag extraída normalmente via Markdown
-            const startTag = '```json';
-            let blockRemaining = remaining.slice(startIndex + startTag.length);
-
-            // Search for triple backtick closing tag
-            endIndex = blockRemaining.indexOf('```');
-
-            // Fallback for truncated LLM streams missing the closing tag
-            if (endIndex === -1) {
-                endIndex = blockRemaining.lastIndexOf('}');
-                if (endIndex !== -1) {
-                    endIndex += 1; // Include the brace
-                }
-            }
-
-            if (endIndex !== -1) {
-                jsonStr = blockRemaining.slice(0, endIndex).trim();
-                // Consume from the markdown start to the closing backticks (if present)
-                let closingBlockLength = blockRemaining.indexOf('```') !== -1 ? 3 : 0;
-                consumedLength = startTag.length + endIndex + closingBlockLength;
-            } else {
-                parts.push({ type: 'text', content: startTag + blockRemaining });
-                break;
-            }
+        const jsonStart = startIndex + startTag.length;
+        const endIndex = content.indexOf(endTag, jsonStart);
+        if (endIndex === -1) {
+            parts.push({ type: 'text', content: content.slice(startIndex) });
+            break;
         }
 
-        // Parse and push the Gen UI block
+        const jsonStr = content.slice(jsonStart, endIndex).trim();
         try {
             const parsedData = JSON.parse(jsonStr);
             parts.push({ type: 'gen_ui', data: parsedData });
-        } catch (e: any) {
-            console.error('[GenUIParser] Parse Error:', e.message);
-            parts.push({
-                type: 'gen_ui',
-                data: {
-                    type: 'parser_error',
-                    error: e.message,
-                    snippet: jsonStr.substring(0, 300) || 'N/A'
-                }
-            });
-            // Fallback plain text
-            parts.push({
-                type: 'text',
-                content: remaining.slice(startIndex, startIndex + consumedLength)
-            });
+        } catch {
+            parts.push({ type: 'text', content: content.slice(startIndex, endIndex + endTag.length) });
         }
 
-        // Advance the remaining string state
-        remaining = remaining.slice(startIndex + consumedLength);
+        cursor = endIndex + endTag.length;
     }
-
-    console.log('[GenUIParser] Total parts generated:', parts.length);
 
     return (
         <div className="flex flex-col gap-4">
@@ -235,6 +161,16 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                                                                     task.priority === 'medium' ? 'Média' : 'Baixa'
                                                             }</span>
                                                         </div>
+                                                    )}
+                                                    {task.id && (
+                                                        <a
+                                                            href={`/dashboard?task_id=${encodeURIComponent(task.id)}`}
+                                                            className="ml-auto inline-flex items-center gap-1.5 text-brand-coral hover:text-white transition-colors font-semibold"
+                                                            title="Abrir tarefa no Dashboard"
+                                                        >
+                                                            <ExternalLink size={12} />
+                                                            Abrir tarefa
+                                                        </a>
                                                     )}
                                                 </div>
                                             </div>
@@ -422,20 +358,143 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                         );
                     }
 
-                    if (data.type === 'parser_error') {
+                    if (data.type === 'proposal_list') {
+                        const proposals = Array.isArray(data.items) ? data.items : [];
                         return (
-                            <div key={index} className="bg-red-500/10 border border-red-500/50 p-4 rounded-xl my-2 text-xs">
-                                <span className="text-red-400 font-bold mb-1 block">Crash parsing JSON: {data.error}</span>
-                                <pre className="text-slate-400 whitespace-pre-wrap">{data.snippet}</pre>
+                            <div key={index} className="flex flex-col gap-3 my-4">
+                                {proposals.map((proposal: any, i: number) => (
+                                    <div key={proposal.id || i} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 hover:border-brand-coral/40 p-5 rounded-2xl shadow-lg transition-all duration-300 group">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-4 flex-1 min-w-0">
+                                                <div className="p-3 bg-brand-coral/10 rounded-xl text-brand-coral border border-brand-coral/20">
+                                                    <FileText size={20} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Proposta Comercial</span>
+                                                        <span className="w-1 h-1 rounded-full bg-slate-700"></span>
+                                                        <span className="text-[10px] font-bold text-brand-coral uppercase tracking-widest">{proposal.slug || `#${proposal.id}`}</span>
+                                                    </div>
+                                                    <h4 className="text-base font-bold text-white mb-1 truncate group-hover:text-brand-coral transition-colors">
+                                                        {proposal.company_name}
+                                                    </h4>
+                                                    <p className="text-xs text-slate-400 font-medium">Responsável: {proposal.responsible_name}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-white/5">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Setup</span>
+                                                <div className="flex items-center gap-1.5 text-slate-300">
+                                                    <DollarSign size={12} className="text-slate-500" />
+                                                    <span className="text-xs font-bold">{Number(proposal.setup_fee || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Mensalidade</span>
+                                                <div className="flex items-center gap-1.5 text-brand-coral">
+                                                    <TrendingUp size={12} className="opacity-70" />
+                                                    <span className="text-sm font-black">{Number(proposal.monthly_fee || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         );
                     }
 
-                    // Se não for um tipo conhecido ainda, desenha o Raw Data JSON pra debug por enquanto
+                    if (data.type === 'project_list') {
+                        const projects = Array.isArray(data.items) ? data.items : [];
+                        return (
+                            <div key={index} className="flex flex-col gap-3 my-4">
+                                {projects.map((project: any, i: number) => {
+                                    const projectTitle = project.name || project.service_type || project.title || 'Projeto sem nome';
+                                    const projectClient = project.client_name || project.company_name || 'C4 Marketing';
+                                    return (
+                                    <div key={project.id || i} className="bg-[#1E293B]/60 backdrop-blur-sm border border-white/10 hover:border-indigo-500/40 p-4 rounded-2xl flex items-center gap-4 transition-all duration-300">
+                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                                            <Briefcase size={22} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h4 className="text-sm font-bold text-white truncate">{projectTitle}</h4>
+                                                {project.status && (
+                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black uppercase tracking-tighter">
+                                                        {project.status}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3 mt-1.5">
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1 font-medium">
+                                                    <Building2 size={10} /> {projectClient}
+                                                </span>
+                                                {project.created_at && (
+                                                    <span className="text-[10px] text-slate-600 flex items-center gap-1 border-l border-white/10 pl-3">
+                                                        <Calendar size={10} /> {format(parseISO(project.created_at), 'dd/MM/yy', { locale: ptBR })}
+                                                    </span>
+                                                )}
+                                                <a
+                                                    href={getProjectKanbanRouteFromGenUi(project)}
+                                                    className="ml-auto inline-flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors font-semibold"
+                                                    title="Abrir Kanban do projeto"
+                                                >
+                                                    <ExternalLink size={12} />
+                                                    Abrir Kanban
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )})}
+                            </div>
+                        );
+                    }
+
+                    if (data.type === 'client_list') {
+                        const clients = Array.isArray(data.items) ? data.items : [];
+                        return (
+                            <div key={index} className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4">
+                                {clients.map((client: any, i: number) => (
+                                    <div key={client.id || i} className="bg-[#1E293B]/30 backdrop-blur-sm border border-white/5 hover:border-white/20 p-4 rounded-2xl flex flex-col gap-3 transition-all duration-300">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-black text-sm uppercase">
+                                                {(client.company_name || client.name || '?')[0]}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-bold text-slate-100 truncate">{client.company_name || client.name || 'Cliente sem nome'}</h4>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                                    {client.responsible_name ? `Responsável: ${client.responsible_name}` : 'Cliente C4'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {client.has_traffic && (
+                                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[9px] font-black uppercase tracking-wider">
+                                                    Tráfego
+                                                </span>
+                                            )}
+                                            {client.has_website && (
+                                                <span className="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] font-black uppercase tracking-wider">
+                                                    Site
+                                                </span>
+                                            )}
+                                            {client.has_landing_page && (
+                                                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-black uppercase tracking-wider">
+                                                    Landing
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    }
+
                     return (
-                        <div key={index} className="bg-slate-800 border border-slate-700 p-4 rounded-xl my-2 text-xs overflow-auto">
-                            <span className="text-slate-400 mb-2 block font-mono">Componente não reconhecido: {data.type}</span>
-                            <pre className="text-green-400">{JSON.stringify(data, null, 2)}</pre>
+                        <div key={index} className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown>
+                                {'Não foi possível renderizar este bloco visual. Exibindo resposta em texto.'}
+                            </ReactMarkdown>
                         </div>
                     );
                 }

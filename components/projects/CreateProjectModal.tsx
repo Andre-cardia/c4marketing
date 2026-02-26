@@ -16,6 +16,7 @@ const SERVICES_OPTIONS = [
     { id: 'website', label: 'Web Site' },
     { id: 'ecommerce', label: 'E-commerce' },
     { id: 'consulting', label: 'Consultoria' },
+    { id: 'ai_agents', label: 'Agentes de IA' },
 ];
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onProjectCreated, projectToEdit }) => {

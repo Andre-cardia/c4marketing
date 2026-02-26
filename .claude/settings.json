@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(grep -l \"traffic_projects\\\\|website_projects\\\\|landing_page_projects\" \"d:/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations/\"*.sql)",
+      "Bash(find \"d:/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations\" -name \"*.sql\" -exec grep -l \"CREATE TABLE\" {} ;)",
+      "Bash(grep -n \"pgcrypto\" \"d:/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations/\"*.sql)",
+      "Bash(grep -i \"CREATE EXTENSION\\\\|pgcrypto\\\\|encryption\" \"d:/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations/\"*.sql)",
+      "Bash(find \"/d/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations\" -name \"*.sql\" -exec grep -l \"CREATE EXTENSION\" {} ;)"
+    ]
+  }
+}

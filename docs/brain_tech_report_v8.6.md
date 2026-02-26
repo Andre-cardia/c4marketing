@@ -988,3 +988,138 @@ Próximos passos naturais:
 4. Confirmação inteligente para ações destrutivas
 5. Batch operations implementadas (já previstas nos próximos passos v8.5)
 6. Agent_Autonomy: sugestões proativas baseadas em padrões detectados
+
+---
+
+## Addendum Pós-v8.6 — Features Implementadas em 26 de Fevereiro de 2026
+
+Este addendum registra as funcionalidades adicionadas após o fechamento original da v8.6, mantendo o histórico anterior intacto.
+
+### 5.1 Comercial e Propostas — Novo Serviço Híbrido `Agentes de IA`
+
+#### Escopo funcional
+
+Foi adicionado um novo serviço no fluxo comercial: **Agentes de IA**, com modelo híbrido de cobrança:
+
+- **Setup inicial (pontual)**
+- **Recorrência mensal**
+
+#### Mudanças técnicas
+
+1. Inclusão do serviço `ai_agents` no catálogo de serviços com novo tipo de precificação `hybrid`.
+2. Evolução do modelo de serviço da proposta para suportar:
+   - `recurringPrice`
+   - `setupPrice`
+   - `details` (detalhamento textual opcional do serviço)
+3. Atualização dos cálculos financeiros:
+   - Mensalidade total agora inclui a parcela recorrente de `ai_agents`.
+   - Investimento pontual inclui o setup de `ai_agents`.
+4. Ajuste dos rótulos na prévia financeira para separar:
+   - `Agentes de IA (Recorrência)`
+   - `Agentes de IA (Setup)`
+
+#### UX/UI da proposta
+
+1. Na tela de criação de proposta, o serviço híbrido exibe dois inputs independentes (Setup e Recorrência).
+2. O campo de **Detalhamento do Serviço (Opcional)** foi incorporado ao fluxo para registrar escopo específico por serviço.
+3. A seção de serviços passou a exibir bloco dedicado de Agentes de IA com:
+   - fases de implantação (roadmap)
+   - infraestrutura inclusa na mensalidade
+   - exibição do detalhamento personalizado do agente
+
+### 5.2 Texto Comercial da Proposta (Hero)
+
+O texto introdutório da proposta foi atualizado para comunicar os pilares combinados da oferta, incluindo:
+
+- Google Ads e Meta Ads
+- Criação de Landing Pages de Alta Performance e Sites
+- Implementação de Agentes de IA
+
+A composição do texto passou a ser dinâmica conforme os serviços selecionados, enfatizando aceleração de vendas, autoridade digital e resultados exponenciais.
+
+### 5.3 Contrato — Regras e Template para `Agentes de IA`
+
+#### Cláusulas e condições
+
+1. `Agentes de IA` foi incluído nas regras de serviços recorrentes para renovação automática contratual.
+2. Foi adicionada cláusula específica de setup e infraestrutura (VPS, API OpenAI e API WhatsApp), incluindo regra de reajuste em caso de ultrapassagem do limite mensal de tokens.
+3. O `ContractDetails` passou a considerar prazo estimado de setup para Agentes de IA (`até 15 dias úteis`).
+
+#### Templates de contrato (migrations)
+
+1. `20260226121500_add_ai_agents_contract_template.sql`
+   - cria template inicial do serviço `ai_agents`.
+2. `20260226130000_update_ai_agents_contract_template.sql`
+   - amplia o conteúdo com roadmap por fases, responsabilidades e política de infraestrutura recorrente.
+
+### 5.4 Chat-Brain — Resiliência de Sessão/JWT
+
+Para mitigar falhas de sessão inválida e loops de autenticação no chat:
+
+1. O frontend (`lib/brain.ts`) passou a validar token antes da chamada principal.
+2. Estratégia de tentativa em camadas:
+   - tentativa 1: `supabase.functions.invoke('chat-brain')`
+   - tentativa 2: refresh de sessão + novo invoke
+   - tentativa 3 (fallback): chamada HTTP direta à função
+3. Ampliação dos padrões de erro JWT tratados (`invalid jwt`, token expirado, malformed etc.).
+4. Mensagem de erro final ao usuário foi padronizada para instrução objetiva de atualizar página/fazer login novamente.
+
+### 5.5 Chat-Brain — Entendimento de Tarefas por Data de Criação
+
+#### Banco e RPC
+
+A função `query_all_tasks` foi evoluída para aceitar `p_created_date` (migration `20260225160000_add_created_date_filter_to_tasks.sql`), permitindo consultas como:
+
+- "tarefas criadas hoje"
+- "tarefas criadas ontem"
+- "novas tarefas desta data"
+
+#### Router e inferência
+
+1. O roteador passou a orientar explicitamente uso de `p_created_date` quando a intenção envolver data de criação.
+2. Foi removido falso-positivo onde menções genéricas a "data de criação" disparavam consulta de tarefas sem contexto explícito de tarefa/pendência.
+3. Tratamento de intenção de "tarefas em aberto" foi reforçado para não limitar incorretamente por status `backlog` quando o usuário pede "em aberto" de forma ampla.
+
+### 5.6 GenUI — Links Navegáveis para Operação
+
+#### Abertura direta de tarefa
+
+1. Cards de `task_list` passaram a incluir CTA **Abrir tarefa**.
+2. O link usa `?task_id=<id>` no Dashboard.
+3. O Dashboard foi atualizado para:
+   - ler `task_id` da query string
+   - abrir automaticamente o `TaskModal` correspondente
+   - limpar o parâmetro da URL após abrir
+
+#### Abertura direta de Kanban do projeto
+
+1. Cards de `project_list` passaram a incluir CTA **Abrir Kanban**.
+2. A rota usada é `/projects?kanban=<acceptance_id>`.
+3. Para garantir esse link, o backend (`chat-brain`) enriquece resultado de `query_all_projects` com `acceptance_id` por empresa (lookup em `acceptances`).
+
+### 5.7 Observabilidade e Telemetria (v8.6 pós-fechamento)
+
+1. Estrutura de logging unificada no `chat-brain` via helper central para `log_agent_execution`.
+2. Passou a registrar breakdown de uso por modelo (`gpt-4o` e `gpt-4o-mini`), com tokens de entrada/saída e custo estimado agregado por requisição.
+3. `meta` da resposta passou a carregar dados operacionais adicionais, incluindo decisão efetiva de roteamento e título sugerido de sessão quando aplicável.
+
+### 5.8 Arquivos-Chave Impactados no Addendum
+
+- `pages/CreateProposal.tsx`
+- `lib/constants.ts`
+- `components/ServiceCard.tsx`
+- `components/Services.tsx`
+- `components/Hero.tsx`
+- `components/ContractDetails.tsx`
+- `pages/ContractView.tsx`
+- `lib/brain.ts`
+- `supabase/functions/chat-brain/index.ts`
+- `components/chat/GenUIParser.tsx`
+- `pages/Dashboard.tsx`
+- `supabase/migrations/20260225160000_add_created_date_filter_to_tasks.sql`
+- `supabase/migrations/20260226121500_add_ai_agents_contract_template.sql`
+- `supabase/migrations/20260226130000_update_ai_agents_contract_template.sql`
+
+### 5.9 Resultado Consolidado
+
+Com este ciclo complementar, o sistema passou a tratar o serviço **Agentes de IA** de ponta a ponta (comercial, proposta, contrato e apresentação), além de elevar a confiabilidade operacional do chat e fechar o fluxo de navegação direta para execução no Kanban e em tarefas específicas.

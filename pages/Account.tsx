@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import Header from '../components/Header';
 import { Camera, Save, User, Mail, Shield, AlertCircle, Loader2, Lock, Eye, EyeOff, Key, ClipboardList, Clock, Briefcase, ExternalLink, Activity, CheckCircle, AlertTriangle, Calendar, Video, Bot, Sparkles, MessageSquare, Trash2 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
@@ -401,7 +400,7 @@ const Account: React.FC = () => {
 
     const getPriorityBadge = (priority: string) => {
         const styles = {
-            low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+            low: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
             medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
             high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
         };
@@ -413,383 +412,375 @@ const Account: React.FC = () => {
     const getStatusBadge = (status: string) => {
         const labels = { backlog: 'Backlog', in_progress: 'Execução', approval: 'Aprovação', done: 'Feito' };
         // @ts-ignore
-        return <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">{labels[status] || status}</span>
+        return <span className="text-sm text-neutral-600 dark:text-neutral-400 font-medium">{labels[status] || status}</span>
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-            <Header />
-            <main className="max-w-6xl mx-auto px-4 py-8">
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-8">Minha Conta</h1>
+        <div className="space-y-8">
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white mb-8">Minha Conta</h1>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* Left Column: Profile & Password */}
-                    <div className="space-y-8">
-                        {/* Profile Section */}
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                            <div className="h-24 bg-gradient-to-r from-brand-coral to-pink-600 opacity-90"></div>
-                            <div className="px-6 pb-6">
-                                <div className="relative flex justify-center -mt-12 mb-4">
-                                    <div className="relative group">
-                                        <div className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 bg-slate-200 overflow-hidden">
-                                            {contextAvatarUrl ? (
-                                                <img src={contextAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400">
-                                                    <User size={40} />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <label className="absolute bottom-0 right-0 p-2 bg-white dark:bg-slate-700 rounded-full shadow-lg cursor-pointer hover:bg-slate-100 transition-colors border border-slate-200 dark:border-slate-600">
-                                            {uploading ? <Loader2 className="w-3 h-3 animate-spin text-brand-coral" /> : <Camera className="w-3 h-3 text-slate-600 dark:text-slate-300" />}
-                                            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
-                                        </label>
+                {/* Left Column: Profile & Password */}
+                <div className="space-y-6">
+                    {/* Profile Section */}
+                    <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                        <div className="h-24 bg-gradient-to-r from-brand-coral to-pink-600 opacity-90"></div>
+                        <div className="px-6 pb-6">
+                            <div className="relative flex justify-center -mt-12 mb-4">
+                                <div className="relative group">
+                                    <div className="w-24 h-24 rounded-full border-4 border-white dark:border-neutral-900 bg-neutral-200 overflow-hidden">
+                                        {contextAvatarUrl ? (
+                                            <img src={contextAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-neutral-100 dark:bg-neutral-800 text-neutral-400">
+                                                <User size={40} />
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-
-                                {message && (
-                                    <div className={`mb-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                                        <AlertCircle size={16} />
-                                        {message.text}
-                                    </div>
-                                )}
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
-                                        <input
-                                            type="text"
-                                            value={fullName}
-                                            onChange={(e) => setFullName(e.target.value)}
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Link do Cal.com / Username</label>
-                                        <input
-                                            type="text"
-                                            value={calComLink}
-                                            onChange={(e) => {
-                                                // Strips domain if user pastes full URL
-                                                const val = e.target.value.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '');
-                                                setCalComLink(val);
-                                            }}
-                                            placeholder="Ex: andre-cardia/reuniao-da-equipe"
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
-                                        />
-                                        <p className="text-[10px] text-slate-400 mt-1">Este link será usado para o botão "Agendar Reunião Interna".</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail</label>
-                                        <input
-                                            type="text"
-                                            value={email || ''}
-                                            disabled
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>
-                                        <input
-                                            type="text"
-                                            value={getRoleLabel(userRole)}
-                                            disabled
-                                            className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 cursor-not-allowed text-sm"
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleSaveProfile}
-                                        disabled={saving}
-                                        className="w-full py-2 text-sm font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-xl border border-brand-coral/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                                    >
-                                        {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                                        Salvar Alterações
-                                    </button>
+                                    <label className="absolute bottom-0 right-0 p-2 bg-white dark:bg-neutral-800 rounded-full shadow-lg cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors border border-neutral-200 dark:border-neutral-700">
+                                        {uploading ? <Loader2 className="w-3 h-3 animate-spin text-brand-coral" /> : <Camera className="w-3 h-3 text-neutral-600 dark:text-neutral-300" />}
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
+                                    </label>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Password Change Section */}
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
-                                <Key className="text-slate-400" size={20} />
-                                <h3 className="font-bold text-slate-800 dark:text-white">Segurança</h3>
-                            </div>
-                            <div className="p-6 space-y-4">
+                            {message && (
+                                <div className={`mb-4 p-3 rounded-xl flex items-center gap-2 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'}`}>
+                                    <AlertCircle size={16} />
+                                    {message.text}
+                                </div>
+                            )}
+
+                            <div className="space-y-4">
                                 <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Nome Completo</label>
                                     <input
-                                        type={showPassword ? "text" : "password"}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
-                                        placeholder="Nova Senha"
+                                        type="text"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                     />
                                 </div>
-                                <div className="flex gap-2">
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Link do Cal.com / Username</label>
                                     <input
-                                        type={showPassword ? "text" : "password"}
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
-                                        placeholder="Confirmar Senha"
+                                        type="text"
+                                        value={calComLink}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/^(https?:\/\/)?(www\.)?cal\.com\//, '').replace(/^\//, '');
+                                            setCalComLink(val);
+                                        }}
+                                        placeholder="Ex: andre-cardia/reuniao-da-equipe"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
                                     />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="p-2 text-slate-400 hover:text-brand-coral border border-slate-300 dark:border-slate-600 rounded-xl"
-                                    >
-                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                    </button>
+                                    <p className="text-[10px] text-neutral-400 mt-1">Este link será usado para o botão "Agendar Reunião Interna".</p>
                                 </div>
-
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">E-mail</label>
+                                    <input
+                                        type="text"
+                                        value={email || ''}
+                                        disabled
+                                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1.5">Função</label>
+                                    <input
+                                        type="text"
+                                        value={getRoleLabel(userRole)}
+                                        disabled
+                                        className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-400 cursor-not-allowed text-sm"
+                                    />
+                                </div>
                                 <button
-                                    onClick={handleUpdatePassword}
-                                    disabled={updatingPassword}
-                                    className="w-full py-2 text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-white transition-colors bg-slate-500/10 hover:bg-slate-600 rounded-xl border border-slate-500/20 dark:border-slate-600/30 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    onClick={handleSaveProfile}
+                                    disabled={saving}
+                                    className="w-full py-2.5 text-sm font-bold text-brand-coral hover:text-white transition-colors bg-brand-coral/10 hover:bg-brand-coral rounded-xl border border-brand-coral/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                 >
-                                    {updatingPassword ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
-                                    Atualizar Senha
+                                    {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                                    Salvar Alterações
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column: Meetings & Tasks */}
-                    <div className="lg:col-span-2 space-y-8">
-
-                        {/* Meetings Section */}
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
-                                        <Calendar size={20} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Agenda (c4storage1)</h2>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Todos os agendamentos</p>
-                                    </div>
-                                </div>
-                                <div className="text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-                                    {myBookings.length} agendadas
-                                </div>
+                    {/* Password Change Section */}
+                    <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
+                        <div className="p-5 border-b border-neutral-100 dark:border-neutral-800 flex items-center gap-3">
+                            <div className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+                                <Key className="text-neutral-500 dark:text-neutral-400" size={18} />
                             </div>
-
-                            <div className="p-6">
-                                {loadingBookings ? (
-                                    <div className="flex items-center justify-center text-slate-400 gap-2 py-8">
-                                        <Loader2 className="animate-spin" /> Carregando agenda...
-                                    </div>
-                                ) : myBookings.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center text-slate-400 gap-2 py-8">
-                                        <Calendar size={32} className="opacity-20" />
-                                        <p>Nenhuma reunião encontrada para seu e-mail.</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {myBookings.map(booking => (
-                                            <div key={booking.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-800 rounded-xl hover:border-brand-coral/50 transition-colors">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm">
-                                                        <span className="text-xs font-bold text-slate-500 uppercase">
-                                                            {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
-                                                        </span>
-                                                        <span className="text-lg font-bold text-brand-coral">
-                                                            {new Date(booking.startTime).getDate()}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-slate-800 dark:text-white text-sm">{booking.title}</h4>
-                                                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                            <Clock size={12} />
-                                                            {new Date(booking.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(booking.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    {booking.meetingUrl && (
-                                                        <a
-                                                            href={booking.meetingUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="p-2 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
-                                                            title="Entrar na Reunião"
-                                                        >
-                                                            <Video size={18} />
-                                                        </a>
-                                                    )}
-
-                                                    <button
-                                                        onClick={() => handleCancelBooking(booking.uid)}
-                                                        className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors border border-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-900/30"
-                                                        title="Excluir Agendamento"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <h3 className="font-bold text-neutral-800 dark:text-white">Segurança</h3>
                         </div>
-
-                        {/* AI Manager Section */}
-                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden relative">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <Bot size={120} className="text-white" />
+                        <div className="p-5 space-y-3">
+                            <div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                    placeholder="Nova Senha"
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white focus:ring-2 focus:ring-brand-coral outline-none text-sm"
+                                    placeholder="Confirmar Senha"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="p-2.5 text-neutral-400 hover:text-brand-coral border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-800 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
 
-                            <div className="p-6 relative z-10">
-                                <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-brand-coral/20 rounded-xl text-brand-coral shadow-inner">
-                                        <Sparkles size={24} />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                                            Gestor de Projetos IA
-                                            {loadingAiMessage && <Loader2 size={16} className="animate-spin text-slate-400" />}
-                                        </h2>
-
-                                        {loadingAiMessage ? (
-                                            <div className="animate-pulse flex space-x-4 mt-2">
-                                                <div className="flex-1 space-y-2 py-1">
-                                                    <div className="h-2 bg-slate-600 rounded"></div>
-                                                    <div className="h-2 bg-slate-600 rounded w-3/4"></div>
-                                                </div>
-                                            </div>
-                                        ) : aiMessage ? (
-                                            <div className="mt-2">
-                                                <div className={`bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 text-slate-200 leading-relaxed font-medium shadow-sm ${isPersistent ? 'border-l-4 border-l-red-500 bg-red-500/10' : ''}`}>
-                                                    "{aiMessage.message}"
-                                                </div>
-                                                <div className="mt-3 flex justify-end">
-                                                    <button
-                                                        onClick={handleMarkRead}
-                                                        disabled={aiMessage.is_read}
-                                                        className={`flex items-center gap-2 text-xs font-bold transition-colors px-3 py-1.5 rounded-lg border ${aiMessage.is_read
-                                                            ? 'text-slate-500 bg-slate-800/50 border-slate-700 cursor-default'
-                                                            : 'text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border-brand-coral/20'
-                                                            }`}
-                                                    >
-                                                        {aiMessage.is_read ? (
-                                                            <>
-                                                                <CheckCircle size={14} />
-                                                                {isPersistent ? 'Ciente (Pendências Ativas)' : 'Lido'}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <CheckCircle size={14} />
-                                                                Confirmar Leitura
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-slate-400 text-sm mt-1">
-                                                Tudo certo por aqui! Nenhuma mensagem nova do seu gestor.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden min-h-[500px] flex flex-col">
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
-                                        <ClipboardList size={20} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Minhas Tarefas</h2>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Tarefas atribuídas a você</p>
-                                    </div>
-                                </div>
-                                <div className="text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-3 py-1 rounded-full">
-                                    {myTasks.length} pendentes
-                                </div>
-                            </div>
-
-                            <div className="p-6 flex-1 overflow-x-auto">
-                                {loadingTasks ? (
-                                    <div className="h-full flex items-center justify-center text-slate-400 gap-2">
-                                        <Loader2 className="animate-spin" /> Carregando tarefas...
-                                    </div>
-                                ) : myTasks.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-4 py-12">
-                                        <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
-                                            <CheckCircle size={32} className="text-slate-300 dark:text-slate-500" />
-                                        </div>
-                                        <p>Você não tem tarefas pendentes.</p>
-                                    </div>
-                                ) : (
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100 dark:border-slate-800">
-                                                <th className="py-3 pl-2">Tarefa</th>
-                                                <th className="py-3">Projeto</th>
-                                                <th className="py-3">Prazo</th>
-                                                <th className="py-3">Prioridade</th>
-                                                <th className="py-3">Status</th>
-                                                <th className="py-3 text-right pr-2">Ação</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="text-sm">
-                                            {myTasks.map(task => (
-                                                <tr key={task.id} className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group">
-                                                    <td className="py-3 pl-2 font-medium text-slate-800 dark:text-slate-200">
-                                                        {task.title}
-                                                    </td>
-                                                    <td className="py-3 text-slate-600 dark:text-slate-400">
-                                                        <div className="flex items-center gap-2">
-                                                            <Briefcase size={14} className="text-slate-400" />
-                                                            {task.project_name}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3 text-slate-600 dark:text-slate-400">
-                                                        <div className={`flex items-center gap-2 ${new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : ''}`}>
-                                                            <Clock size={14} />
-                                                            {new Date(task.due_date).toLocaleDateString()}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {getPriorityBadge(task.priority)}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {getStatusBadge(task.status)}
-                                                    </td>
-                                                    <td className="py-3 text-right pr-2">
-                                                        <button
-                                                            onClick={() => handleOpenTask(task)}
-                                                            className="text-brand-coral hover:text-red-600 font-bold text-xs flex items-center gap-1 ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            Abrir <ExternalLink size={12} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
+                            <button
+                                onClick={handleUpdatePassword}
+                                disabled={updatingPassword}
+                                className="w-full py-2.5 text-sm font-bold text-neutral-600 dark:text-neutral-300 hover:text-white transition-colors bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-700 dark:hover:bg-neutral-700 rounded-xl border border-neutral-200 dark:border-neutral-700 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {updatingPassword ? <Loader2 className="animate-spin" size={16} /> : <Shield size={16} />}
+                                Atualizar Senha
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {selectedProjectId && (
-                    <TaskModal
-                        isOpen={showTaskModal}
-                        onClose={handleCloseTaskModal}
-                        projectId={selectedProjectId}
-                        task={selectedTask}
-                        projectName={selectedTask?.project_name}
-                        onSave={handleTaskSaved}
-                    />
-                )}
-            </main>
+                {/* Right Column: Meetings & Tasks */}
+                <div className="lg:col-span-2 space-y-6">
+
+                    {/* Meetings Section */}
+                    <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
+                        <div className="p-5 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
+                                    <Calendar size={18} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-neutral-900 dark:text-white">Agenda (c4storage1)</h2>
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Todos os agendamentos</p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700">
+                                {myBookings.length} agendadas
+                            </span>
+                        </div>
+
+                        <div className="p-5">
+                            {loadingBookings ? (
+                                <div className="flex items-center justify-center text-neutral-400 gap-2 py-8">
+                                    <Loader2 className="animate-spin" size={18} /> Carregando agenda...
+                                </div>
+                            ) : myBookings.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center text-neutral-400 gap-2 py-10">
+                                    <Calendar size={32} className="opacity-20" />
+                                    <p className="text-sm">Nenhuma reunião encontrada para seu e-mail.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {myBookings.map(booking => (
+                                        <div key={booking.id} className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-700 rounded-xl hover:border-brand-coral/40 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex flex-col items-center justify-center w-12 h-12 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-sm">
+                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase">
+                                                        {new Date(booking.startTime).toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
+                                                    </span>
+                                                    <span className="text-lg font-bold text-brand-coral leading-none">
+                                                        {new Date(booking.startTime).getDate()}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-neutral-800 dark:text-white text-sm">{booking.title}</h4>
+                                                    <div className="flex items-center gap-2 text-xs text-neutral-400 mt-0.5">
+                                                        <Clock size={11} />
+                                                        {new Date(booking.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} – {new Date(booking.endTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {booking.meetingUrl && (
+                                                    <a
+                                                        href={booking.meetingUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="p-2 bg-brand-coral/10 hover:bg-brand-coral text-brand-coral hover:text-white rounded-lg transition-colors"
+                                                        title="Entrar na Reunião"
+                                                    >
+                                                        <Video size={16} />
+                                                    </a>
+                                                )}
+                                                <button
+                                                    onClick={() => handleCancelBooking(booking.uid)}
+                                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors border border-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 dark:border-red-900/30"
+                                                    title="Excluir Agendamento"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* AI Manager Section */}
+                    <div className="bg-gradient-to-br from-neutral-900 to-neutral-800 rounded-2xl shadow-lg border border-neutral-700 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-4 opacity-5">
+                            <Bot size={140} className="text-white" />
+                        </div>
+
+                        <div className="p-6 relative z-10">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-brand-coral/20 rounded-xl text-brand-coral shrink-0">
+                                    <Sparkles size={22} />
+                                </div>
+                                <div className="flex-1">
+                                    <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+                                        Gestor de Projetos IA
+                                        {loadingAiMessage && <Loader2 size={14} className="animate-spin text-neutral-400" />}
+                                    </h2>
+
+                                    {loadingAiMessage ? (
+                                        <div className="animate-pulse space-y-2 mt-3">
+                                            <div className="h-2.5 bg-neutral-700 rounded w-full"></div>
+                                            <div className="h-2.5 bg-neutral-700 rounded w-3/4"></div>
+                                        </div>
+                                    ) : aiMessage ? (
+                                        <div className="mt-2">
+                                            <div className={`rounded-xl p-4 border text-neutral-200 leading-relaxed text-sm font-medium shadow-sm ${isPersistent
+                                                ? 'border-l-4 border-l-red-500 bg-red-500/10 border-red-500/30'
+                                                : 'bg-white/5 border-white/10'
+                                                }`}>
+                                                "{aiMessage.message}"
+                                            </div>
+                                            <div className="mt-3 flex justify-end">
+                                                <button
+                                                    onClick={handleMarkRead}
+                                                    disabled={aiMessage.is_read}
+                                                    className={`flex items-center gap-2 text-xs font-bold transition-colors px-3 py-1.5 rounded-lg border ${aiMessage.is_read
+                                                        ? 'text-neutral-500 bg-neutral-800/50 border-neutral-700 cursor-default'
+                                                        : 'text-brand-coral hover:text-white bg-brand-coral/10 hover:bg-brand-coral border-brand-coral/30'
+                                                        }`}
+                                                >
+                                                    <CheckCircle size={13} />
+                                                    {aiMessage.is_read
+                                                        ? (isPersistent ? 'Ciente (Pendências Ativas)' : 'Lido')
+                                                        : 'Confirmar Leitura'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-neutral-400 text-sm mt-1">
+                                            Tudo certo por aqui! Nenhuma mensagem nova do seu gestor.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tasks Section */}
+                    <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden min-h-[400px] flex flex-col">
+                        <div className="p-5 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-brand-coral/10 rounded-lg text-brand-coral">
+                                    <ClipboardList size={18} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-neutral-900 dark:text-white">Minhas Tarefas</h2>
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Tarefas atribuídas a você</p>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-3 py-1 rounded-full border border-neutral-200 dark:border-neutral-700">
+                                {myTasks.length} pendentes
+                            </span>
+                        </div>
+
+                        <div className="p-5 flex-1 overflow-x-auto">
+                            {loadingTasks ? (
+                                <div className="h-full flex items-center justify-center text-neutral-400 gap-2">
+                                    <Loader2 className="animate-spin" size={18} /> Carregando tarefas...
+                                </div>
+                            ) : myTasks.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-neutral-400 gap-4 py-12">
+                                    <div className="w-16 h-16 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center">
+                                        <CheckCircle size={28} className="text-neutral-300 dark:text-neutral-600" />
+                                    </div>
+                                    <p className="text-sm">Você não tem tarefas pendentes.</p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-100 dark:border-neutral-800">
+                                            <th className="py-3 pl-2">Tarefa</th>
+                                            <th className="py-3">Projeto</th>
+                                            <th className="py-3">Prazo</th>
+                                            <th className="py-3">Prioridade</th>
+                                            <th className="py-3">Status</th>
+                                            <th className="py-3 text-right pr-2">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm">
+                                        {myTasks.map(task => (
+                                            <tr key={task.id} className="border-b border-neutral-50 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group">
+                                                <td className="py-3 pl-2 font-medium text-neutral-800 dark:text-neutral-100">
+                                                    {task.title}
+                                                </td>
+                                                <td className="py-3 text-neutral-500 dark:text-neutral-400">
+                                                    <div className="flex items-center gap-2">
+                                                        <Briefcase size={13} className="text-neutral-400 shrink-0" />
+                                                        {task.project_name}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3">
+                                                    <div className={`flex items-center gap-1.5 text-sm ${new Date(task.due_date) < new Date() ? 'text-red-500 font-bold' : 'text-neutral-500 dark:text-neutral-400'}`}>
+                                                        <Clock size={13} />
+                                                        {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3">
+                                                    {getPriorityBadge(task.priority)}
+                                                </td>
+                                                <td className="py-3">
+                                                    {getStatusBadge(task.status)}
+                                                </td>
+                                                <td className="py-3 text-right pr-2">
+                                                    <button
+                                                        onClick={() => handleOpenTask(task)}
+                                                        className="text-brand-coral hover:text-red-500 font-bold text-xs flex items-center gap-1 ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        Abrir <ExternalLink size={11} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {selectedProjectId && (
+                <TaskModal
+                    isOpen={showTaskModal}
+                    onClose={handleCloseTaskModal}
+                    projectId={selectedProjectId}
+                    task={selectedTask}
+                    projectName={selectedTask?.project_name}
+                    onSave={handleTaskSaved}
+                />
+            )}
         </div>
     );
 };

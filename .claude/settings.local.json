@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase status)",
+      "Bash(npx supabase status)",
+      "Bash(ls .env*)",
+      "Bash(supabase functions deploy chat-brain)",
+      "Bash(npx supabase functions deploy chat-brain)",
+      "Bash(grep -n \"proposals\\\\|acceptances\" \"D:\\\\GitHub\\\\C4 Marketing\\\\aistudio-repository-template\\\\supabase\\\\migrations\"/*.sql)",
+      "Bash(xargs grep -l \"proposals\\\\|acceptances\")",
+      "Bash(ls -la supabase/migrations/*.sql)",
+      "Bash(grep -n \"CREATE TABLE.*proposals\\\\|CREATE TABLE.*acceptances\" \"supabase/migrations\"/*.sql)",
+      "Bash(grep -A 50 \"CREATE TABLE.*proposals\" \"supabase/backups\"/*.sql)"
+    ]
+  }
+}

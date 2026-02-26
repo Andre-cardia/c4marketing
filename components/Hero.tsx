@@ -26,14 +26,23 @@ const Hero: React.FC<HeroProps> = ({
 
   const hasTraffic = serviceIds.includes('traffic_management');
   const hasSiteOrLP = serviceIds.includes('website') || serviceIds.includes('landing_page') || serviceIds.includes('ecommerce');
+  const hasAIAgents = serviceIds.includes('ai_agents');
+
+  const pillars: string[] = [];
+  if (hasTraffic) pillars.push('anúncios segmentados no Google Ads e Meta Ads');
+  if (hasSiteOrLP) pillars.push('criação de Landing Pages de Alta Performance e Sites');
+  if (hasAIAgents) pillars.push('implementação de Agentes de IA');
+
+  const joinPillars = (items: string[]) => {
+    if (items.length === 0) return '';
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return `${items[0]} e ${items[1]}`;
+    return `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
+  };
 
   let introText = "";
-  if (hasTraffic && hasSiteOrLP) {
-    introText = "Esta proposta apresenta a estratégia completa de aceleração de vendas, combinando autoridade digital através de uma nova presença web e anúncios segmentados no Google e Meta.";
-  } else if (hasTraffic) {
-    introText = "Esta proposta apresenta a estratégia de aceleração de vendas e autoridade digital através de anúncios segmentados no Google e Meta, além de uma estrutura otimizada de conversão.";
-  } else if (hasSiteOrLP) {
-    introText = "Esta proposta apresenta o projeto de desenvolvimento da sua nova presença digital, focada em design premium, alta performance e otimização para conversão de visitantes em clientes.";
+  if (pillars.length > 0) {
+    introText = `Esta proposta apresenta uma estratégia integrada de crescimento, combinando ${joinPillars(pillars)} para acelerar vendas, fortalecer a autoridade digital e gerar resultados exponenciais para a sua empresa.`;
   } else {
     introText = "Esta proposta apresenta soluções estratégicas personalizadas para o crescimento do seu negócio no ambiente digital.";
   }
