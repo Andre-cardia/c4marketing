@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
 const Home: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,6 +43,25 @@ const Home: React.FC = () => {
     }
 
     navigate('/dashboard');
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      if (error) throw error;
+      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada e clique no link para redefinir sua senha.');
+    } catch (err: any) {
+      setError(err.message || 'Não foi possível enviar o e-mail. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -188,16 +207,18 @@ const Home: React.FC = () => {
             <div className="relative mb-8">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2.5 bg-brand-coral/10 border border-brand-coral/20 rounded-xl">
-                  {mode === 'login' ? <KeyRound size={20} className="text-brand-coral" /> : <UserPlus size={20} className="text-brand-coral" />}
+                  {mode === 'login' ? <KeyRound size={20} className="text-brand-coral" /> : mode === 'register' ? <UserPlus size={20} className="text-brand-coral" /> : <Mail size={20} className="text-brand-coral" />}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">
-                    {mode === 'login' ? 'Bem-vindo de volta' : 'Primeiro Acesso'}
+                    {mode === 'login' ? 'Bem-vindo de volta' : mode === 'register' ? 'Primeiro Acesso' : 'Recuperar Senha'}
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {mode === 'login'
                       ? 'Acesse o painel administrativo'
-                      : 'Defina sua senha de acesso'}
+                      : mode === 'register'
+                      ? 'Defina sua senha de acesso'
+                      : 'Enviaremos um link para seu e-mail'}
                   </p>
                 </div>
               </div>
@@ -220,7 +241,7 @@ const Home: React.FC = () => {
             )}
 
             {/* Form */}
-            <form onSubmit={handleAuth} className="space-y-5">
+            <form onSubmit={mode === 'forgot-password' ? handleForgotPassword : handleAuth} className="space-y-5">
               {/* Email */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
@@ -239,31 +260,44 @@ const Home: React.FC = () => {
                 </div>
               </div>
 
-              {/* Password */}
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
-                  Senha
-                </label>
-                <div className="relative group">
-                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
-                    placeholder="••••••••"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+              {/* Password (hidden on forgot-password mode) */}
+              {mode !== 'forgot-password' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                      Senha
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
+                        className="text-[10px] text-slate-500 hover:text-brand-coral transition-colors font-medium uppercase tracking-wider"
+                      >
+                        Esqueci minha senha
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative group">
+                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Confirm Password (Register mode) */}
               {mode === 'register' && (
@@ -300,10 +334,20 @@ const Home: React.FC = () => {
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       Processando...
                     </>
+                  ) : mode === 'forgot-password' ? (
+                    <>
+                      Enviar link de recuperação
+                      <Mail className="w-4 h-4" />
+                    </>
+                  ) : mode === 'login' ? (
+                    <>
+                      Acessar Dashboard
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </>
                   ) : (
                     <>
-                      {mode === 'login' ? 'Acessar Dashboard' : 'Criar Senha de Acesso'}
-                      {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : <Lock className="w-4 h-4" />}
+                      Criar Senha de Acesso
+                      <Lock className="w-4 h-4" />
                     </>
                   )}
                 </span>
@@ -316,7 +360,7 @@ const Home: React.FC = () => {
                 <p className="text-sm text-slate-600">
                   Primeiro acesso?{' '}
                   <button
-                    onClick={() => { setMode('register'); setError(null); }}
+                    onClick={() => { setMode('register'); setError(null); setSuccessMessage(null); }}
                     className="text-brand-coral font-bold hover:text-white transition-colors"
                   >
                     Criar senha
@@ -324,9 +368,9 @@ const Home: React.FC = () => {
                 </p>
               ) : (
                 <p className="text-sm text-slate-600">
-                  Já tem conta?{' '}
+                  {mode === 'forgot-password' ? 'Lembrou a senha?' : 'Já tem conta?'}{' '}
                   <button
-                    onClick={() => { setMode('login'); setError(null); }}
+                    onClick={() => { setMode('login'); setError(null); setSuccessMessage(null); }}
                     className="text-brand-coral font-bold hover:text-white transition-colors"
                   >
                     Fazer login
