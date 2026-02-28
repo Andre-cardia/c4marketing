@@ -26,5 +26,4 @@ BEGIN
   LIMIT p_limit;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.get_session_history TO authenticated, service_role;

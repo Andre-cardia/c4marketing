@@ -66,10 +66,7 @@ BEGIN
         'message', format('Tarefa "%s" criada (ID: %s) para %s.', p_title, v_task_id, coalesce(v_client_name,'desconhecido'))
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_create_traffic_task TO authenticated, service_role;
-
-
 -- ============================================================
 -- 2. execute_delete_task  (deletar tarefa)
 --    Aceita p_task_id (UUID) OU p_task_title + p_project_id/name
@@ -154,10 +151,7 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' do projeto ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_delete_task TO authenticated, service_role;
-
-
 -- ============================================================
 -- 3. execute_move_task  (mover tarefa entre colunas do Kanban)
 --    Status válidos: backlog, in_progress, approval, done, paused
@@ -260,10 +254,7 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_move_task TO authenticated, service_role;
-
-
 -- ============================================================
 -- 4. execute_update_project_status (já existia, adicionar p_project_name)
 -- ============================================================
@@ -366,10 +357,7 @@ BEGIN
         'message', format('Projeto %s (%s) atualizado de "%s" para "%s".', coalesce(v_client_name,'desconhecido'), v_table, v_old_status, p_new_status)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_update_project_status TO authenticated, service_role;
-
-
 -- ============================================================
 -- 5. execute_update_task  (atualizar campos de tarefa existente)
 --    Aceita p_task_id (UUID) OU p_task_title + p_project_id/name
@@ -487,5 +475,4 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_update_task TO authenticated, service_role;

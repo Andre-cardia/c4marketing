@@ -28,5 +28,4 @@ BEGIN
   RETURN true;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.delete_chat_session(uuid) TO authenticated;

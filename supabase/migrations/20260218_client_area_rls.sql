@@ -2,7 +2,6 @@
 ALTER TABLE app_users DROP CONSTRAINT IF EXISTS app_users_role_check;
 ALTER TABLE app_users ADD CONSTRAINT app_users_role_check 
   CHECK (role IN ('admin', 'gestor', 'operacional', 'comercial', 'leitor', 'cliente'));
-
 -- Policy for Traffic Projects (Clients)
 CREATE POLICY "Clients can view their own traffic projects" 
 ON traffic_projects FOR SELECT TO authenticated 
@@ -15,7 +14,6 @@ USING (
     AND a.client_email = (SELECT email FROM app_users WHERE id = auth.uid())
   )
 );
-
 -- Policy for Traffic Campaigns (Clients)
 CREATE POLICY "Clients can view their campaigns" 
 ON traffic_campaigns FOR SELECT TO authenticated 
@@ -29,7 +27,6 @@ USING (
     AND a.client_email = (SELECT email FROM app_users WHERE id = auth.uid())
   )
 );
-
 -- Policy for Traffic Campaign Timeline (Clients)
 CREATE POLICY "Clients can view their timeline" 
 ON traffic_campaign_timeline FOR SELECT TO authenticated 
@@ -44,7 +41,6 @@ USING (
     AND a.client_email = (SELECT email FROM app_users WHERE id = auth.uid())
   )
 );
-
 -- Ensure RLS is enabled (idempotent)
 ALTER TABLE traffic_projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE traffic_campaigns ENABLE ROW LEVEL SECURITY;

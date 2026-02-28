@@ -2,7 +2,6 @@
 -- This avoids false negatives caused by timezone/clock drift between services.
 
 DROP FUNCTION IF EXISTS public.query_all_tasks(bigint, text, boolean);
-
 CREATE OR REPLACE FUNCTION public.query_all_tasks(
   p_project_id bigint DEFAULT NULL,
   p_status text DEFAULT NULL,
@@ -68,5 +67,4 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_all_tasks(bigint, text, boolean, date, text) TO authenticated, service_role;

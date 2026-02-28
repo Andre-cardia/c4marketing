@@ -68,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             label: 'Agente Tráfego',
             icon: Target,
             path: '/traffic-agent',
-            roles: ['admin', 'gestor', 'operacional'],
+            roles: ['gestor'],
             isIA: true
         },
         {

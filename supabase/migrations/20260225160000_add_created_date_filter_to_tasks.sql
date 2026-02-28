@@ -1,7 +1,6 @@
 -- Add p_created_date filter to query_all_tasks so the brain can find tasks created on a specific date.
 
 DROP FUNCTION IF EXISTS public.query_all_tasks(bigint, text, boolean, date, text);
-
 CREATE OR REPLACE FUNCTION public.query_all_tasks(
   p_project_id   bigint  DEFAULT NULL,
   p_status       text    DEFAULT NULL,
@@ -69,5 +68,4 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_all_tasks(bigint, text, boolean, date, text, date) TO authenticated, service_role;

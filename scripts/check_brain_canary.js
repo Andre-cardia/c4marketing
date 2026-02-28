@@ -16,6 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const defaultUserId = '321f03b7-4b78-41f5-8133-6967d6aea169';
 const userId = process.env.BRAIN_TEST_USER_ID || defaultUserId;
 const userEmail = process.env.BRAIN_TEST_USER_EMAIL || 'andre@c4marketing.com';
+const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
 const sessionId = process.env.BRAIN_TEST_SESSION_ID || randomUUID();
 
 const projectRef = (() => {
@@ -44,29 +45,39 @@ const b64u = (obj) =>
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 
+// JWT sintético (3 segmentos) para acionar fallback de claims no chat-brain
+// quando o token não for validável por assinatura no GoTrue.
 const syntheticJwt = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
   iss: 'supabase',
   ref: projectRef,
-  role: 'authenticated',
+  role: userRole,
   sub: userId,
   email: userEmail,
-})} signature`;
+  iat: Math.floor(Date.now() / 1000),
+  exp: Math.floor(Date.now() / 1000) + 60 * 60,
+})}.${b64u({ sig: 'canary' })}`;
 
 const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
 
 const callChat = async (query) => {
-  const res = await fetch(chatEndpoint, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${syntheticJwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      session_id: sessionId,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(chatEndpoint, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${syntheticJwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        session_id: sessionId,
+      }),
+    });
+  } catch (fetchError) {
+    const cause = fetchError?.cause ? ` | cause=${String(fetchError.cause)}` : '';
+    throw new Error(`chat-brain fetch failed: ${fetchError?.message || fetchError}${cause}`);
+  }
 
   const json = await res.json().catch(() => ({}));
   return { status: res.status, body: json };
@@ -145,6 +156,10 @@ try {
     t4Pass ? 'Marker encontrado na resposta.' : 'Marker não foi encontrado na resposta.',
     false
   );
+  if (!t4Pass) {
+    console.log(`       t4.answer=${t4Answer}`);
+    console.log(`       t4.meta=${JSON.stringify(t4.body?.meta || {})}`);
+  }
 
   // 5) Normative hierarchy (best effort; non-critical)
   const t5 = await callChat('Em conflito normativo, policy ou memo prevalece?');

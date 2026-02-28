@@ -194,7 +194,7 @@ export default function BrainManager() {
         }
     };
 
-    if (userRole !== 'gestor' && userRole !== 'admin') {
+    if (userRole !== 'gestor') {
         return (
             <div className="flex items-center justify-center min-h-[400px] text-neutral-500">
                 <p>Acesso restrito a gestores.</p>

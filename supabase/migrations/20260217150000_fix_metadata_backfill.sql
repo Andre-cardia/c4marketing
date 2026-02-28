@@ -15,7 +15,6 @@ where metadata->>'type' != 'chat_log'
     or content ilike '%contrato%'
   )
   and metadata->>'artifact_kind' is null;
-
 -- 2. Proposals
 update brain.documents
 set metadata = jsonb_set(
@@ -30,7 +29,6 @@ where metadata->>'type' != 'chat_log'
     or content ilike '%proposta%'
   )
   and metadata->>'artifact_kind' is null;
-
 -- 3. Projects
 update brain.documents
 set metadata = jsonb_set(
@@ -44,6 +42,5 @@ where metadata->>'type' != 'chat_log'
     or metadata->>'source_table' = 'projects'
   )
   and metadata->>'artifact_kind' is null;
-
 -- 4. Default: tag everything else as 'unknown' or rely on content?
--- For now, let's keep it safe. If it doesn't match above, it might be hidden from strict filters.
+-- For now, let's keep it safe. If it doesn't match above, it might be hidden from strict filters.;

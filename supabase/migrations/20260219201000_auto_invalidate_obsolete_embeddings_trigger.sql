@@ -27,12 +27,9 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_brain_documents_auto_invalidate ON brain.documents;
-
 CREATE TRIGGER trg_brain_documents_auto_invalidate
 BEFORE INSERT OR UPDATE ON brain.documents
 FOR EACH ROW
 EXECUTE FUNCTION public.brain_documents_auto_invalidate();
-
 GRANT EXECUTE ON FUNCTION public.brain_documents_auto_invalidate() TO authenticated, service_role;

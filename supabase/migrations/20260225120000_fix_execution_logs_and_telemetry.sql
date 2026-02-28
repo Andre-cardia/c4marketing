@@ -6,7 +6,6 @@
 
 -- 1. Garantir schema
 CREATE SCHEMA IF NOT EXISTS brain;
-
 -- 2. Criar tabela se não existir (caso completo)
 CREATE TABLE IF NOT EXISTS brain.execution_logs (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,7 +25,6 @@ CREATE TABLE IF NOT EXISTS brain.execution_logs (
     error_message  TEXT,
     created_at     TIMESTAMPTZ DEFAULT now()
 );
-
 -- 3. Adicionar colunas faltantes (idempotente)
 DO $$
 BEGIN
@@ -90,7 +88,6 @@ BEGIN
         ALTER TABLE brain.execution_logs ADD COLUMN tokens_total INTEGER DEFAULT 0;
     END IF;
 END $$;
-
 -- Backfill: preencher tokens de registros antigos que têm params.token_usage
 UPDATE brain.execution_logs
 SET
@@ -99,25 +96,21 @@ SET
     tokens_total  = coalesce((params->'token_usage'->>'total_tokens')::INTEGER, 0)
 WHERE tokens_total = 0
   AND params->'token_usage' IS NOT NULL;
-
 -- 4. Índices
 CREATE INDEX IF NOT EXISTS idx_execution_logs_session_id  ON brain.execution_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_agent_name  ON brain.execution_logs(agent_name);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_created_at  ON brain.execution_logs(created_at);
-
 -- 5. Grants de schema
 -- Acesso direto à tabela: apenas service_role (backend)
 -- Usuários autenticados acessam somente via RPCs com verificação de cargo
 GRANT USAGE ON SCHEMA brain TO authenticated, service_role;
 GRANT ALL   ON brain.execution_logs TO service_role;
-
 -- ============================================================
 -- 6. log_agent_execution (upsert seguro)
 -- ============================================================
 -- Remover todas as versões anteriores para evitar conflito de overload
 DROP FUNCTION IF EXISTS public.log_agent_execution(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, INTEGER, NUMERIC, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.log_agent_execution(TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, INTEGER, NUMERIC, TEXT, TEXT, INTEGER, INTEGER, INTEGER);
-
 CREATE OR REPLACE FUNCTION public.log_agent_execution(
     p_session_id    TEXT,
     p_agent_name    TEXT,
@@ -149,9 +142,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RETURN NULL;
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.log_agent_execution TO authenticated, service_role;
-
 -- ============================================================
 -- 7. query_telemetry_summary
 -- ============================================================
@@ -278,9 +269,7 @@ BEGIN
         'tokens_by_agent',      coalesce(v_tokens_by_agent, '[]'::jsonb)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.query_telemetry_summary TO authenticated, service_role;
-
 -- ============================================================
 -- 8. query_autonomy_suggestions
 -- ============================================================
@@ -361,5 +350,4 @@ BEGIN
 
     RETURN v_suggestions;
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.query_autonomy_suggestions TO authenticated, service_role;

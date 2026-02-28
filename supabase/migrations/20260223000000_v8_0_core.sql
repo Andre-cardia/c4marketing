@@ -3,7 +3,6 @@
 
 -- 0. Garantir existência do schema brain
 CREATE SCHEMA IF NOT EXISTS brain;
-
 -- 1. Tabela de Logs de Execução para Agentes
 CREATE TABLE IF NOT EXISTS brain.execution_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,12 +19,10 @@ CREATE TABLE IF NOT EXISTS brain.execution_logs (
     error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Índices para performance de busca em logs
 CREATE INDEX IF NOT EXISTS idx_execution_logs_session_id ON brain.execution_logs(session_id);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_agent_name ON brain.execution_logs(agent_name);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_created_at ON brain.execution_logs(created_at);
-
 -- 2. Evolução da Tabela de Sessões para Telemetria
 -- Nota: Caso a tabela 'sessions' não esteja no schema brain, ajuste conforme necessário.
 -- Como vi em sessões anteriores que 'sessions' é usada para chat-brain, assume-se schema brain ou public.
@@ -47,7 +44,6 @@ BEGIN
         END IF;
     END IF;
 END $$;
-
 -- 3. Curadoria de Memória: Flag de Verdade Canônica
 DO $$ 
 BEGIN 
@@ -57,7 +53,6 @@ BEGIN
         WHERE (metadata->>'is_canonical_truth') IS NOT NULL;
     END IF;
 END $$;
-
 -- 4. Função para Registrar Logs de Execução (em public para compatibilidade com supabase.rpc())
 CREATE OR REPLACE FUNCTION public.log_agent_execution(
     p_session_id TEXT,
@@ -95,7 +90,6 @@ EXCEPTION WHEN undefined_table OR undefined_schema THEN
     RETURN NULL;
 END;
 $$;
-
 -- Grant de acesso
 GRANT USAGE ON SCHEMA brain TO authenticated;
 GRANT USAGE ON SCHEMA brain TO service_role;

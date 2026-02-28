@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setError('ERRO DE CONFIGURAÇÃO: As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas. O sistema não pode se conectar ao banco de dados.');
+      setError(`ERRO DE CONFIGURAÇÃO: ${supabaseConfigError || 'As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas.'} O sistema não pode se conectar ao banco de dados.`);
     } else {
       checkUser();
     }

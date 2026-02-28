@@ -38,8 +38,6 @@ EXCEPTION
     RETURN NULL;
 END;
 $$;
-
-
 CREATE OR REPLACE FUNCTION public.query_financial_summary(
   p_reference_date date DEFAULT NULL,
   p_status text DEFAULT 'Ativo',
@@ -165,5 +163,4 @@ BEGIN
   RETURN COALESCE(result, '{}'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_financial_summary(date, text, text, text) TO authenticated, service_role;

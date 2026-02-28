@@ -9,13 +9,10 @@ create table if not exists project_tasks (
   due_date timestamptz,
   created_at timestamptz default now()
 );
-
 -- Add index for performance
 create index if not exists idx_project_tasks_project_id on project_tasks(project_id);
 create index if not exists idx_project_tasks_status on project_tasks(status);
-
 -- Enable RLS (Optional, but good practice. Assuming public access for simplicity based on existing repo, or standard policies)
 alter table project_tasks enable row level security;
-
 create policy "Enable all access for authenticated users" on project_tasks
   for all using (true) with check (true);

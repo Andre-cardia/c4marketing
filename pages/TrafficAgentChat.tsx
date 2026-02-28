@@ -44,7 +44,7 @@ function isTrafficOutOfScopeIntent(text: string): boolean {
 }
 
 export default function TrafficAgentChat() {
-    const { avatarUrl } = useUserRole();
+    const { avatarUrl, userRole, loading: roleLoading } = useUserRole();
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -239,6 +239,14 @@ export default function TrafficAgentChat() {
             setIsLoading(false);
         }
     };
+
+    if (!roleLoading && userRole !== 'gestor') {
+        return (
+            <div className="flex items-center justify-center min-h-[400px] text-neutral-500">
+                <p>Acesso restrito a gestores.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="text-slate-100">

@@ -77,7 +77,7 @@ const App: React.FC = () => {
               <Route path="/account" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}><DashboardLayout><Account /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainManager /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain-telemetry" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainTelemetry /></DashboardLayout></ProtectedRoute>} />
-              <Route path="/traffic-agent" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><TrafficAgentChat /></DashboardLayout></ProtectedRoute>} />
+              <Route path="/traffic-agent" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><TrafficAgentChat /></DashboardLayout></ProtectedRoute>} />
               <Route path="/client/preview/:acceptanceId" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><ClientDashboard /></ProtectedRoute>} />
               <Route path="/client" element={<ProtectedRoute allowedRoles={['cliente']}><ClientDashboard /></ProtectedRoute>} />
             </Routes>

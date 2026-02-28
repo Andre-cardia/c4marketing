@@ -1,5 +1,4 @@
 BEGIN;
-
 -- ==========================================
 -- 1. CORREÇÃO DE PERMISSÕES PARA PROPOSTAS E ACEITES (Permite a exclusão)
 -- ==========================================
@@ -20,7 +19,6 @@ CREATE POLICY "Staff full access" ON "public"."proposals"
             AND role IN ('admin', 'gestor', 'operacional', 'comercial')
         )
     );
-
 DROP POLICY IF EXISTS "Staff full access" ON "public"."acceptances";
 CREATE POLICY "Staff full access" ON "public"."acceptances"
     FOR ALL TO authenticated
@@ -38,7 +36,6 @@ CREATE POLICY "Staff full access" ON "public"."acceptances"
             AND role IN ('admin', 'gestor', 'operacional', 'comercial')
         )
     );
-
 -- ==========================================
 -- 2. CORREÇÃO DA CRIAÇÃO DE USUÁRIOS (Permite que gestores adicionem usuários)
 -- ==========================================
@@ -52,7 +49,6 @@ CREATE POLICY "Staff can insert app_users" ON "public"."app_users"
             AND role IN ('admin', 'gestor')
         )
     );
-
 -- ==========================================
 -- 3. RECUPERAÇÃO DA PROPOSTA "SANTOS GOLDEN" EXCLUÍDA
 -- ==========================================
@@ -82,5 +78,4 @@ WHERE NOT EXISTS (
     FROM "public"."proposals"
     WHERE "slug" = 'santos-golden-seguros'
 );
-
 COMMIT;

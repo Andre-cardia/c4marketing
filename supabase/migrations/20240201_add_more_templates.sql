@@ -12,7 +12,6 @@ INSERT INTO contract_templates (service_id, title, content) VALUES
 ### 2. PRAZOS
 2.1. O prazo de entrega estimado é de 7 (sete) dias úteis após o recebimento de todo o material necessário (briefing, acessos e identidade visual).
 ');
-
 -- Insert Ecommerce Template
 INSERT INTO contract_templates (service_id, title, content) VALUES 
 ('ecommerce', 'Desenvolvimento de E-commerce (Loja Virtual)', '

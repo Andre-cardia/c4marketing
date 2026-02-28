@@ -29,7 +29,6 @@ BEGIN
   LIMIT match_count;
 END;
 $$;
-
 -- 2. Função de Inserção no schema Public
 CREATE OR REPLACE FUNCTION public.insert_brain_document (
   content text,
@@ -51,7 +50,6 @@ BEGIN
   RETURN new_id;
 END;
 $$;
-
 -- Permissões
 GRANT EXECUTE ON FUNCTION public.match_brain_documents TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.insert_brain_document TO authenticated, service_role;

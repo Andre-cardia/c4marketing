@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
             ? forcedAgentRaw
             : null
         const forcedAgentAllowedRoles: Record<string, string[]> = {
-            Agent_MarketingTraffic: ['gestor', 'operacional', 'admin'],
+            Agent_MarketingTraffic: ['gestor'],
         }
 
         const getProjectRefFromSupabaseUrl = () => {
@@ -236,6 +236,21 @@ Deno.serve(async (req) => {
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 401
+            })
+        }
+
+        const normalizeRoleValue = (value: string) =>
+            (value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+
+        const normalizedUserRole = normalizeRoleValue(userRole)
+        // Guardrail de produto: o Segundo Cérebro é exclusivo para perfil gestor.
+        if (normalizedUserRole !== 'gestor') {
+            return new Response(JSON.stringify({
+                error: 'Acesso negado. O Segundo Cérebro está disponível somente para usuários com perfil gestor.',
+                meta: { forbidden_role: userRole, required_role: 'gestor' }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403
             })
         }
 
@@ -415,6 +430,12 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                 && normalized !== 'concluído'
                 && normalized !== 'finalizado'
         }
+
+        const isRecentApprovedProjectIntent = (text: string) =>
+            hasAny(text, ['projeto', 'projetos'])
+            && hasAny(text, ['novo', 'novos', 'recente', 'recentes', 'ultimo', 'último', 'ultimos', 'últimos'])
+            && hasAny(text, ['aprovad', 'aceit', 'ativo', 'ativos', 'ativa', 'ativas'])
+        const recentProjectWindowDays = 45
 
         const stripBareTypedJsonObjects = (value: string): string => {
             if (!value) return value
@@ -675,6 +696,47 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                 return { rpc_name: call.rpc_name, params }
             })
 
+        // Reforço determinístico para perguntas compostas:
+        // garante cobertura de usuários/projetos mesmo quando o roteador gerar chamada parcial.
+        const enforceCompositeCoverage = (text: string, baseCalls: DbQueryCall[]): DbQueryCall[] => {
+            const calls = [...(baseCalls || [])]
+            const hasCall = (rpc: string) => calls.some((c) => c.rpc_name === rpc)
+            const mentionsUsers = hasAny(text, [
+                'usuario', 'usuário', 'usuarios', 'usuários',
+                'colaborador', 'colaboradores', 'equipe', 'time',
+                'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cio',
+                'cargo', 'funcao', 'função', 'papel',
+                'presidente', 'fundador', 'dono', 'diretor executivo'
+            ])
+            const mentionsAccess = hasAny(text, ['acesso', 'acessos', 'acessou', 'logou', 'login', 'entrou'])
+            const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
+
+            if (mentionsUsers && !mentionsAccess && !hasCall('query_all_users')) {
+                calls.push({ rpc_name: 'query_all_users', params: {} })
+            }
+
+            if (mentionsProjects && !hasCall('query_all_projects')) {
+                const projectParams: Record<string, any> = {}
+                if (hasAny(text, ['trafego', 'tráfego', 'traffic', 'gestao de trafego', 'gestão de tráfego'])) {
+                    projectParams.p_service_type = 'traffic'
+                } else if (hasAny(text, ['site', 'website'])) {
+                    projectParams.p_service_type = 'website'
+                } else if (hasAny(text, ['landing', 'lp', 'pagina de captura', 'página de captura'])) {
+                    projectParams.p_service_type = 'landing_page'
+                }
+
+                if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                    projectParams.p_status_filter = 'Ativo'
+                } else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) {
+                    projectParams.p_status_filter = 'Inativo'
+                }
+
+                calls.push({ rpc_name: 'query_all_projects', params: projectParams })
+            }
+
+            return dedupeDbCalls(enrichDbCalls(calls))
+        }
+
         const isExplicitMemorySaveIntent = (text: string) => hasAny(text, [
             'guarde isso', 'guarde esta informacao', 'guarde essa informacao',
             'grave isso', 'grave essa informacao', 'grave esta informacao',
@@ -760,6 +822,234 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             }
 
             return savedId
+        }
+
+        type ExplicitFactRecord = {
+            fact: string;
+            created_at: string | null;
+            scope: 'session' | 'user';
+        }
+
+        const parseExplicitFactFromContent = (content: string): string => {
+            const raw = String(content || '').replace(/\s+/g, ' ').trim()
+            if (!raw) return ''
+            const match = raw.match(/FATO EXPL[IÍ]CITO INFORMADO PELO USU[ÁA]RIO \([^)]+\):\s*(.+)$/i)
+            return (match?.[1] || raw).replace(/\s+/g, ' ').trim()
+        }
+
+        const parseExplicitFactFromCognitiveContent = (content: string): string | null => {
+            const raw = String(content || '').replace(/\s+/g, ' ').trim()
+            if (!raw) return null
+
+            const summaryMatch = raw.match(/Resumo salvo:\s*"([^"]+)"/i)
+            if (summaryMatch?.[1]) {
+                const fact = summaryMatch[1].trim()
+                return fact.length >= 8 ? fact : null
+            }
+
+            return null
+        }
+
+        const extractLatestExplicitFactFromMessages = (
+            messages: Array<{ role: string; content: string }>,
+            scope: 'session' | 'user'
+        ): ExplicitFactRecord | null => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i]
+                if (msg.role !== 'assistant') continue
+                const fact = parseExplicitFactFromCognitiveContent(msg.content)
+                if (!fact) continue
+                return {
+                    fact,
+                    created_at: null,
+                    scope,
+                }
+            }
+            return null
+        }
+
+        const extractLatestExplicitSaveCommandFromMessages = (
+            messages: Array<{ role: string; content: string }>,
+            scope: 'session' | 'user'
+        ): ExplicitFactRecord | null => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i]
+                if (msg.role !== 'user') continue
+                if (!isExplicitMemorySaveIntent(msg.content)) continue
+                const fact = extractMemoryFactText(msg.content)
+                if (!fact || fact.length < 8) continue
+                return {
+                    fact,
+                    created_at: null,
+                    scope,
+                }
+            }
+            return null
+        }
+
+        let explicitFactsCache: ExplicitFactRecord[] | null = null
+        const loadRecentExplicitFacts = async (limit = 6): Promise<ExplicitFactRecord[]> => {
+            if (explicitFactsCache) return explicitFactsCache
+            try {
+                // Preferred deterministic path (requires RPC migration).
+                // If unavailable, fallback to semantic retrieval below.
+                const { data: rpcFacts, error: rpcFactsError } = await supabaseAdmin.rpc(
+                    'get_recent_explicit_user_facts',
+                    {
+                        p_user_id: userId,
+                        p_session_id: session_id ?? null,
+                        p_limit: limit,
+                    }
+                )
+                if (!rpcFactsError && Array.isArray(rpcFacts) && rpcFacts.length > 0) {
+                    explicitFactsCache = rpcFacts
+                        .map((row: any) => ({
+                            fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
+                            created_at: row?.created_at || null,
+                            scope: row?.scope === 'session' ? 'session' : 'user',
+                        }))
+                        .filter((row) => row.fact.length > 0)
+                    if (explicitFactsCache.length > 0) {
+                        return explicitFactsCache
+                    }
+                } else if (rpcFactsError) {
+                    console.warn('get_recent_explicit_user_facts unavailable; using semantic fallback:', rpcFactsError.message)
+                }
+
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const topK = Math.max(8, Math.min(30, limit * 4))
+                const queryEmbedding = await embedder('fato explicito informado pelo usuario memoria salva')
+                const recallFilters = {
+                    tenant_id: userId,
+                    type_allowlist: ['session_summary', 'official_doc', 'database_record'],
+                    type_blocklist: ['chat_log'],
+                    artifact_kind: null,
+                    source_table: 'user_facts',
+                    client_id: null,
+                    project_id: null,
+                    source_id: null,
+                    status: 'active',
+                    time_window_minutes: null,
+                }
+                const { data: docsRaw, error: docsError } = await supabaseAdmin.rpc('match_brain_documents', {
+                    query_embedding: queryEmbedding,
+                    match_count: topK,
+                    filters: recallFilters,
+                })
+                if (docsError) {
+                    throw new Error(`match_brain_documents explicit facts failed: ${docsError.message}`)
+                }
+                const docs = Array.isArray(docsRaw) ? docsRaw : []
+
+                const candidates: ExplicitFactRecord[] = docs
+                    .filter((doc: any) => isExplicitUserFactDoc(doc))
+                    .map((doc: any) => {
+                        const meta = doc?.metadata || {}
+                        const fact = parseExplicitFactFromContent(doc?.content || '')
+                        const savedAt = typeof meta?.saved_at === 'string'
+                            ? meta.saved_at
+                            : (typeof meta?.created_at === 'string' ? meta.created_at : null)
+                        const scope: 'session' | 'user' =
+                            session_id && String(meta?.session_id || '') === String(session_id)
+                                ? 'session'
+                                : 'user'
+                        return { fact, created_at: savedAt, scope }
+                    })
+                    .filter((item) => item.fact.length > 0)
+                    .sort((a, b) => {
+                        if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
+                        const aTs = a.created_at ? Date.parse(a.created_at) : 0
+                        const bTs = b.created_at ? Date.parse(b.created_at) : 0
+                        const safeA = Number.isFinite(aTs) ? aTs : 0
+                        const safeB = Number.isFinite(bTs) ? bTs : 0
+                        return safeB - safeA
+                    })
+
+                const merged: ExplicitFactRecord[] = []
+                const seen = new Set<string>()
+                for (const item of candidates) {
+                    const key = item.fact.toLowerCase()
+                    if (seen.has(key)) continue
+                    seen.add(key)
+                    merged.push(item)
+                    if (merged.length >= limit) break
+                }
+
+                explicitFactsCache = merged
+                return explicitFactsCache
+            } catch (explicitFactError: any) {
+                console.error('explicit facts retrieval failed:', explicitFactError?.message || explicitFactError)
+                explicitFactsCache = []
+                return explicitFactsCache
+            }
+        }
+
+        const loadLatestExplicitFactFromCognitiveLogs = async (): Promise<ExplicitFactRecord | null> => {
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const queryEmbedding = await embedder('Resumo salvo')
+                const buildCandidates = (docs: any[]): ExplicitFactRecord[] => {
+                    return docs
+                        .map((doc: any) => {
+                            const meta = doc?.metadata || {}
+                            const fact = parseExplicitFactFromCognitiveContent(doc?.content || '')
+                            if (!fact) return null
+                            const savedAt = typeof meta?.saved_at === 'string'
+                                ? meta.saved_at
+                                : (typeof meta?.created_at === 'string' ? meta.created_at : null)
+                            const scope: 'session' | 'user' =
+                                session_id && String(meta?.session_id || '') === String(session_id)
+                                    ? 'session'
+                                    : 'user'
+                            return { fact, created_at: savedAt, scope }
+                        })
+                        .filter((row: ExplicitFactRecord | null): row is ExplicitFactRecord => !!row)
+                        .sort((a, b) => {
+                            if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
+                            const aTs = a.created_at ? Date.parse(a.created_at) : 0
+                            const bTs = b.created_at ? Date.parse(b.created_at) : 0
+                            const safeA = Number.isFinite(aTs) ? aTs : 0
+                            const safeB = Number.isFinite(bTs) ? bTs : 0
+                            return safeB - safeA
+                        })
+                }
+
+                // 1) Prioriza janela recente para responder "acabei de salvar".
+                // 2) Se não houver resultado, cai para histórico completo.
+                for (const timeWindowMinutes of [240, null] as Array<number | null>) {
+                    const filters = {
+                        tenant_id: userId,
+                        type_allowlist: ['chat_log', 'session_summary'],
+                        type_blocklist: [],
+                        artifact_kind: null,
+                        source_table: 'chat_messages',
+                        client_id: null,
+                        project_id: null,
+                        source_id: null,
+                        status: 'active',
+                        time_window_minutes: timeWindowMinutes,
+                    }
+                    const { data, error } = await supabaseAdmin.rpc('match_brain_documents', {
+                        query_embedding: queryEmbedding,
+                        match_count: 100,
+                        filters,
+                    })
+                    if (error) {
+                        throw new Error(`match_brain_documents cognitive fallback failed: ${error.message}`)
+                    }
+
+                    const docs = Array.isArray(data) ? data : []
+                    const candidates = buildCandidates(docs)
+                    if (candidates.length > 0) {
+                        return candidates[0]
+                    }
+                }
+
+                return null
+            } catch (cognitiveFallbackError: any) {
+                console.error('explicit fact cognitive fallback failed:', cognitiveFallbackError?.message || cognitiveFallbackError)
+                return null
+            }
         }
 
         const memoryWriteEvents: Array<{ stage: string; status: 'ok' | 'error'; id?: string; detail?: string }> = []
@@ -889,9 +1179,21 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             'conversas passadas',
             'conversa anterior',
         ])
+        const isExplicitMemoryRecallIntent = hasAny(query, [
+            'o que eu pedi para salvar',
+            'o que pedi para salvar',
+            'qual informacao eu pedi para salvar',
+            'qual informação eu pedi para salvar',
+            'acabei de pedir para salvar',
+            'qual foi a ultima informacao salva',
+            'qual foi a última informação salva',
+            'me lembra do que pedi para salvar',
+            'o que voce salvou',
+            'o que você salvou',
+        ])
 
         const shouldInjectCrossSessionMemory =
-            isPastConversationIntent || sessionMessages.length === 0
+            isPastConversationIntent || isExplicitMemoryRecallIntent || sessionMessages.length === 0
 
         // Resposta determinística para pergunta de memória sem histórico disponível.
         // Evita o modelo responder que "não tem acesso" ao histórico.
@@ -948,6 +1250,115 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                     })
                 }
             }
+        }
+
+        // Recuperação determinística da última memória explícita salva.
+        // Evita inconsistência em perguntas diretas sobre "o que acabei de pedir para salvar?".
+        if (isExplicitMemoryRecallIntent) {
+            let latestFact: string | null = null
+            let latestScope: 'session' | 'user' | 'none' = 'none'
+            let latestSource:
+                | 'session_history'
+                | 'session_save_command'
+                | 'cross_session_history'
+                | 'cross_session_save_command'
+                | 'explicit_fact_store'
+                | 'cognitive_fallback'
+                | 'none' = 'none'
+            let recallCandidates = 0
+
+            const sessionHistoryFact = extractLatestExplicitFactFromMessages(sessionMessages, 'session')
+            if (sessionHistoryFact) {
+                latestFact = sessionHistoryFact.fact
+                latestScope = sessionHistoryFact.scope
+                latestSource = 'session_history'
+            }
+
+            if (!latestFact) {
+                const sessionSaveCommandFact = extractLatestExplicitSaveCommandFromMessages(sessionMessages, 'session')
+                if (sessionSaveCommandFact) {
+                    latestFact = sessionSaveCommandFact.fact
+                    latestScope = sessionSaveCommandFact.scope
+                    latestSource = 'session_save_command'
+                }
+            }
+
+            if (!latestFact && crossSessionMessages.length > 0) {
+                const crossSessionPlainMessages = crossSessionMessages.map((m) => ({
+                    role: m.role,
+                    content: m.content,
+                }))
+
+                const crossHistoryFact = extractLatestExplicitFactFromMessages(crossSessionPlainMessages, 'user')
+                if (crossHistoryFact) {
+                    latestFact = crossHistoryFact.fact
+                    latestScope = crossHistoryFact.scope
+                    latestSource = 'cross_session_history'
+                } else {
+                    const crossSaveCommandFact = extractLatestExplicitSaveCommandFromMessages(crossSessionPlainMessages, 'user')
+                    if (crossSaveCommandFact) {
+                        latestFact = crossSaveCommandFact.fact
+                        latestScope = crossSaveCommandFact.scope
+                        latestSource = 'cross_session_save_command'
+                    }
+                }
+            }
+
+            if (!latestFact) {
+                const recentFacts = await loadRecentExplicitFacts(6)
+                recallCandidates = recentFacts.length
+                const sessionScopedFact = recentFacts.find((item) => item.scope === 'session') || null
+                if (sessionScopedFact) {
+                    latestFact = sessionScopedFact.fact
+                    latestScope = sessionScopedFact.scope
+                    latestSource = 'explicit_fact_store'
+                }
+
+                if (!latestFact) {
+                    const cognitiveFallbackFact = await loadLatestExplicitFactFromCognitiveLogs()
+                    if (cognitiveFallbackFact) {
+                        latestFact = cognitiveFallbackFact.fact
+                        latestScope = cognitiveFallbackFact.scope
+                        latestSource = 'cognitive_fallback'
+                    } else if (recentFacts[0]) {
+                        latestFact = recentFacts[0].fact
+                        latestScope = recentFacts[0].scope
+                        latestSource = 'explicit_fact_store'
+                    }
+                }
+            }
+
+            if (latestFact) {
+                const recallAnswer = `A última informação que você pediu para salvar foi: "${latestFact}".`
+                await persistCognitiveMemorySafe('assistant', recallAnswer, 'assistant_explicit_memory_recall_hit')
+                return new Response(JSON.stringify({
+                    answer: recallAnswer,
+                    documents: [],
+                    meta: {
+                        memory_recall: 'hit',
+                        memory_recall_scope: latestScope,
+                        memory_recall_source: latestSource,
+                        memory_recall_candidates: recallCandidates,
+                        memory_write_events: memoryWriteEvents,
+                    }
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                })
+            }
+
+            const recallMissAnswer = 'Não encontrei uma memória explícita salva recentemente para recuperar agora.'
+            await persistCognitiveMemorySafe('assistant', recallMissAnswer, 'assistant_explicit_memory_recall_miss')
+            return new Response(JSON.stringify({
+                answer: recallMissAnswer,
+                documents: [],
+                meta: {
+                    memory_recall: 'miss',
+                    memory_recall_scope: 'none',
+                    memory_write_events: memoryWriteEvents,
+                }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
         }
 
         // 2. Router Step
@@ -1485,6 +1896,7 @@ Retorne apenas function calls (sem texto livre).`
                 // Complementa consultas em perguntas compostas para evitar respostas parciais.
                 const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
                 let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
+                dbCalls = enforceCompositeCoverage(input.user_message, dbCalls)
 
                 // Guardrail de intenção: consultas de tarefas devem sempre executar query_all_tasks
                 // e priorizá-la como chamada principal para evitar GenUI de projetos indevido.
@@ -1710,6 +2122,42 @@ Retorne apenas function calls (sem texto livre).`
                 reason: `${decision.reason} | forced_agent=${forcedAgent}`,
             }
             : decision
+
+        // Normalização global de chamadas DB (inclui decisões vindas do fallback heurístico),
+        // garantindo cobertura de consultas compostas e consistência de parâmetros.
+        if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
+            const parsedCalls: DbQueryCall[] = []
+            const rawDbParams: any = effectiveDecision.db_query_params
+
+            if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                for (const call of rawDbParams.calls) {
+                    if (!call || typeof call !== 'object' || typeof call.rpc_name !== 'string') continue
+                    const { rpc_name, ...params } = call
+                    if (!dbRpcNames.has(rpc_name)) continue
+                    parsedCalls.push({ rpc_name, params })
+                }
+            } else if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                const { rpc_name, ...params } = rawDbParams
+                parsedCalls.push({ rpc_name, params })
+            }
+
+            if (parsedCalls.length > 0) {
+                const supplementalDbCalls = inferSupplementalDbCalls(query)
+                let normalizedCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(parsedCalls, supplementalDbCalls)))
+                normalizedCalls = enforceCompositeCoverage(query, normalizedCalls)
+
+                const primary = normalizedCalls[0]
+                effectiveDecision = {
+                    ...effectiveDecision,
+                    db_query_params: normalizedCalls.length > 1
+                        ? {
+                            rpc_name: '__batch__',
+                            calls: normalizedCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                        }
+                        : { rpc_name: primary.rpc_name, ...primary.params },
+                }
+            }
+        }
 
         if (effectiveDecision.agent === 'Agent_MarketingTraffic') {
             const sanitizeTrafficCalls = (calls: DbQueryCall[]) =>
@@ -1964,11 +2412,28 @@ Retorne apenas function calls (sem texto livre).`
                             normalizedData = normalizedData.map((row: any) => ({
                                 ...row,
                                 acceptance_id: acceptanceByCompany.get(String(row?.company_name || '').trim()) ?? null,
+                                acceptance_timestamp:
+                                    acceptanceRows.find((acc: any) => String(acc?.company_name || '').trim() === String(row?.company_name || '').trim())?.timestamp
+                                    ?? null,
                             }))
                         }
                     }
                 } catch (enrichmentError) {
                     console.error('query_all_projects enrichment failed:', enrichmentError)
+                }
+
+                if (isRecentApprovedProjectIntent(query)) {
+                    const wantsActiveStatus = hasAny(query, ['ativo', 'ativos', 'ativa', 'ativas'])
+                    const cutoffMs = Date.now() - (recentProjectWindowDays * 24 * 60 * 60 * 1000)
+                    normalizedData = normalizedData.filter((row: any) => {
+                        const rawTs = row?.acceptance_timestamp || row?.created_at || null
+                        if (!rawTs) return false
+                        const ts = new Date(rawTs).getTime()
+                        if (Number.isNaN(ts)) return false
+                        const statusNorm = normalizeText(String(row?.client_status || ''))
+                        const statusOk = !wantsActiveStatus || statusNorm === 'ativo'
+                        return ts >= cutoffMs && statusOk
+                    })
                 }
             }
 
@@ -2020,7 +2485,7 @@ Retorne apenas function calls (sem texto livre).`
                     'get_canonical_corporate_docs',
                     {
                         query_embedding: queryEmbedding,
-                        p_user_role: userRole,
+                        p_user_role: normalizeText(userRole || '') === 'gestor' ? 'gestão' : userRole,
                         p_top_k: 6,
                     }
                 )
@@ -2328,6 +2793,23 @@ Retorne apenas function calls (sem texto livre).`
 
         // Guardrail global: sempre consultar memória cognitiva antes de responder.
         cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+        if (isPastConversationIntent || isLeadershipQuery) {
+            const recentExplicitFacts = await loadRecentExplicitFacts(6)
+            if (recentExplicitFacts.length > 0) {
+                const mergedFacts = Array.from(new Set([
+                    ...explicitUserFacts,
+                    ...recentExplicitFacts.map((item) => item.fact),
+                ]))
+                explicitUserFacts = mergedFacts.slice(0, 6)
+
+                if (!explicitLeadershipFact) {
+                    const leadershipFact = recentExplicitFacts.find((item) => leadershipHintRegex.test(item.fact))
+                    if (leadershipFact) {
+                        explicitLeadershipFact = leadershipFact.fact
+                    }
+                }
+            }
+        }
 
         // 4. Generation Step — com identidade do usuário e histórico
         const agentName = (effectiveDecision.agent as any) || "Agent_Projects"
@@ -2437,6 +2919,8 @@ ${identityBlock}
 ${responseStyleBlock}
 
 ${consolidatedMemoryBlock}
+${crossSessionMemoryBlock}
+${explicitLeadershipFactBlock}
 
 === CAMADA 1: MEMÓRIA VOLÁTIL (HISTÓRICO DA SESSÃO) ===
 O histórico abaixo é o contexto imediato da nossa conversa atual.
