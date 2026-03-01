@@ -288,7 +288,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-neutral-900 rounded-c4 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200 dark:border-neutral-800">
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
 
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center bg-white dark:bg-neutral-950">
@@ -309,7 +309,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     </div>
 
                     {/* Body */}
-                    <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                    <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
 
                         {/* Title */}
                         <div>
