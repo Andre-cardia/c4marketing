@@ -46,6 +46,9 @@ CREATE INDEX IF NOT EXISTS idx_task_snapshots_company
 
 ALTER TABLE public.task_monthly_snapshots ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Gestor full access to task snapshots"
+  ON public.task_monthly_snapshots;
+
 CREATE POLICY "Gestor full access to task snapshots"
   ON public.task_monthly_snapshots
   FOR ALL TO authenticated
@@ -109,6 +112,15 @@ GRANT EXECUTE ON FUNCTION public.create_task_monthly_snapshot(date) TO service_r
 -- ─── 3. Schedule monthly snapshot via pg_cron ─────────────────────────────────
 -- Runs at 03:00 UTC on the 1st of each month (00:00 Brasília)
 -- Snapshots the previous month
+
+DO $$
+BEGIN
+  PERFORM cron.unschedule('task-monthly-snapshot');
+EXCEPTION
+  WHEN OTHERS THEN
+    NULL;
+END;
+$$;
 
 SELECT cron.schedule(
   'task-monthly-snapshot',

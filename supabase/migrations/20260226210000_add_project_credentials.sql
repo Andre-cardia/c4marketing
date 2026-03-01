@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS public.project_credentials (
 
 ALTER TABLE public.project_credentials ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "authenticated_can_manage_credentials"
+  ON public.project_credentials;
+
 CREATE POLICY "authenticated_can_manage_credentials"
   ON public.project_credentials
   FOR ALL
