@@ -287,11 +287,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-neutral-900 rounded-c4 shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-neutral-200 dark:border-neutral-800">
-                <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="bg-white dark:bg-neutral-900 rounded-c4 shadow-xl w-full max-w-2xl overflow-y-auto max-h-[90vh] border border-neutral-200 dark:border-neutral-800">
+                <form onSubmit={handleSubmit} className="flex flex-col">
 
                     {/* Header */}
-                    <div className="px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center bg-white dark:bg-neutral-950">
+                    <div className="sticky top-0 z-10 px-6 py-4 border-b border-neutral-100 dark:border-neutral-800 flex justify-between items-center bg-white dark:bg-neutral-950">
                         <div>
                             <h2 className="text-xl font-bold text-neutral-900 dark:text-white flex items-center gap-3">
                                 {task ? 'Editar Tarefa' : 'Nova Tarefa'}
@@ -309,7 +309,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     </div>
 
                     {/* Body */}
-                    <div className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
+                    <div className="p-6 space-y-6">
 
                         {/* Title */}
                         <div>
@@ -513,7 +513,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                     </div>
 
                     {/* Footer */}
-                    <div className="p-6 border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex items-center justify-between">
+                    <div className="sticky bottom-0 z-10 p-6 border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex items-center justify-between">
                         <div>
                             {task?.id && (
                                 <button
