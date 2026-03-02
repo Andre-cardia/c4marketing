@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:brain:canary": "node scripts/check_brain_canary.js",
+    "check:brain:memory-long": "node scripts/check_brain_memory_long_horizon.js"
   },
   "dependencies": {
     "@calcom/embed-react": "^1.5.3",

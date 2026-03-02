@@ -163,12 +163,23 @@ node scripts/check_brain_canary.js
 
 ### P1.1 Suite de memoria de longo prazo (T+1/T+7/T+30)
 
-- [ ] Criar suite automatizada dedicada (ex.: `scripts/check_brain_memory_long_horizon.js`).
-- [ ] Cobrir 3 cenarios minimos:
+- [x] Criar suite automatizada dedicada (`scripts/check_brain_memory_long_horizon.js`).
+- [x] Cobrir 3 cenarios minimos:
   - salvar fato explicito em T0;
   - validar recall em T+1, T+7 e T+30;
   - validar metadados (`memory_recall_scope/source/candidates`).
 - [ ] Rodar diariamente em CI (ou job agendado externo).
+
+Evidencia atual (2026-03-02):
+- Comando: `npm run check:brain:memory-long`
+- Resultado: `PASS=0`, `PENDING=3`, `FAIL=0`
+- Observacao operacional:
+  - T+1 e T+7 ainda pendentes com `memory_recall_source=cognitive_fallback` retornando marcador de T+30.
+  - A suite foi ajustada para nao reseedar em loop quando houver marcador de outro horizonte.
+- Janelas due esperadas:
+  - T+1 em 2026-03-03
+  - T+7 em 2026-03-09
+  - T+30 em 2026-04-01
 
 **Criterio de aceite:** 14 dias consecutivos sem falha nos cenarios T+1/T+7/T+30.
 
