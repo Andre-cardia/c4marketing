@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
 const Home: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -99,6 +99,24 @@ const Home: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const redirectTo = `${window.location.origin}/update-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar e-mail. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 relative overflow-hidden">
 
@@ -188,16 +206,18 @@ const Home: React.FC = () => {
             <div className="relative mb-8">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2.5 bg-brand-coral/10 border border-brand-coral/20 rounded-xl">
-                  {mode === 'login' ? <KeyRound size={20} className="text-brand-coral" /> : <UserPlus size={20} className="text-brand-coral" />}
+                  {mode === 'register' ? <UserPlus size={20} className="text-brand-coral" /> : <KeyRound size={20} className="text-brand-coral" />}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">
-                    {mode === 'login' ? 'Bem-vindo de volta' : 'Primeiro Acesso'}
+                    {mode === 'login' ? 'Bem-vindo de volta' : mode === 'register' ? 'Primeiro Acesso' : 'Recuperar Senha'}
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {mode === 'login'
                       ? 'Acesse o painel administrativo'
-                      : 'Defina sua senha de acesso'}
+                      : mode === 'register'
+                      ? 'Defina sua senha de acesso'
+                      : 'Informe seu e-mail para receber o link'}
                   </p>
                 </div>
               </div>
@@ -220,7 +240,7 @@ const Home: React.FC = () => {
             )}
 
             {/* Form */}
-            <form onSubmit={handleAuth} className="space-y-5">
+            <form onSubmit={mode === 'forgot' ? handleForgotPassword : handleAuth} className="space-y-5">
               {/* Email */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
@@ -240,7 +260,7 @@ const Home: React.FC = () => {
               </div>
 
               {/* Password */}
-              <div className="space-y-2">
+              {mode !== 'forgot' && <div className="space-y-2">
                 <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
                   Senha
                 </label>
@@ -263,7 +283,7 @@ const Home: React.FC = () => {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-              </div>
+              </div>}
 
               {/* Confirm Password (Register mode) */}
               {mode === 'register' && (
@@ -302,8 +322,8 @@ const Home: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      {mode === 'login' ? 'Acessar Dashboard' : 'Criar Senha de Acesso'}
-                      {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : <Lock className="w-4 h-4" />}
+                      {mode === 'login' ? 'Acessar Dashboard' : mode === 'register' ? 'Criar Senha de Acesso' : 'Enviar link de recuperação'}
+                      {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : mode === 'register' ? <Lock className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
                     </>
                   )}
                 </span>
@@ -311,20 +331,31 @@ const Home: React.FC = () => {
             </form>
 
             {/* Mode Toggle */}
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center space-y-2">
               {mode === 'login' ? (
-                <p className="text-sm text-slate-600">
-                  Primeiro acesso?{' '}
-                  <button
-                    onClick={() => { setMode('register'); setError(null); }}
-                    className="text-brand-coral font-bold hover:text-white transition-colors"
-                  >
-                    Criar senha
-                  </button>
-                </p>
+                <>
+                  <p className="text-sm text-slate-600">
+                    Primeiro acesso?{' '}
+                    <button
+                      onClick={() => { setMode('register'); setError(null); }}
+                      className="text-brand-coral font-bold hover:text-white transition-colors"
+                    >
+                      Criar senha
+                    </button>
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Esqueceu a senha?{' '}
+                    <button
+                      onClick={() => { setMode('forgot'); setError(null); }}
+                      className="text-brand-coral font-bold hover:text-white transition-colors"
+                    >
+                      Recuperar senha
+                    </button>
+                  </p>
+                </>
               ) : (
                 <p className="text-sm text-slate-600">
-                  Já tem conta?{' '}
+                  Lembrou a senha?{' '}
                   <button
                     onClick={() => { setMode('login'); setError(null); }}
                     className="text-brand-coral font-bold hover:text-white transition-colors"
