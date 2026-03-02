@@ -94,6 +94,7 @@ const hasIntegrationError = (text) => {
 };
 
 const tests = [];
+const runStartedAt = Date.now();
 
 const pushResult = (name, pass, detail, critical = false) => {
   tests.push({ name, pass, detail, critical });
@@ -175,6 +176,33 @@ try {
   const total = tests.length;
   const passed = tests.filter((t) => t.pass).length;
   const criticalFailed = tests.filter((t) => t.critical && !t.pass).length;
+  const memoryRecallPass = tests.find((t) => t.name === 'Recuperação Imediata da Memória')?.pass ?? null;
+  const runLatencyMs = Date.now() - runStartedAt;
+
+  if (serviceClient) {
+    const { error: sloLogError } = await serviceClient.rpc('log_agent_execution', {
+      p_session_id: sessionId,
+      p_agent_name: 'Canary_BrainMemory',
+      p_action: 'memory_canary',
+      p_status: criticalFailed > 0 ? 'error' : 'success',
+      p_params: {
+        canary: 'brain_memory',
+        marker,
+        total_tests: total,
+        passed_tests: passed,
+        critical_failed: criticalFailed,
+      },
+      p_result: {
+        memory_recall_pass: memoryRecallPass,
+      },
+      p_latency_ms: runLatencyMs,
+      p_error_message: criticalFailed > 0 ? 'Critical canary failures detected' : null,
+    });
+
+    if (sloLogError) {
+      console.warn(`[WARN] Memory SLO canary log failed: ${sloLogError.message}`);
+    }
+  }
 
   if (serviceClient) {
     const { error: cleanupError } = await serviceClient

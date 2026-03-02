@@ -185,23 +185,43 @@ Evidencia atual (2026-03-02):
 
 ### P1.2 SLO e alertas de memoria
 
-- [ ] Definir SLO formal (minimo):
+- [x] Definir SLO formal (minimo):
   - `recall_hit_rate >= 95%` (24h)
   - `critical_canary_failures = 0`
-- [ ] Instrumentar painel/alerta para queda de consistencia.
-- [ ] Definir rota de escalacao (quem recebe, em quanto tempo responde).
+- [x] Instrumentar painel/alerta para queda de consistencia.
+- [x] Definir rota de escalacao (quem recebe, em quanto tempo responde).
+
+Evidencia atual (2026-03-02):
+- RPC criada: `public.query_memory_slo(p_days, p_target_recall_hit_rate, p_max_critical_canary_failures)`
+- Painel: `pages/BrainTelemetry.tsx` agora consulta `query_memory_slo` e exibe bloco de status com badge `OK/ALERT/NO_DATA`.
+- Canary: `scripts/check_brain_canary.js` passou a registrar execucao em `brain.execution_logs` com
+  - `agent_name=Canary_BrainMemory`
+  - `action=memory_canary`
+  - `status=success|error`
+  - `params.critical_failed`
+- Escalacao operacional:
+  - `ALERT` por recall abaixo da meta ou canario critico > 0.
+  - resposta inicial em ate 15 min (gestao tecnica).
+  - mitigacao/rollback em ate 60 min quando houver impacto no recall.
 
 **Criterio de aceite:** alerta dispara em queda real e evidencia fica registrada.
 
 ### P1.3 Runbook de incidente de memoria
 
-- [ ] Publicar runbook operacional (ex.: `docs/runbook_memory_incidents.md`) contendo:
+- [x] Publicar runbook operacional (`docs/runbook_memory_incidents.md`) contendo:
   - triagem inicial;
   - comandos de diagnostico;
   - rollback de migration;
   - validacao de recuperacao;
   - comunicacao de incidente.
-- [ ] Realizar simulacao de incidente com o time.
+- [x] Realizar simulacao de incidente com o time.
+
+Evidencia atual (2026-03-02):
+- Runbook publicado: `docs/runbook_memory_incidents.md`
+- Escopo coberto: triagem, diagnostico, mitigacao/rollback, validacao e comunicacao.
+- Simulacao executada e registrada: `docs/memory_incident_simulation_2026-03-02.md`
+  - canario: `5/5` (falhas criticas `0`)
+  - SLO: `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
 
 **Criterio de aceite:** runbook aprovado e usado em simulacao.
 
