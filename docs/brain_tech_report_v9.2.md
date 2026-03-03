@@ -2317,21 +2317,22 @@ Resultado final consolidado:
 
 ---
 
-### 8.7 Situação de migrações remotas (status operacional)
+### 8.7 Situação de migrações remotas (status operacional atualizado em 3 de março de 2026)
 
-Durante o ciclo, foi identificado backlog/mismatch de histórico de migrations no ambiente remoto.
+No fechamento operacional pós-ciclo, o backlog/mismatch remoto/local foi regularizado.
 
-Diagnóstico registrado:
+Evidências consolidadas:
 
-- necessidade de `--include-all` para parte das migrations antigas locais;
-- confirmação via dry-run de conjunto pendente antes de push efetivo;
-- correções de memória em runtime foram concluídas e validadas por canário mesmo antes da regularização completa desse backlog.
+- saneamento de histórico aplicado com `supabase migration repair` nos pontos necessários;
+- aplicação controlada com `supabase db push --linked --include-all --yes`;
+- migrações críticas de memória/cron efetivamente aplicadas no ambiente-alvo;
+- canário revalidado após saneamento com resultado **5/5** (0 falhas críticas).
 
-Recomendação operacional:
+Resultado:
 
-1. concluir saneamento do histórico remoto/local de migration;
-2. aplicar push controlado por lotes;
-3. reexecutar canário após cada lote.
+1. a base de migrations está alinhada para operação contínua;
+2. o risco estrutural dos itens 6/7/8 da matriz foi reduzido para baixo;
+3. a operação passou a focar no hardening de qualidade/capacidade (não mais em regularização de base).
 
 ---
 
@@ -2344,11 +2345,31 @@ Recomendação operacional:
 #### Scripts de verificação
 
 - `scripts/check_brain_canary.js`
+- `scripts/check_brain_memory_long_horizon.js`
+- `scripts/check_brain_memory_slo.js`
+- `scripts/check_brain_memory_load.js`
+- `scripts/check_brain_memory_quality_audit.js`
+- `scripts/check_brain_cost_quality_governance.js`
+
+#### Workflows de monitoramento
+
+- `.github/workflows/brain-memory-long-horizon-daily.yml`
+- `.github/workflows/brain-memory-quality-audit-weekly.yml`
+- `.github/workflows/brain-cost-quality-governance-monthly.yml`
 
 #### Migrations novas
 
 - `supabase/migrations/20260227193000_add_brain_sync_cron_management.sql`
 - `supabase/migrations/20260228111500_add_recent_explicit_user_facts_rpc.sql`
+- `supabase/migrations/20260303143000_fix_query_telemetry_summary_service_role.sql`
+
+#### Relatórios operacionais
+
+- `docs/brain_memory_load_report_20260303_152825.md`
+- `docs/brain_memory_quality_audit_20260303_170058.md`
+- `docs/brain_memory_cost_quality_report_20260303_174352.md`
+- `docs/runbook_memory_incidents.md`
+- `docs/memory_incident_simulation_2026-03-02.md`
 
 ---
 
@@ -2361,6 +2382,12 @@ Recomendação operacional:
 - [x] Telemetria de origem/escopo de recall disponível.
 - [x] Canário operacional atualizado e validado.
 - [x] Canário final em **5/5**.
+- [x] Saneamento de migrations remotas concluído (P0).
+- [x] RPC determinística + cron parametrizado aplicados e validados (P0).
+- [x] Runbook de incidente publicado e simulado (P1.3).
+- [x] Rotina de carga/concorrência implantada com limite operacional definido (P2.1).
+- [x] Auditoria semanal de qualidade implantada (P2.2).
+- [x] Governança mensal de custo x qualidade implantada (P2.3).
 
 ---
 
@@ -2368,4 +2395,12 @@ Recomendação operacional:
 
 O ciclo v9.2 concluiu a correção do principal gap reportado para o Segundo Cérebro: a memória deixou de ser apenas um repositório semântico e passou a operar com caminhos determinísticos para fatos explícitos de usuário, com governança de acesso por perfil gestor e validação contínua por canário.
 
-Com isso, a proposta original de "memória cognitiva corporativa viva" avançou para um estado operacional consistente, auditável e pronto para o próximo ciclo de hardening de migrations e ampliação de autonomia.
+Com o fechamento operacional de P0/P1/P2, o sistema está consistente e auditável em produção controlada, com rotinas de monitoramento diário/semanal/mensal já ativas.
+
+### 8.11 Pendências objetivas para "memória viva total"
+
+Apesar dos avanços, a maturidade total ainda depende de três fechamentos:
+
+1. estabilizar 14 dias consecutivos de canário + suíte T+1/T+7/T+30 sem falhas;
+2. recuperar `recall_hit_rate` para `>=95%` e manter `critical_canary_failures=0` de forma sustentada;
+3. evoluir a capacidade além de 20 sessões simultâneas sem degradação de sucesso/consistência.

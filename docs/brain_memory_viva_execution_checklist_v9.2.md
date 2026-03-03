@@ -352,6 +352,11 @@ Evidencia atual (2026-03-03):
 
 Somente declarar "totalmente maduro" quando:
 
-- [ ] Itens 6, 7 e 8 da matriz estiverem `Pronto`.
+- [x] Itens 6, 7 e 8 da matriz estiverem `Pronto`.
 - [ ] Itens 9, 10, 11 e 12 estiverem ao menos em risco baixo com evidencia operacional.
 - [ ] Canary + suite de longo prazo estiverem estaveis por 14 dias consecutivos.
+
+Status atual (2026-03-03):
+- Gate 1: `OK` (itens 6/7/8 em `Pronto`).
+- Gate 2: `PENDENTE` (item 12 em `Pronto`; itens 9/10/11 ainda em `Em risco`).
+- Gate 3: `PENDENTE` (janela de 14 dias consecutivos ainda em formação).
