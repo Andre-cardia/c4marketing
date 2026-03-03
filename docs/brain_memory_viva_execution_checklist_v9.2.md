@@ -215,10 +215,14 @@ Evidencia atual (2026-03-02):
 
 Evidencia atual (2026-03-03):
 - Comando: `npm run check:brain:memory-long`
-- Resultado: `PASS=0`, `PENDING=3`, `FAIL=0`
+- Resultado baseline: `PASS=0`, `PENDING=3`, `FAIL=0`
 - Observacao operacional:
   - T+1 e T+7 ainda pendentes com `memory_recall_source=cognitive_fallback` retornando marcador de T+30.
   - A suite foi ajustada para nao reseedar em loop quando houver marcador de outro horizonte.
+- Execucao diaria (2026-03-03 UTC):
+  - `PASS=0`, `PENDING=3`, `FAIL=0`
+  - `Due windows evaluated now: 0`
+  - sinais atuais: `memory_recall_source=cognitive_fallback` e ausencia de marcador canonico LH na resposta.
 - CI diario configurado:
   - workflow: `.github/workflows/brain-memory-long-horizon-daily.yml`
   - gatilhos: `schedule` diario (`0 9 * * *`, 06:00 BRT) + `workflow_dispatch`
@@ -297,17 +301,48 @@ Evidencia atual (2026-03-03):
 
 ### P2.2 Auditoria de qualidade de memoria
 
-- [ ] Criar rotina semanal de amostragem de fatos salvos vs fatos recuperados.
-- [ ] Classificar amostras em: correta, parcial, incorreta, desatualizada.
-- [ ] Registrar taxa de qualidade semanal.
+- [x] Criar rotina semanal de amostragem de fatos salvos vs fatos recuperados.
+- [x] Classificar amostras em: correta, parcial, incorreta, desatualizada.
+- [x] Registrar taxa de qualidade semanal.
+
+Evidencia atual (2026-03-03):
+- Script criado: `scripts/check_brain_memory_quality_audit.js`
+- Comando: `npm run check:brain:memory-quality`
+- Workflow semanal configurado:
+  - `.github/workflows/brain-memory-quality-audit-weekly.yml`
+  - gatilhos: `schedule` semanal (segunda 06:30 BRT) + `workflow_dispatch`
+- Relatorio semanal:
+  - `docs/brain_memory_quality_audit_20260303_170058.md`
+  - amostras: `8`
+  - taxa:
+    - correta: `100%` (8/8)
+    - parcial: `0%` (0/8)
+    - incorreta: `0%` (0/8)
+    - desatualizada: `0%` (0/8)
 
 **Criterio de aceite:** tendencia estavel de qualidade e acao corretiva quando cair.
 
 ### P2.3 Governanca custo x qualidade
 
-- [ ] Publicar relatorio mensal de custo de inferencia vs qualidade de recall.
-- [ ] Definir limite de custo por interacao e politica de ajuste.
-- [ ] Revisar estrategia de retrieval conforme dados reais.
+- [x] Publicar relatorio mensal de custo de inferencia vs qualidade de recall.
+- [x] Definir limite de custo por interacao e politica de ajuste.
+- [x] Revisar estrategia de retrieval conforme dados reais.
+
+Evidencia atual (2026-03-03):
+- Script criado: `scripts/check_brain_cost_quality_governance.js`
+- Comando: `npm run check:brain:governance-cost-quality`
+- Workflow mensal configurado:
+  - `.github/workflows/brain-cost-quality-governance-monthly.yml`
+  - gatilhos: `schedule` mensal (dia 1, 07:00 BRT) + `workflow_dispatch`
+- Migration aplicada para permitir telemetria com `service_role`:
+  - `supabase/migrations/20260303143000_fix_query_telemetry_summary_service_role.sql`
+- Relatorio mensal:
+  - `docs/brain_memory_cost_quality_report_20260303_174352.md`
+  - janela: `30 dias`
+  - custo por interacao: `$0.013119` (limite `$0.0100`)
+  - recall hit-rate: `90%` (meta `95%`)
+  - decisao mensal: `RECUPERAR_QUALIDADE_E_CUSTO`
+  - proxima acao: estabilizar recall e reduzir custo em paralelo com revisao de retrieval deterministico.
 
 **Criterio de aceite:** decisao mensal registrada com metricas e proxima acao.
 

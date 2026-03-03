@@ -10,7 +10,9 @@
     "check:brain:canary": "node scripts/check_brain_canary.js",
     "check:brain:memory-long": "node scripts/check_brain_memory_long_horizon.js",
     "check:brain:slo": "node scripts/check_brain_memory_slo.js",
-    "check:brain:memory-load": "node scripts/check_brain_memory_load.js"
+    "check:brain:memory-load": "node scripts/check_brain_memory_load.js",
+    "check:brain:memory-quality": "node scripts/check_brain_memory_quality_audit.js",
+    "check:brain:governance-cost-quality": "node scripts/check_brain_cost_quality_governance.js"
   },
   "dependencies": {
     "@calcom/embed-react": "^1.5.3",
