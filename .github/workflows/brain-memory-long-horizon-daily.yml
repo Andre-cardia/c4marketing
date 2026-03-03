@@ -1,4 +1,4 @@
-name: Brain Memory Long Horizon
+name: Brain Memory Daily Stability
 
 on:
   schedule:
@@ -7,16 +7,17 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: brain-memory-long-horizon-daily
+  group: brain-memory-daily-stability
   cancel-in-progress: false
 
 jobs:
-  check-memory-long-horizon:
+  check-memory-daily-stability:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BRAIN_LH_AUTOINIT: "true"
     steps:
       - name: Checkout
@@ -33,10 +34,46 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${VITE_SUPABASE_ANON_KEY:-}" ]; then
-            echo "::error::Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY repository secret."
+          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${VITE_SUPABASE_ANON_KEY:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "::error::Missing VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY repository secret."
             exit 1
           fi
 
+      - name: Run memory canary
+        id: canary
+        continue-on-error: true
+        run: npm run check:brain:canary
+
       - name: Run long-horizon memory suite
+        id: memory_long
+        continue-on-error: true
         run: npm run check:brain:memory-long
+
+      - name: Run memory SLO check
+        id: memory_slo
+        continue-on-error: true
+        run: npm run check:brain:slo
+
+      - name: Build stability streak report
+        id: stability_streak
+        continue-on-error: true
+        run: npm run check:brain:stability-streak
+
+      - name: Upload stability reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-memory-daily-stability-reports
+          path: docs/brain_memory_stability_streak_report_*.md
+          if-no-files-found: ignore
+
+      - name: Enforce daily stability checks
+        if: always()
+        run: |
+          failures=0
+          [ "${{ steps.canary.outcome }}" = "success" ] || failures=$((failures + 1))
+          [ "${{ steps.memory_long.outcome }}" = "success" ] || failures=$((failures + 1))
+          [ "${{ steps.memory_slo.outcome }}" = "success" ] || failures=$((failures + 1))
+          [ "${{ steps.stability_streak.outcome }}" = "success" ] || failures=$((failures + 1))
+          echo "Daily check failures: $failures"
+          [ "$failures" -eq 0 ] || exit 1

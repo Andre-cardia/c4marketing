@@ -2350,6 +2350,7 @@ Resultado:
 - `scripts/check_brain_memory_load.js`
 - `scripts/check_brain_memory_quality_audit.js`
 - `scripts/check_brain_cost_quality_governance.js`
+- `scripts/check_brain_memory_stability_streak.js`
 
 #### Workflows de monitoramento
 
@@ -2362,12 +2363,14 @@ Resultado:
 - `supabase/migrations/20260227193000_add_brain_sync_cron_management.sql`
 - `supabase/migrations/20260228111500_add_recent_explicit_user_facts_rpc.sql`
 - `supabase/migrations/20260303143000_fix_query_telemetry_summary_service_role.sql`
+- `supabase/migrations/20260303195000_add_query_memory_stability_daily_rpc.sql`
 
 #### Relatórios operacionais
 
 - `docs/brain_memory_load_report_20260303_152825.md`
 - `docs/brain_memory_quality_audit_20260303_170058.md`
 - `docs/brain_memory_cost_quality_report_20260303_174352.md`
+- `docs/brain_memory_stability_streak_report_20260303_183423.md`
 - `docs/runbook_memory_incidents.md`
 - `docs/memory_incident_simulation_2026-03-02.md`
 
@@ -2404,3 +2407,5 @@ Apesar dos avanços, a maturidade total ainda depende de três fechamentos:
 1. estabilizar 14 dias consecutivos de canário + suíte T+1/T+7/T+30 sem falhas;
 2. recuperar `recall_hit_rate` para `>=95%` e manter `critical_canary_failures=0` de forma sustentada;
 3. evoluir a capacidade além de 20 sessões simultâneas sem degradação de sucesso/consistência.
+
+Status do gate de estabilidade em 2026-03-03 (UTC): streak inicial `1/14`.

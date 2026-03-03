@@ -223,10 +223,16 @@ Evidencia atual (2026-03-03):
   - `PASS=0`, `PENDING=3`, `FAIL=0`
   - `Due windows evaluated now: 0`
   - sinais atuais: `memory_recall_source=cognitive_fallback` e ausencia de marcador canonico LH na resposta.
+- Snapshot de estabilidade diaria (2026-03-03 UTC):
+  - canario: `5/5` e `falhas criticas=0`
+  - SLO (24h): `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
+  - streak de estabilidade (canario + long-horizon): `1/14`
+  - relatorio: `docs/brain_memory_stability_streak_report_20260303_183423.md`
 - CI diario configurado:
-  - workflow: `.github/workflows/brain-memory-long-horizon-daily.yml`
+  - workflow: `.github/workflows/brain-memory-long-horizon-daily.yml` (`Brain Memory Daily Stability`)
   - gatilhos: `schedule` diario (`0 9 * * *`, 06:00 BRT) + `workflow_dispatch`
-  - secrets exigidos no repositorio: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+  - rotinas diarias: canario + long-horizon + SLO + streak de estabilidade
+  - secrets exigidos no repositorio: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - Janelas due esperadas:
   - T+1 em 2026-03-03
   - T+7 em 2026-03-09
@@ -359,4 +365,4 @@ Somente declarar "totalmente maduro" quando:
 Status atual (2026-03-03):
 - Gate 1: `OK` (itens 6/7/8 em `Pronto`).
 - Gate 2: `PENDENTE` (item 12 em `Pronto`; itens 9/10/11 ainda em `Em risco`).
-- Gate 3: `PENDENTE` (janela de 14 dias consecutivos ainda em formação).
+- Gate 3: `PENDENTE` (streak atual `1/14`; janela de 14 dias consecutivos ainda em formação).

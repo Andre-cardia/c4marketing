@@ -1,10 +1,12 @@
 import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[FATAL] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
@@ -30,6 +32,12 @@ const todayUtcMs = Date.UTC(runNow.getUTCFullYear(), runNow.getUTCMonth(), runNo
 const autoInit = (process.env.BRAIN_LH_AUTOINIT ?? 'true').toLowerCase() !== 'false';
 const role = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
 const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
+const serviceClient =
+  serviceRoleKey && supabaseUrl
+    ? createClient(supabaseUrl, serviceRoleKey, {
+        auth: { persistSession: false },
+      })
+    : null;
 
 const horizons = [
   {
@@ -307,6 +315,7 @@ const printResult = (result) => {
 
 const run = async () => {
   try {
+    const runStartedAt = Date.now();
     console.log('=== Brain Memory Long Horizon ===');
     console.log(`Date (UTC): ${todayIso}`);
     console.log(`Auto-init: ${autoInit ? 'enabled' : 'disabled'}`);
@@ -332,6 +341,43 @@ const run = async () => {
     console.log(`Pending: ${pending}`);
     console.log(`Fail: ${failed}`);
     console.log(`Due windows evaluated now: ${dueNow}`);
+
+    if (serviceClient) {
+      const logStatus = failed > 0 ? 'error' : 'success';
+      const runSessionId = randomUUID();
+      const compactResults = results.map((r) => ({
+        horizon: r.horizon.label,
+        status: r.status,
+        age_days: typeof r.ageDays === 'number' ? r.ageDays : null,
+        source: r.meta?.memory_recall_source ?? null,
+      }));
+
+      const { error: logError } = await serviceClient.rpc('log_agent_execution', {
+        p_session_id: runSessionId,
+        p_agent_name: 'Canary_BrainMemory',
+        p_action: 'memory_long_horizon',
+        p_status: logStatus,
+        p_params: {
+          auto_init: autoInit,
+          total_horizons: results.length,
+          pass: passed,
+          pending,
+          fail: failed,
+          due_now: dueNow,
+        },
+        p_result: {
+          results: compactResults,
+        },
+        p_latency_ms: Date.now() - runStartedAt,
+        p_error_message: failed > 0 ? 'Long horizon failures detected' : null,
+      });
+
+      if (logError) {
+        console.warn(`[WARN] Memory long-horizon log failed: ${logError.message}`);
+      }
+    } else {
+      console.log('[INFO] Long-horizon execution log skipped: SUPABASE_SERVICE_ROLE_KEY not set.');
+    }
 
     if (failed > 0) {
       process.exit(1);
