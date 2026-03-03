@@ -24,23 +24,34 @@ npx -y supabase --version
 
 ### P0.1 Backup + inventario de migrations
 
-- [ ] Gerar backup remoto antes de qualquer aplicacao:
+- [x] Gerar backup remoto antes de qualquer aplicacao:
 
 ```bash
 npx -y supabase db dump --linked --file "supabase/backups/backup_pre_saneamento_$(date +%Y%m%d_%H%M%S).sql" --workdir .
 ```
 
-- [ ] Listar estado atual de migrations remotas:
+- [x] Listar estado atual de migrations remotas:
 
 ```bash
 npx -y supabase migration list --linked --workdir .
 ```
 
-- [ ] Validar duplicidade local de versao (14 digitos):
+- [x] Validar duplicidade local de versao (14 digitos):
 
 ```bash
 ls supabase/migrations/*.sql | sed -E 's|.*/([0-9]{14})_.*|\1|' | sort | uniq -d
 ```
+
+Evidencia atual (2026-03-02):
+- Backup remoto gerado com sucesso:
+  - `supabase/backups/backup_pre_saneamento_20260302_185224.sql` (~168 KB).
+- Inventario remoto executado com `supabase migration list --linked --workdir .`.
+  - Resultado: sem divergencia local/remoto para as migrations listadas (incluindo `20260302193000` e `20260302194500`).
+- Checagem de duplicidade local executada com:
+  - `ls supabase/migrations/*.sql | sed -E 's|.*/([0-9]{14})_.*|\\1|' | sort | uniq -d`
+  - Resultado: sem duplicidades (saida vazia).
+- Backups gerenciados no projeto (API Supabase) tambem confirmados:
+  - ultimo backup fisico `COMPLETED` em `2026-03-02T03:12:30.874Z`.
 
 **Criterio de aceite:** backup gerado em `supabase/backups/` e sem surpresa critica no inventario.
 
@@ -48,29 +59,34 @@ ls supabase/migrations/*.sql | sed -E 's|.*/([0-9]{14})_.*|\1|' | sort | uniq -d
 
 Seguir o runbook em `docs/migration_sanitation_plan.md`.
 
-- [ ] Rodar dry-run inicial:
+- [x] Rodar dry-run inicial:
 
 ```bash
 npx -y supabase db push --linked --dry-run --workdir .
 ```
 
-- [ ] Se houver mismatch estrutural, executar rebaseline:
+- [x] Se houver mismatch estrutural, executar rebaseline (N/A: dry-run limpo, sem mismatch):
 
 ```bash
 npx -y supabase db pull --linked --workdir .
 ```
 
-- [ ] Marcar baseline como aplicado (sem reexecucao):
+- [x] Marcar baseline como aplicado (N/A: sem baseline novo nesta etapa):
 
 ```bash
 npx -y supabase migration repair --linked --status applied <BASELINE_14_DIGITOS> --workdir .
 ```
 
-- [ ] Revalidar dry-run:
+- [x] Revalidar dry-run (N/A: dry-run inicial ja retornou limpo):
 
 ```bash
 npx -y supabase db push --linked --dry-run --workdir .
 ```
+
+Evidencia atual (2026-03-02):
+- `npx -y supabase db push --linked --dry-run --workdir .`
+- Resultado: `Remote database is up to date.`
+- Sem erro `schema_migrations_pkey`.
 
 **Criterio de aceite:** dry-run limpo, sem erro `schema_migrations_pkey`.
 
@@ -80,17 +96,21 @@ Migrations alvo:
 - `supabase/migrations/20260227193000_add_brain_sync_cron_management.sql`
 - `supabase/migrations/20260228111500_add_recent_explicit_user_facts_rpc.sql`
 
-- [ ] Aplicar pendencias no ambiente-alvo:
+- [x] Aplicar pendencias no ambiente-alvo:
 
 ```bash
 npx -y supabase db push --linked --workdir .
 ```
 
+Evidencia atual (2026-03-02):
+- `npx -y supabase db push --linked --workdir .`
+- Resultado: `Remote database is up to date.` (migrations criticas ja presentes no alvo).
+
 **Criterio de aceite:** `db push` concluido sem falha.
 
 ### P0.4 Validar RPC deterministica de fatos recentes (item 6)
 
-- [ ] Confirmar funcao criada:
+- [x] Confirmar funcao criada (validacao funcional via RPC):
 
 ```sql
 select n.nspname as schema, p.proname
@@ -100,18 +120,23 @@ where n.nspname = 'public'
   and p.proname = 'get_recent_explicit_user_facts';
 ```
 
-- [ ] Executar chamada de smoke test:
+- [x] Executar chamada de smoke test:
 
 ```sql
 select * 
 from public.get_recent_explicit_user_facts('<USER_UUID>'::uuid, null, 6);
 ```
 
+Evidencia atual (2026-03-02):
+- RPC executada com service role:
+  - `get_recent_explicit_user_facts(p_user_id='321f03b7-4b78-41f5-8133-6967d6aea169', p_limit=6)`
+  - Resultado: `rpc_ok=1`, `rows=6`, sem erro.
+
 **Criterio de aceite:** funcao listada e retorno sem erro.
 
 ### P0.5 Validar gestao segura de cron por ambiente (item 8)
 
-- [ ] Confirmar funcoes de schedule/unschedule:
+- [x] Confirmar funcoes de schedule/unschedule (validacao funcional via RPC):
 
 ```sql
 select n.nspname as schema, p.proname
@@ -121,7 +146,7 @@ where n.nspname = 'public'
   and p.proname in ('schedule_brain_sync_job', 'unschedule_brain_sync_job');
 ```
 
-- [ ] Criar/agendar job usando parametros (sem hardcode em migration):
+- [x] Criar/agendar job usando parametros (sem hardcode em migration):
 
 ```sql
 select public.schedule_brain_sync_job(
@@ -132,7 +157,7 @@ select public.schedule_brain_sync_job(
 );
 ```
 
-- [ ] Validar job:
+- [x] Validar job:
 
 ```sql
 select jobid, jobname, schedule, active
@@ -140,20 +165,38 @@ from cron.job
 where jobname = 'invoke-brain-sync-every-5min';
 ```
 
+Evidencia atual (2026-03-03):
+- `schedule_brain_sync_job` executada com sucesso:
+  - retorno: `invoke-brain-sync-every-5min`.
+- URL e chave passadas por parametro (sem hardcode em migration).
+- Validacao manual no SQL Editor:
+  - `jobid=8`
+  - `jobname=invoke-brain-sync-every-5min`
+  - `schedule=*/5 * * * *`
+  - `active=true`
+
 **Criterio de aceite:** job ativo, sem segredo hardcoded em arquivo SQL.
 
 ### P0.6 Revalidacao canario completo (pos-migration)
 
-- [ ] Executar canario:
+- [x] Executar canario:
 
 ```bash
 node scripts/check_brain_canary.js
 ```
 
-- [ ] Registrar evidencia no PR ou changelog com:
+- [x] Registrar evidencia no PR ou changelog com:
   - `Falhas criticas: 0`
   - `Recuperacao Imediata da Memoria: [PASS]`
   - `Pergunta Composta (multi-RPC): [PASS]`
+
+Evidencia atual (2026-03-02):
+- `node scripts/check_brain_canary.js`
+- Resultado:
+  - `Falhas criticas: 0`
+  - `Recuperacao Imediata da Memoria: [PASS]`
+  - `Pergunta Composta (multi-RPC): [PASS]`
+  - Session ID: `6fc3c73c-4703-4604-a929-f8cfc76c77cb`
 
 **Criterio de aceite:** canario verde e sem regressao de recall imediato.
 
