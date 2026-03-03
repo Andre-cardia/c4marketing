@@ -278,9 +278,20 @@ Evidencia atual (2026-03-02):
 
 ### P2.1 Carga e concorrencia
 
-- [ ] Criar teste de carga de recall com 20/50/100 sessoes simultaneas.
-- [ ] Medir taxa de sucesso, latencia e consistencia de resposta.
-- [ ] Definir limite operacional e gatilho de escala.
+- [x] Criar teste de carga de recall com 20/50/100 sessoes simultaneas.
+- [x] Medir taxa de sucesso, latencia e consistencia de resposta.
+- [x] Definir limite operacional e gatilho de escala.
+
+Evidencia atual (2026-03-03):
+- Script criado: `scripts/check_brain_memory_load.js`
+- Comando: `npm run check:brain:memory-load`
+- Relatorio: `docs/brain_memory_load_report_20260303_152825.md`
+- Resultado por patamar:
+  - 20 sessoes: `PASS` (success 100%, consistency 100%, p95 10716ms)
+  - 50 sessoes: `FAIL` (success 98%, consistency 98%, 1x HTTP 503)
+  - 100 sessoes: `FAIL` (success 96%, consistency 96%, 4x HTTP 503)
+- Limite operacional recomendado: `20 sessoes simultaneas`
+- Gatilho de escala: degradacao no padrao de 50 sessoes (success 98%, consistency 98%, p95 14906ms).
 
 **Criterio de aceite:** relatorio com resultado por patamar (20/50/100) e plano de capacidade.
 
