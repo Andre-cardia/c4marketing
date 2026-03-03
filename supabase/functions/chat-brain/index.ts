@@ -830,6 +830,30 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             scope: 'session' | 'user';
         }
 
+        const sortExplicitFacts = (items: ExplicitFactRecord[]): ExplicitFactRecord[] => {
+            return [...items].sort((a, b) => {
+                if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
+                const aTs = a.created_at ? Date.parse(a.created_at) : 0
+                const bTs = b.created_at ? Date.parse(b.created_at) : 0
+                const safeA = Number.isFinite(aTs) ? aTs : 0
+                const safeB = Number.isFinite(bTs) ? bTs : 0
+                return safeB - safeA
+            })
+        }
+
+        const dedupeExplicitFacts = (items: ExplicitFactRecord[], limit: number): ExplicitFactRecord[] => {
+            const merged: ExplicitFactRecord[] = []
+            const seen = new Set<string>()
+            for (const item of items) {
+                const key = item.fact.toLowerCase()
+                if (seen.has(key)) continue
+                seen.add(key)
+                merged.push(item)
+                if (merged.length >= limit) break
+            }
+            return merged
+        }
+
         const parseExplicitFactFromContent = (content: string): string => {
             const raw = String(content || '').replace(/\s+/g, ' ').trim()
             if (!raw) return ''
@@ -902,13 +926,14 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                     }
                 )
                 if (!rpcFactsError && Array.isArray(rpcFacts) && rpcFacts.length > 0) {
-                    explicitFactsCache = rpcFacts
+                    const fromRpc = rpcFacts
                         .map((row: any) => ({
                             fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
                             created_at: row?.created_at || null,
                             scope: row?.scope === 'session' ? 'session' : 'user',
                         }))
                         .filter((row) => row.fact.length > 0)
+                    explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(fromRpc), limit)
                     if (explicitFactsCache.length > 0) {
                         return explicitFactsCache
                     }
@@ -956,26 +981,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                         return { fact, created_at: savedAt, scope }
                     })
                     .filter((item) => item.fact.length > 0)
-                    .sort((a, b) => {
-                        if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
-                        const aTs = a.created_at ? Date.parse(a.created_at) : 0
-                        const bTs = b.created_at ? Date.parse(b.created_at) : 0
-                        const safeA = Number.isFinite(aTs) ? aTs : 0
-                        const safeB = Number.isFinite(bTs) ? bTs : 0
-                        return safeB - safeA
-                    })
-
-                const merged: ExplicitFactRecord[] = []
-                const seen = new Set<string>()
-                for (const item of candidates) {
-                    const key = item.fact.toLowerCase()
-                    if (seen.has(key)) continue
-                    seen.add(key)
-                    merged.push(item)
-                    if (merged.length >= limit) break
-                }
-
-                explicitFactsCache = merged
+                explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(candidates), limit)
                 return explicitFactsCache
             } catch (explicitFactError: any) {
                 console.error('explicit facts retrieval failed:', explicitFactError?.message || explicitFactError)
@@ -1307,10 +1313,13 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             if (!latestFact) {
                 const recentFacts = await loadRecentExplicitFacts(6)
                 recallCandidates = recentFacts.length
-                const sessionScopedFact = recentFacts.find((item) => item.scope === 'session') || null
-                if (sessionScopedFact) {
-                    latestFact = sessionScopedFact.fact
-                    latestScope = sessionScopedFact.scope
+                const bestExplicitFact =
+                    recentFacts.find((item) => item.scope === 'session')
+                    || recentFacts[0]
+                    || null
+                if (bestExplicitFact) {
+                    latestFact = bestExplicitFact.fact
+                    latestScope = bestExplicitFact.scope
                     latestSource = 'explicit_fact_store'
                 }
 
@@ -1320,10 +1329,6 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                         latestFact = cognitiveFallbackFact.fact
                         latestScope = cognitiveFallbackFact.scope
                         latestSource = 'cognitive_fallback'
-                    } else if (recentFacts[0]) {
-                        latestFact = recentFacts[0].fact
-                        latestScope = recentFacts[0].scope
-                        latestSource = 'explicit_fact_store'
                     }
                 }
             }

@@ -215,19 +215,20 @@ Evidencia atual (2026-03-02):
 
 Evidencia atual (2026-03-03):
 - Comando: `npm run check:brain:memory-long`
-- Resultado baseline: `PASS=0`, `PENDING=3`, `FAIL=0`
+- Resultado baseline inicial: `PASS=0`, `PENDING=3`, `FAIL=0`
 - Observacao operacional:
-  - T+1 e T+7 ainda pendentes com `memory_recall_source=cognitive_fallback` retornando marcador de T+30.
+  - Foi corrigida a prioridade de recall para favorecer `explicit_fact_store` quando houver fatos explícitos disponíveis.
   - A suite foi ajustada para nao reseedar em loop quando houver marcador de outro horizonte.
-- Execucao diaria (2026-03-03 UTC):
-  - `PASS=0`, `PENDING=3`, `FAIL=0`
-  - `Due windows evaluated now: 0`
-  - sinais atuais: `memory_recall_source=cognitive_fallback` e ausencia de marcador canonico LH na resposta.
+- Execucao diaria validada (2026-03-03 UTC, pos-ajuste):
+  - `PASS=1`, `PENDING=2`, `FAIL=0`
+  - `Due windows evaluated now: 1`
+  - T+1: `PASS` (idade 1d), `memory_recall_source=explicit_fact_store`, marcador canônico `LH::T+1`
+  - T+7/T+30: `PENDING` (ainda nao due), com marcador canônico e fonte `explicit_fact_store`
 - Snapshot de estabilidade diaria (2026-03-03 UTC):
   - canario: `5/5` e `falhas criticas=0`
   - SLO (24h): `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
   - streak de estabilidade (canario + long-horizon): `1/14`
-  - relatorio: `docs/brain_memory_stability_streak_report_20260303_183423.md`
+  - relatorio: `docs/brain_memory_stability_streak_report_20260303_184653.md`
 - CI diario configurado:
   - workflow: `.github/workflows/brain-memory-long-horizon-daily.yml` (`Brain Memory Daily Stability`)
   - gatilhos: `schedule` diario (`0 9 * * *`, 06:00 BRT) + `workflow_dispatch`
