@@ -224,12 +224,13 @@ Evidencia atual (2026-03-03):
   - `Due windows evaluated now: 1`
   - T+1: `PASS` (idade 1d), `memory_recall_source=explicit_fact_store`, marcador canônico `LH::T+1`
   - T+7/T+30: `PENDING` (ainda nao due), com marcador canônico e fonte `explicit_fact_store`
+  - relatorio LH: `docs/brain_memory_long_horizon_report_20260303_205612.md`
 - Snapshot de estabilidade diaria (2026-03-03 UTC):
   - canario: `5/5` e `falhas criticas=0`
   - SLO (24h): `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
   - observabilidade de canario para SLO: `slo_tracked=true` (canarios manuais de depuracao nao poluem a janela oficial)
   - streak de estabilidade (canario + long-horizon): `1/14`
-  - relatorio: `docs/brain_memory_stability_streak_report_20260303_184653.md`
+  - relatorio: `docs/brain_memory_stability_streak_report_20260303_205620.md`
 - CI diario configurado:
   - workflow: `.github/workflows/brain-memory-long-horizon-daily.yml` (`Brain Memory Daily Stability`)
   - gatilhos: `schedule` diario (`0 9 * * *`, 06:00 BRT) + `workflow_dispatch`

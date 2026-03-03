@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 dotenv.config();
 
@@ -59,6 +61,14 @@ const horizons = [
     userEmail: process.env.BRAIN_LH_T30_USER_EMAIL || 'brain-lh-t30@c4marketing.com',
   },
 ];
+
+const pad = (n) => String(n).padStart(2, '0');
+const formatTs = () => {
+  const d = new Date();
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}_${pad(d.getUTCHours())}${pad(
+    d.getUTCMinutes(),
+  )}${pad(d.getUTCSeconds())}`;
+};
 
 const b64u = (obj) =>
   Buffer.from(JSON.stringify(obj), 'utf8')
@@ -313,6 +323,37 @@ const printResult = (result) => {
   console.log(`       marker=${markerText}`);
 };
 
+const buildReportMarkdown = ({ results, passed, pending, failed, dueNow, reportPath }) => {
+  const lines = [];
+  lines.push('# Relatorio Diario - Memoria Long Horizon');
+  lines.push('');
+  lines.push(`- Data UTC: ${new Date().toISOString()}`);
+  lines.push(`- Auto-init: ${autoInit ? 'enabled' : 'disabled'}`);
+  lines.push(`- PASS: ${passed}`);
+  lines.push(`- PENDING: ${pending}`);
+  lines.push(`- FAIL: ${failed}`);
+  lines.push(`- Due windows avaliadas agora: ${dueNow}`);
+  lines.push('');
+  lines.push('## Resultado por horizonte');
+  lines.push('');
+  lines.push('| Horizonte | Status | Age (dias) | Scope | Source | Candidates | Marker |');
+  lines.push('|---|---|---:|---|---|---:|---|');
+  for (const r of results) {
+    const scope = r.meta?.memory_recall_scope ?? 'n/a';
+    const source = r.meta?.memory_recall_source ?? 'n/a';
+    const candidates = Number.isFinite(r.meta?.memory_recall_candidates) ? r.meta.memory_recall_candidates : 'n/a';
+    const marker = r.marker?.raw || 'n/a';
+    const age = typeof r.ageDays === 'number' ? r.ageDays : 'n/a';
+    lines.push(`| ${r.horizon.label} | ${r.status} | ${age} | ${scope} | ${source} | ${candidates} | ${marker} |`);
+    lines.push(``);
+    lines.push(`Detalhe ${r.horizon.label}: ${r.detail}`);
+    lines.push('');
+  }
+  lines.push(`_Arquivo gerado automaticamente por scripts/check_brain_memory_long_horizon.js em ${reportPath}.`);
+  lines.push('');
+  return lines.join('\n');
+};
+
 const run = async () => {
   try {
     const runStartedAt = Date.now();
@@ -341,6 +382,23 @@ const run = async () => {
     console.log(`Pending: ${pending}`);
     console.log(`Fail: ${failed}`);
     console.log(`Due windows evaluated now: ${dueNow}`);
+
+    const reportPath =
+      process.env.BRAIN_LH_REPORT_PATH || path.join('docs', `brain_memory_long_horizon_report_${formatTs()}.md`);
+    await fs.mkdir(path.dirname(reportPath), { recursive: true });
+    await fs.writeFile(
+      reportPath,
+      buildReportMarkdown({
+        results,
+        passed,
+        pending,
+        failed,
+        dueNow,
+        reportPath,
+      }),
+      'utf8',
+    );
+    console.log(`REPORT_PATH=${reportPath}`);
 
     if (serviceClient) {
       const logStatus = failed > 0 ? 'error' : 'success';

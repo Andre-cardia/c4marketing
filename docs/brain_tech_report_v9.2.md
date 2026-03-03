@@ -2370,9 +2370,10 @@ Resultado:
 
 - `docs/brain_memory_load_report_20260303_152825.md`
 - `docs/brain_memory_load_report_20260303_204347.md`
+- `docs/brain_memory_long_horizon_report_20260303_205612.md`
 - `docs/brain_memory_quality_audit_20260303_170058.md`
 - `docs/brain_memory_cost_quality_report_20260303_174352.md`
-- `docs/brain_memory_stability_streak_report_20260303_184653.md`
+- `docs/brain_memory_stability_streak_report_20260303_205620.md`
 - `docs/runbook_memory_incidents.md`
 - `docs/memory_incident_simulation_2026-03-02.md`
 

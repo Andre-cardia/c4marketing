@@ -50,6 +50,14 @@ jobs:
         continue-on-error: true
         run: npm run check:brain:memory-long
 
+      - name: Upload long-horizon reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-memory-long-horizon-reports
+          path: docs/brain_memory_long_horizon_report_*.md
+          if-no-files-found: ignore
+
       - name: Run memory SLO check
         id: memory_slo
         continue-on-error: true
