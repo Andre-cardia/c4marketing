@@ -226,7 +226,7 @@ Evidencia atual (2026-03-03):
   - T+7/T+30: `PENDING` (ainda nao due), com marcador canônico e fonte `explicit_fact_store`
 - Snapshot de estabilidade diaria (2026-03-03 UTC):
   - canario: `5/5` e `falhas criticas=0`
-  - SLO (24h): `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
+  - SLO (24h): `overall=alert`, `recall_hit_rate=100%`, `critical_failures=2` (falhas críticas registradas durante janela de ajuste/deploy)
   - streak de estabilidade (canario + long-horizon): `1/14`
   - relatorio: `docs/brain_memory_stability_streak_report_20260303_184653.md`
 - CI diario configurado:
@@ -296,13 +296,13 @@ Evidencia atual (2026-03-02):
 Evidencia atual (2026-03-03):
 - Script criado: `scripts/check_brain_memory_load.js`
 - Comando: `npm run check:brain:memory-load`
-- Relatorio: `docs/brain_memory_load_report_20260303_152825.md`
+- Relatorio mais recente: `docs/brain_memory_load_report_20260303_204347.md`
 - Resultado por patamar:
-  - 20 sessoes: `PASS` (success 100%, consistency 100%, p95 10716ms)
-  - 50 sessoes: `FAIL` (success 98%, consistency 98%, 1x HTTP 503)
-  - 100 sessoes: `FAIL` (success 96%, consistency 96%, 4x HTTP 503)
-- Limite operacional recomendado: `20 sessoes simultaneas`
-- Gatilho de escala: degradacao no padrao de 50 sessoes (success 98%, consistency 98%, p95 14906ms).
+  - 20 sessoes: `PASS` (success 100%, consistency 100%, p95 8526ms)
+  - 50 sessoes: `PASS` (success 100%, consistency 100%, p95 8335ms)
+  - 100 sessoes: `PASS` (success 100%, consistency 100%, p95 4938ms)
+- Limite operacional recomendado: `100 sessoes simultaneas`
+- Gatilho de escala: degradacao sustentada (`success_rate` abaixo da meta, `consistency_rate` abaixo da meta ou `p95` acima de 20000ms por 3 ciclos consecutivos).
 
 **Criterio de aceite:** relatorio com resultado por patamar (20/50/100) e plano de capacidade.
 
@@ -365,5 +365,5 @@ Somente declarar "totalmente maduro" quando:
 
 Status atual (2026-03-03):
 - Gate 1: `OK` (itens 6/7/8 em `Pronto`).
-- Gate 2: `PENDENTE` (item 12 em `Pronto`; itens 9/10/11 ainda em `Em risco`).
+- Gate 2: `PENDENTE` (itens 10 e 12 em `Pronto`; itens 9 e 11 ainda em `Em risco`).
 - Gate 3: `PENDENTE` (streak atual `1/14`; janela de 14 dias consecutivos ainda em formação).

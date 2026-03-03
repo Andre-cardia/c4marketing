@@ -25,8 +25,8 @@ Classificação:
 | 7 | Higiene de migrations remotas | Sem backlog/mismatch entre local e remoto | Pronto | Saneamento executado e `supabase db push --linked --include-all --yes` concluído | Baixo | Rodar `db push --dry-run` antes de cada janela de mudança |
 | 8 | Gestão segura de cron por ambiente | Sem URL/chave hardcoded, com rotação segura | Pronto | `schedule_brain_sync_job` aplicado e job `invoke-brain-sync-every-5min` ativo | Baixo | Revisar schedule/chaves em rotina mensal |
 | 9 | Memória de longo prazo (dias/semanas) | Testes automatizados para continuidade entre sessões longas | Em risco | Suíte T+1/T+7/T+30 criada + CI diária; T+1 due em `PASS` com `explicit_fact_store`; streak automático em `1/14` | Médio | Acumular janela real e fechar 14 dias estáveis |
-|10 | Teste de carga e concorrência | Recall consistente com múltiplas sessões simultâneas | Em risco | Teste 20/50/100 executado; 20 PASS, 50/100 com degradação e 503 | Médio | Tratar capacidade para elevar teto operacional acima de 20 sessões |
-|11 | SLO/Alertas específicos de memória | Alertar queda de hit-rate/consistência de recall | Em risco | RPC/painel de SLO implantados + rota de escalacao; relatório mensal marcou `ALERT` | Médio | Recuperar hit-rate para >=95% e zerar falhas críticas sustentadas |
+|10 | Teste de carga e concorrência | Recall consistente com múltiplas sessões simultâneas | Pronto | Teste 20/50/100 revalidado com 100% sucesso/consistência em todos os patamares | Baixo | Manter teste de carga periódico para detectar regressões |
+|11 | SLO/Alertas específicos de memória | Alertar queda de hit-rate/consistência de recall | Em risco | RPC/painel de SLO implantados + rota de escalacao; janela 24h atual em `ALERT` por falhas críticas recentes | Médio | Recuperar hit-rate para >=95% e zerar falhas críticas sustentadas |
 |12 | Runbook operacional de incidentes | Procedimento claro para falhas de memória, migração e rollback | Pronto | `docs/runbook_memory_incidents.md` + simulação registrada | Baixo | Repetir simulação trimestral |
 
 ## 3. Veredito executivo

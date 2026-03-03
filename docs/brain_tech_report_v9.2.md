@@ -2368,6 +2368,7 @@ Resultado:
 #### Relatórios operacionais
 
 - `docs/brain_memory_load_report_20260303_152825.md`
+- `docs/brain_memory_load_report_20260303_204347.md`
 - `docs/brain_memory_quality_audit_20260303_170058.md`
 - `docs/brain_memory_cost_quality_report_20260303_174352.md`
 - `docs/brain_memory_stability_streak_report_20260303_184653.md`
@@ -2406,6 +2407,6 @@ Apesar dos avanços, a maturidade total ainda depende de três fechamentos:
 
 1. estabilizar 14 dias consecutivos de canário + suíte T+1/T+7/T+30 sem falhas;
 2. recuperar `recall_hit_rate` para `>=95%` e manter `critical_canary_failures=0` de forma sustentada;
-3. evoluir a capacidade além de 20 sessões simultâneas sem degradação de sucesso/consistência.
+3. manter a capacidade revalidada de 100 sessões com monitoramento periódico para prevenir regressão.
 
 Status do gate de estabilidade em 2026-03-03 (UTC): streak inicial `1/14`, com janela `T+1` já validada em `PASS` (fonte de recall: `explicit_fact_store`).

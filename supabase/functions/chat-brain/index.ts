@@ -1374,6 +1374,13 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             user_message: query,
         }
 
+        const isCompositeUserProjectCountIntent =
+            hasAny(query, ['quantos', 'quantas', 'total', 'totais', 'numero', 'número'])
+            && hasAny(query, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            && hasAny(query, ['projeto', 'projetos'])
+            && !isExplicitMemoryRecallIntent
+            && !isExplicitMemorySaveIntent(query)
+
         // LLM Router com Function Calling — o LLM escolhe qual RPC usar
         const availableTools = [
             {
@@ -2119,7 +2126,46 @@ Retorne apenas function calls (sem texto livre).`
             } as RouteDecision
         }
 
-        const decision = await routeRequestHybrid(routerInput, { callRouterLLM })
+        const forcedCompositeCalls: DbQueryCall[] = []
+        if (isCompositeUserProjectCountIntent) {
+            forcedCompositeCalls.push({ rpc_name: 'query_all_users', params: {} })
+            const projectParams: Record<string, any> = {}
+            if (hasAny(query, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                projectParams.p_status_filter = 'Ativo'
+            }
+            forcedCompositeCalls.push({ rpc_name: 'query_all_projects', params: projectParams })
+        }
+
+        const decision: RouteDecision = forcedCompositeCalls.length > 0
+            ? {
+                artifact_kind: 'project',
+                task_kind: 'factual_lookup',
+                risk_level: 'low',
+                agent: 'Agent_BrainOps',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                filters: {
+                    tenant_id: userId,
+                    type_allowlist: ['official_doc', 'session_summary'],
+                    type_blocklist: ['chat_log'],
+                    artifact_kind: null,
+                    source_table: null,
+                    client_id: null,
+                    project_id: null,
+                    source_id: null,
+                    status: 'active',
+                    time_window_minutes: null,
+                },
+                top_k: 0,
+                tools_allowed: ['db_read'],
+                tool_hint: 'db_query',
+                db_query_params: {
+                    rpc_name: '__batch__',
+                    calls: forcedCompositeCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                },
+                confidence: 0.99,
+                reason: 'Deterministic composite count route: users + projects',
+            } as RouteDecision
+            : await routeRequestHybrid(routerInput, { callRouterLLM })
         let effectiveDecision = forcedAgent
             ? {
                 ...decision,
@@ -2262,6 +2308,19 @@ Retorne apenas function calls (sem texto livre).`
             'cargo', 'funcao', 'função', 'papel',
             'presidente', 'fundador', 'dono', 'diretor executivo'
         ])
+        const isCountOnlyIntent = hasAny(query, [
+            'quantos', 'quantas', 'total', 'totais', 'numero', 'número',
+        ]) && !hasAny(query, [
+            'analise', 'análise', 'compare', 'comparar', 'tendencia', 'tendência',
+            'estrategia', 'estratégia', 'motivo', 'por que', 'por quê',
+        ])
+        const canUseDbCountFastPath =
+            effectiveDecision.tool_hint === 'db_query'
+            && isCountOnlyIntent
+            && !isPastConversationIntent
+            && !isLeadershipQuery
+            && !isExplicitMemoryRecallIntent
+            && !isExplicitMemorySaveIntent(query)
         let explicitLeadershipFact: string | null = null
         const leadershipHintRegex = /(ceo|cto|cfo|coo|cmo|cio|presidente|diretor executivo|fundador|dono)/i
 
@@ -2660,7 +2719,9 @@ Retorne apenas function calls (sem texto livre).`
         }
 
         // Canonical retrieval — executado ANTES de qualquer outra busca.
-        const { text: canonicalBlock, count: canonicalDocsCount } = await runCanonicalRetrieval()
+        const { text: canonicalBlock, count: canonicalDocsCount } = canUseDbCountFastPath
+            ? { text: '', count: 0 }
+            : await runCanonicalRetrieval()
 
         if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
@@ -2796,8 +2857,14 @@ Retorne apenas function calls (sem texto livre).`
             contextText = await runVectorRetrieval()
         }
 
-        // Guardrail global: sempre consultar memória cognitiva antes de responder.
-        cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+        // Fast-path para consultas de contagem puramente estruturadas:
+        // evita custo/latência de retrieval cognitivo quando não agrega precisão.
+        if (canUseDbCountFastPath) {
+            cognitiveMemoryContext = 'CONSULTA DE MEMÓRIA COGNITIVA: pulada por fast-path determinístico de contagem SQL.'
+        } else {
+            // Guardrail global padrão: consultar memória cognitiva antes de responder.
+            cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+        }
         if (isPastConversationIntent || isLeadershipQuery) {
             const recentExplicitFacts = await loadRecentExplicitFacts(6)
             if (recentExplicitFacts.length > 0) {
@@ -2814,6 +2881,41 @@ Retorne apenas function calls (sem texto livre).`
                     }
                 }
             }
+        }
+
+        const countRows = (value: any): any[] => (Array.isArray(value) ? value : [])
+        const countActiveProjects = (rows: any[]): number => {
+            if (!Array.isArray(rows) || rows.length === 0) return 0
+            const activeRows = rows.filter((row: any) => {
+                const status = normalizeText(String(row?.client_status || row?.status || row?.project_status || ''))
+                return status === 'ativo'
+            })
+            return activeRows.length > 0 ? activeRows.length : rows.length
+        }
+
+        const buildDeterministicDbCountAnswer = (): string | null => {
+            if (!canUseDbCountFastPath) return null
+            if (executedDbRpcs.some((rpc) => executorRpcNames.has(rpc))) return null
+
+            const wantsUsers = hasAny(query, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            const wantsProjects = hasAny(query, ['projeto', 'projetos'])
+
+            const usersRows = countRows(rawDbRecordsByRpcForGenUI['query_all_users'])
+            const projectRows = countRows(rawDbRecordsByRpcForGenUI['query_all_projects'])
+            const usersCount = usersRows.length
+            const activeProjectsCount = countActiveProjects(projectRows)
+
+            if (wantsUsers && wantsProjects && (usersRows.length > 0 || projectRows.length > 0)) {
+                return `Hoje temos ${usersCount} usuários cadastrados e ${activeProjectsCount} projetos ativos no sistema.`
+            }
+            if (wantsUsers && usersRows.length > 0) {
+                return `Hoje temos ${usersCount} usuários cadastrados no sistema.`
+            }
+            if (wantsProjects && projectRows.length > 0) {
+                return `Hoje temos ${activeProjectsCount} projetos ativos no sistema.`
+            }
+
+            return null
         }
 
         // 4. Generation Step — com identidade do usuário e histórico
@@ -2946,35 +3048,44 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         // Mensagem atual do usuário
         messages.push({ role: 'user', content: query })
 
-        const chatResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: messages as any,
-            temperature: 0.1
-        })
+        const deterministicDbAnswer = buildDeterministicDbCountAnswer()
+        let usedDeterministicDbAnswer = false
+        let answer = ''
 
-        const endTime = performance.now()
-        totalLatencyMs = Math.round(endTime - startTime)
-        const usage = chatResponse.usage
-        if (usage) {
-            const mainModel = 'gpt-4o'; // Modelo principal dos agentes
-            const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
-                (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
+        if (deterministicDbAnswer) {
+            answer = deterministicDbAnswer
+            usedDeterministicDbAnswer = true
+        } else {
+            const chatResponse = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: messages as any,
+                temperature: 0.1
+            })
 
-            totalInputTokens += usage.prompt_tokens;
-            totalOutputTokens += usage.completion_tokens;
-            totalCostEst += chatCost;
+            const endTime = performance.now()
+            totalLatencyMs = Math.round(endTime - startTime)
+            const usage = chatResponse.usage
+            if (usage) {
+                const mainModel = 'gpt-4o'; // Modelo principal dos agentes
+                const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
+                    (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
 
-            modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
-            modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
-            modelUsage['gpt-4o'].cost += chatCost;
+                totalInputTokens += usage.prompt_tokens;
+                totalOutputTokens += usage.completion_tokens;
+                totalCostEst += chatCost;
+
+                modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
+                modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
+                modelUsage['gpt-4o'].cost += chatCost;
+            }
+
+            answer = chatResponse.choices[0].message.content || ''
         }
-
-        let answer = chatResponse.choices[0].message.content || ''
         let suggestedSessionTitle: string | null = null
 
         const llmGeneratedGenUi = /"type"\s*:\s*"(?:task_list|project_list|client_list|proposal_list|user_list|access_list)"/.test(answer);
 
-        if (isTrafficAgentContext && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && rpcNameForGenUI === 'query_all_tasks') {
+        if (!usedDeterministicDbAnswer && isTrafficAgentContext && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && rpcNameForGenUI === 'query_all_tasks') {
             // Traffic Agent: filtrar tasks pelo cliente/projeto mencionado na query antes de injetar GenUI.
             const normalizedQuery = normalizeText(query)
             const trafficFilteredTasks = rawDbRecordsForGenUI.filter((task: any) => {
@@ -2989,7 +3100,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         }
 
         // FORÇA BRUTA: Injetar componente UI na resposta final via backend (apenas para agentes não-Traffic)
-        if (hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && !isTrafficAgentContext) {
+        if (!usedDeterministicDbAnswer && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && !isTrafficAgentContext) {
             // ANTI-DUPLICAÇÃO: Remover blocos ```json que o LLM já tenha gerado por conta própria
             // ou blocos de json truncados, para evitar duplicação com a injenção do GenUI
             answer = answer.replace(/```json[\s\S]*?(?:```|$)/g, '').trim();
@@ -3226,7 +3337,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             return sanitizeSessionTitle(base)
         }
 
-        const shouldSuggestSessionTitle = !!session_id && sessionMessages.length <= 1 && query.trim().length >= 8
+        const shouldSuggestSessionTitle = !!session_id && sessionMessages.length <= 1 && query.trim().length >= 8 && !usedDeterministicDbAnswer
         if (shouldSuggestSessionTitle) {
             try {
                 const titleResponse = await openai.chat.completions.create({
