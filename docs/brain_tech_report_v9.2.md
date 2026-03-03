@@ -2364,6 +2364,7 @@ Resultado:
 - `supabase/migrations/20260228111500_add_recent_explicit_user_facts_rpc.sql`
 - `supabase/migrations/20260303143000_fix_query_telemetry_summary_service_role.sql`
 - `supabase/migrations/20260303195000_add_query_memory_stability_daily_rpc.sql`
+- `supabase/migrations/20260303211000_filter_slo_to_tracked_canary_runs.sql`
 
 #### Relatórios operacionais
 
@@ -2406,7 +2407,7 @@ Com o fechamento operacional de P0/P1/P2, o sistema está consistente e auditáv
 Apesar dos avanços, a maturidade total ainda depende de três fechamentos:
 
 1. estabilizar 14 dias consecutivos de canário + suíte T+1/T+7/T+30 sem falhas;
-2. recuperar `recall_hit_rate` para `>=95%` e manter `critical_canary_failures=0` de forma sustentada;
+2. manter `recall_hit_rate` em `>=95%` e `critical_canary_failures=0` de forma sustentada nos canários oficiais (`slo_tracked=true`);
 3. manter a capacidade revalidada de 100 sessões com monitoramento periódico para prevenir regressão.
 
 Status do gate de estabilidade em 2026-03-03 (UTC): streak inicial `1/14`, com janela `T+1` já validada em `PASS` (fonte de recall: `explicit_fact_store`).

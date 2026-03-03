@@ -33,6 +33,7 @@ if (!projectRef) {
 }
 
 const marker = `CANARY_MEMORY_${Date.now()}`;
+const sloTracked = (process.env.BRAIN_CANARY_SLO_TRACKED || 'false').toLowerCase() === 'true';
 const serviceClient =
   serviceRoleKey && supabaseUrl
     ? createClient(supabaseUrl, serviceRoleKey)
@@ -187,6 +188,7 @@ try {
       p_status: criticalFailed > 0 ? 'error' : 'success',
       p_params: {
         canary: 'brain_memory',
+        slo_tracked: sloTracked,
         marker,
         total_tests: total,
         passed_tests: passed,

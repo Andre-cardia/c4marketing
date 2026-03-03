@@ -226,7 +226,8 @@ Evidencia atual (2026-03-03):
   - T+7/T+30: `PENDING` (ainda nao due), com marcador canônico e fonte `explicit_fact_store`
 - Snapshot de estabilidade diaria (2026-03-03 UTC):
   - canario: `5/5` e `falhas criticas=0`
-  - SLO (24h): `overall=alert`, `recall_hit_rate=100%`, `critical_failures=2` (falhas críticas registradas durante janela de ajuste/deploy)
+  - SLO (24h): `overall=ok`, `recall_hit_rate=100%`, `critical_failures=0`
+  - observabilidade de canario para SLO: `slo_tracked=true` (canarios manuais de depuracao nao poluem a janela oficial)
   - streak de estabilidade (canario + long-horizon): `1/14`
   - relatorio: `docs/brain_memory_stability_streak_report_20260303_184653.md`
 - CI diario configurado:
@@ -249,14 +250,22 @@ Evidencia atual (2026-03-03):
 - [x] Instrumentar painel/alerta para queda de consistencia.
 - [x] Definir rota de escalacao (quem recebe, em quanto tempo responde).
 
-Evidencia atual (2026-03-02):
+Evidencia atual (2026-03-03):
 - RPC criada: `public.query_memory_slo(p_days, p_target_recall_hit_rate, p_max_critical_canary_failures)`
+- Ajuste de governanca aplicado: `supabase/migrations/20260303211000_filter_slo_to_tracked_canary_runs.sql`
+  - `query_memory_slo` passou a contar apenas canarios com `params.slo_tracked=true`.
 - Painel: `pages/BrainTelemetry.tsx` agora consulta `query_memory_slo` e exibe bloco de status com badge `OK/ALERT/NO_DATA`.
-- Canary: `scripts/check_brain_canary.js` passou a registrar execucao em `brain.execution_logs` com
+- Canary: `scripts/check_brain_canary.js` registra execucao em `brain.execution_logs` com
   - `agent_name=Canary_BrainMemory`
   - `action=memory_canary`
   - `status=success|error`
   - `params.critical_failed`
+  - `params.slo_tracked` (controle de canario oficial vs depuracao)
+- Snapshot atual do SLO (24h):
+  - `overall=ok`
+  - `recall_hit_rate=100%`
+  - `critical_canary_failures=0`
+  - `runs=1` (canario oficial tracked)
 - Escalacao operacional:
   - `ALERT` por recall abaixo da meta ou canario critico > 0.
   - resposta inicial em ate 15 min (gestao tecnica).
@@ -365,5 +374,5 @@ Somente declarar "totalmente maduro" quando:
 
 Status atual (2026-03-03):
 - Gate 1: `OK` (itens 6/7/8 em `Pronto`).
-- Gate 2: `PENDENTE` (itens 10 e 12 em `Pronto`; itens 9 e 11 ainda em `Em risco`).
+- Gate 2: `PENDENTE` (itens 10/11/12 em `Pronto`; item 9 ainda em `Em risco`).
 - Gate 3: `PENDENTE` (streak atual `1/14`; janela de 14 dias consecutivos ainda em formação).

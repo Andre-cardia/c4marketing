@@ -19,6 +19,7 @@ jobs:
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BRAIN_LH_AUTOINIT: "true"
+      BRAIN_CANARY_SLO_TRACKED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

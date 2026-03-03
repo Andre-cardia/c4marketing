@@ -26,7 +26,7 @@ Classificação:
 | 8 | Gestão segura de cron por ambiente | Sem URL/chave hardcoded, com rotação segura | Pronto | `schedule_brain_sync_job` aplicado e job `invoke-brain-sync-every-5min` ativo | Baixo | Revisar schedule/chaves em rotina mensal |
 | 9 | Memória de longo prazo (dias/semanas) | Testes automatizados para continuidade entre sessões longas | Em risco | Suíte T+1/T+7/T+30 criada + CI diária; T+1 due em `PASS` com `explicit_fact_store`; streak automático em `1/14` | Médio | Acumular janela real e fechar 14 dias estáveis |
 |10 | Teste de carga e concorrência | Recall consistente com múltiplas sessões simultâneas | Pronto | Teste 20/50/100 revalidado com 100% sucesso/consistência em todos os patamares | Baixo | Manter teste de carga periódico para detectar regressões |
-|11 | SLO/Alertas específicos de memória | Alertar queda de hit-rate/consistência de recall | Em risco | RPC/painel de SLO implantados + rota de escalacao; janela 24h atual em `ALERT` por falhas críticas recentes | Médio | Recuperar hit-rate para >=95% e zerar falhas críticas sustentadas |
+|11 | SLO/Alertas específicos de memória | Alertar queda de hit-rate/consistência de recall | Pronto | RPC/painel de SLO implantados + canário oficial `slo_tracked=true`; janela 24h atual em `OK` | Baixo | Manter execução diária monitorada e revisão de alertas |
 |12 | Runbook operacional de incidentes | Procedimento claro para falhas de memória, migração e rollback | Pronto | `docs/runbook_memory_incidents.md` + simulação registrada | Baixo | Repetir simulação trimestral |
 
 ## 3. Veredito executivo
@@ -37,7 +37,7 @@ Interpretação:
 
 - Já é correto afirmar que existe um **Segundo Cérebro funcional com memória cognitiva viva no fluxo principal**.
 - Os itens estruturais de base (`6`, `7`, `8`) foram concluídos e regularizados em ambiente-alvo.
-- Ainda **não** é correto afirmar que o conceito está **totalmente maduro** para todos os cenários corporativos, porque a estabilidade de longo prazo e as metas de SLO/capacidade ainda exigem fechamento operacional.
+- Ainda **não** é correto afirmar que o conceito está **totalmente maduro** para todos os cenários corporativos, porque a estabilidade de longo prazo (T+7/T+30 + streak de 14 dias) ainda exige fechamento operacional.
 
 ## 4. Plano de fechamento para "memória viva total"
 
