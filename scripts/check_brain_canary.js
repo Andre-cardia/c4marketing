@@ -207,16 +207,16 @@ try {
   }
 
   if (serviceClient) {
-    const { error: cleanupError } = await serviceClient
-      .schema('brain')
-      .from('documents')
-      .delete()
-      .ilike('content', `%${marker}%`);
+    const { data: deletedRows, error: cleanupError } = await serviceClient.rpc(
+      'cleanup_brain_canary_marker',
+      { p_marker: marker }
+    );
 
     if (cleanupError) {
       console.warn(`[WARN] Canary marker cleanup failed: ${cleanupError.message}`);
     } else {
-      console.log('[INFO] Canary marker cleanup executed (service role).');
+      const deletedCount = Number.isFinite(Number(deletedRows)) ? Number(deletedRows) : 0;
+      console.log(`[INFO] Canary marker cleanup executed (service role). deleted_rows=${deletedCount}`);
     }
   } else {
     console.log('[INFO] Cleanup skipped: SUPABASE_SERVICE_ROLE_KEY not set in local env.');
