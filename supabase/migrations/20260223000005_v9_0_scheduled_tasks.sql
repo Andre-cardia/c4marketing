@@ -18,25 +18,18 @@ CREATE TABLE IF NOT EXISTS public.scheduled_tasks (
     created_by      TEXT,
     created_at      TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_run ON public.scheduled_tasks (next_run) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_project_id ON public.scheduled_tasks (project_id);
-
 -- RLS
 ALTER TABLE public.scheduled_tasks ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Authenticated can read scheduled_tasks" ON public.scheduled_tasks;
 CREATE POLICY "Authenticated can read scheduled_tasks"
     ON public.scheduled_tasks FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "Service role manages scheduled_tasks" ON public.scheduled_tasks;
 CREATE POLICY "Service role manages scheduled_tasks"
     ON public.scheduled_tasks FOR ALL TO service_role USING (true);
-
 GRANT SELECT ON public.scheduled_tasks TO authenticated;
 GRANT ALL ON public.scheduled_tasks TO service_role;
-
-
 -- ============================================================
 -- 2. Função auxiliar: calcular próxima data de execução
 -- ============================================================
@@ -92,8 +85,6 @@ BEGIN
 
     RETURN v_next;
 END; $$;
-
-
 -- ============================================================
 -- 3. execute_schedule_task  (criar agendamento recorrente)
 -- ============================================================
@@ -173,10 +164,7 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' para ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_schedule_task TO authenticated, service_role;
-
-
 -- ============================================================
 -- 4. run_scheduled_tasks  (chamada pelo pg_cron diariamente)
 -- ============================================================
@@ -231,11 +219,9 @@ BEGIN
 
     RETURN v_processed;
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.run_scheduled_tasks TO service_role;
-
 -- ============================================================
 -- pg_cron: ativar manualmente no painel do Supabase
 -- Requer extensão pg_cron habilitada.
 -- ============================================================
--- SELECT cron.schedule('run-scheduled-tasks', '0 6 * * *', 'SELECT run_scheduled_tasks()');
+-- SELECT cron.schedule('run-scheduled-tasks', '0 6 * * *', 'SELECT run_scheduled_tasks()');;

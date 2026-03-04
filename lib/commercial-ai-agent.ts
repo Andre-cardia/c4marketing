@@ -61,7 +61,7 @@ export async function fetchCommercialContext(
     const { data: allAcceptances, error: accError } = await supabase
         .from('acceptances')
         .select(`
-            id, timestamp, company_name, status,
+            id, timestamp, billing_start_date, expiration_date, company_name, status,
             contract_snapshot,
             proposal_id,
             proposal:proposals (
@@ -140,16 +140,12 @@ function computeMonthlyMetrics(
 
     const now = new Date();
 
-    // Calculate the CURRENT active MRR once — based on all contracts active RIGHT NOW
-    // This is the projected MRR for every month, assuming all active contracts remain
-    const currentlyActiveContracts = acceptances.filter(a => isActiveContract(a));
-    const currentActiveMRR = currentlyActiveContracts.reduce((sum, acc) => sum + getMonthlyFee(acc), 0);
-    const currentActiveCount = currentlyActiveContracts.length;
-
     for (let m = 0; m < 12; m++) {
         const monthKey = `${year}-${String(m + 1).padStart(2, '0')}`;
         const monthStart = new Date(year, m, 1);
         const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
+        const activeContractsAtMonthEnd = acceptances.filter(a => isFinanciallyActiveAtDate(a, monthEnd));
+        const monthMRR = activeContractsAtMonthEnd.reduce((sum, acc) => sum + getMonthlyFee(acc), 0);
 
         // Future months: project current active MRR
         if (monthStart > now) {
@@ -161,7 +157,7 @@ function computeMonthlyMetrics(
                 setupRevenue: 0, totalRevenue: 0,
                 activeClients: 0,
                 isForecast: true,
-                forecastMRR: currentActiveMRR,
+                forecastMRR: monthMRR,
             });
             continue;
         }
@@ -178,19 +174,11 @@ function computeMonthlyMetrics(
             return d >= monthStart && d <= monthEnd;
         });
 
-        // Calculate MRR: sum of monthly_fee for contracts whose start date is on or before monthEnd
-        const activeContracts = acceptances.filter(a => {
-            const acceptDate = new Date(a.timestamp);
-            if (acceptDate > monthEnd) return false;
-            return isActiveContract(a);
-        });
+        // MRR: contratos ativos na data de referência do mês (considera billing_start_date quando existir)
+        const activeContracts = activeContractsAtMonthEnd;
 
-        let mrr = 0;
+        let mrr = monthMRR;
         let setupRevenue = 0;
-
-        activeContracts.forEach((acc: any) => {
-            mrr += getMonthlyFee(acc);
-        });
 
         // Setup revenue: sum of setup_fee for contracts started this month
         monthAcceptances.forEach((acc: any) => {
@@ -232,7 +220,7 @@ function computeMonthlyMetrics(
             totalRevenue: mrr + setupRevenue,
             activeClients: activeContracts.length,
             isForecast: false,
-            forecastMRR: currentActiveMRR,  // projected MRR based on current active contracts
+            forecastMRR: monthMRR,
         });
     }
 
@@ -293,6 +281,45 @@ function isChurnedContract(acc: any): boolean {
     if (!status) return false;
     const churnStatuses = ['Cancelado', 'Suspenso', 'Finalizado', 'cancelado', 'suspenso', 'finalizado'];
     return churnStatuses.some(s => s.toLowerCase() === status.toLowerCase());
+}
+
+function parseDateLike(value: string | null | undefined, endOfDay = false): Date | null {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return new Date(`${raw}T${endOfDay ? '23:59:59' : '00:00:00'}`);
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+}
+
+function getFinancialStartDate(acc: any): Date | null {
+    const billingStart = parseDateLike(acc?.billing_start_date);
+    if (billingStart) return billingStart;
+    const snapshotBillingStart = parseDateLike(acc?.contract_snapshot?.billing_start_date);
+    if (snapshotBillingStart) return snapshotBillingStart;
+    const snapshotProposalBillingStart = parseDateLike(acc?.contract_snapshot?.proposal?.billing_start_date);
+    if (snapshotProposalBillingStart) return snapshotProposalBillingStart;
+    return parseDateLike(acc?.timestamp);
+}
+
+function isFinanciallyActiveAtDate(acc: any, referenceDate: Date): boolean {
+    if (!isActiveContract(acc)) return false;
+
+    const financialStart = getFinancialStartDate(acc);
+    if (financialStart && financialStart > referenceDate) {
+        return false;
+    }
+
+    const expirationDate = parseDateLike(acc?.expiration_date, true);
+    if (expirationDate && expirationDate < referenceDate) {
+        return false;
+    }
+
+    return true;
 }
 
 // ─── AI Chat ─────────────────────────────────────────────────────────────────

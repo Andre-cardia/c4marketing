@@ -6,7 +6,6 @@
 
 -- 1. CORRIGIR query_all_projects: status 'Ativo'/'Inativo' (não 'accepted')
 DROP FUNCTION IF EXISTS public.query_all_projects(text, text);
-
 CREATE OR REPLACE FUNCTION public.query_all_projects(
   p_service_type text DEFAULT NULL,
   p_status_filter text DEFAULT NULL
@@ -72,8 +71,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- 2. CLIENTES (acceptances + serviços contratados)
 CREATE OR REPLACE FUNCTION public.query_all_clients(
   p_status text DEFAULT NULL
@@ -110,8 +107,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- 3. PROPOSTAS
 CREATE OR REPLACE FUNCTION public.query_all_proposals()
 RETURNS json
@@ -144,8 +139,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- 4. USUÁRIOS
 CREATE OR REPLACE FUNCTION public.query_all_users()
 RETURNS json
@@ -174,8 +167,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- 5. TAREFAS (project_tasks)
 CREATE OR REPLACE FUNCTION public.query_all_tasks(
   p_project_id bigint DEFAULT NULL,
@@ -210,8 +201,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- 6. LOGS DE ACESSO
 CREATE OR REPLACE FUNCTION public.query_access_summary()
 RETURNS json
@@ -236,8 +225,6 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
-
 -- Permissões
 GRANT EXECUTE ON FUNCTION public.query_all_projects TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.query_all_clients TO authenticated, service_role;

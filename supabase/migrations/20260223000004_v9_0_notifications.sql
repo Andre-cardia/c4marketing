@@ -44,15 +44,13 @@ BEGIN
 
     RETURN NEW;
 END; $$;
-
 -- Criar trigger na tabela project_tasks
 DROP TRIGGER IF EXISTS trg_task_assignee_notify ON project_tasks;
 CREATE TRIGGER trg_task_assignee_notify
     AFTER INSERT OR UPDATE ON project_tasks
     FOR EACH ROW
     EXECUTE FUNCTION public.notify_task_assignee();
-
 -- Habilitar realtime na tabela notices para o frontend receber atualizações em tempo real
 -- (Execute manualmente no painel do Supabase se necessário):
 -- ALTER TABLE notices REPLICA IDENTITY FULL;
--- SELECT supabase_realtime.quote_wal2json('{notices}'::name[]);
+-- SELECT supabase_realtime.quote_wal2json('{notices}'::name[]);;

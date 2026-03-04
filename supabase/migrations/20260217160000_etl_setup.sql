@@ -10,9 +10,7 @@ create table if not exists brain.sync_queue (
   processed_at timestamptz,
   error_message text
 );
-
 create index if not exists idx_brain_sync_queue_status on brain.sync_queue(status) where status = 'pending';
-
 -- 2. Trigger Function
 create or replace function brain.handle_project_change()
 returns trigger
@@ -57,36 +55,30 @@ begin
   return COALESCE(NEW, OLD);
 end;
 $$;
-
 -- 3. Apply Triggers
 -- Website Projects
 drop trigger if exists T_brain_sync_website_projects on public.website_projects;
 create trigger T_brain_sync_website_projects
 after insert or update or delete on public.website_projects
 for each row execute function brain.handle_project_change();
-
 drop trigger if exists T_brain_sync_websites on public.websites;
 create trigger T_brain_sync_websites
 after insert or update or delete on public.websites
 for each row execute function brain.handle_project_change();
-
 -- Landing Page Projects
 drop trigger if exists T_brain_sync_lp_projects on public.landing_page_projects;
 create trigger T_brain_sync_lp_projects
 after insert or update or delete on public.landing_page_projects
 for each row execute function brain.handle_project_change();
-
 drop trigger if exists T_brain_sync_landing_pages on public.landing_pages;
 create trigger T_brain_sync_landing_pages
 after insert or update or delete on public.landing_pages
 for each row execute function brain.handle_project_change();
-
 -- Traffic Projects
 drop trigger if exists T_brain_sync_traffic_projects on public.traffic_projects;
 create trigger T_brain_sync_traffic_projects
 after insert or update or delete on public.traffic_projects
 for each row execute function brain.handle_project_change();
-
 drop trigger if exists T_brain_sync_traffic_campaigns on public.traffic_campaigns;
 create trigger T_brain_sync_traffic_campaigns
 after insert or update or delete on public.traffic_campaigns

@@ -16,6 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const defaultUserId = '321f03b7-4b78-41f5-8133-6967d6aea169';
 const userId = process.env.BRAIN_TEST_USER_ID || defaultUserId;
 const userEmail = process.env.BRAIN_TEST_USER_EMAIL || 'andre@c4marketing.com';
+const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
 const sessionId = process.env.BRAIN_TEST_SESSION_ID || randomUUID();
 
 const projectRef = (() => {
@@ -32,6 +33,7 @@ if (!projectRef) {
 }
 
 const marker = `CANARY_MEMORY_${Date.now()}`;
+const sloTracked = (process.env.BRAIN_CANARY_SLO_TRACKED || 'false').toLowerCase() === 'true';
 const serviceClient =
   serviceRoleKey && supabaseUrl
     ? createClient(supabaseUrl, serviceRoleKey)
@@ -44,29 +46,39 @@ const b64u = (obj) =>
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 
+// JWT sintético (3 segmentos) para acionar fallback de claims no chat-brain
+// quando o token não for validável por assinatura no GoTrue.
 const syntheticJwt = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
   iss: 'supabase',
   ref: projectRef,
-  role: 'authenticated',
+  role: userRole,
   sub: userId,
   email: userEmail,
-})} signature`;
+  iat: Math.floor(Date.now() / 1000),
+  exp: Math.floor(Date.now() / 1000) + 60 * 60,
+})}.${b64u({ sig: 'canary' })}`;
 
 const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
 
 const callChat = async (query) => {
-  const res = await fetch(chatEndpoint, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${syntheticJwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query,
-      session_id: sessionId,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch(chatEndpoint, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${syntheticJwt}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        session_id: sessionId,
+      }),
+    });
+  } catch (fetchError) {
+    const cause = fetchError?.cause ? ` | cause=${String(fetchError.cause)}` : '';
+    throw new Error(`chat-brain fetch failed: ${fetchError?.message || fetchError}${cause}`);
+  }
 
   const json = await res.json().catch(() => ({}));
   return { status: res.status, body: json };
@@ -83,6 +95,7 @@ const hasIntegrationError = (text) => {
 };
 
 const tests = [];
+const runStartedAt = Date.now();
 
 const pushResult = (name, pass, detail, critical = false) => {
   tests.push({ name, pass, detail, critical });
@@ -145,6 +158,10 @@ try {
     t4Pass ? 'Marker encontrado na resposta.' : 'Marker não foi encontrado na resposta.',
     false
   );
+  if (!t4Pass) {
+    console.log(`       t4.answer=${t4Answer}`);
+    console.log(`       t4.meta=${JSON.stringify(t4.body?.meta || {})}`);
+  }
 
   // 5) Normative hierarchy (best effort; non-critical)
   const t5 = await callChat('Em conflito normativo, policy ou memo prevalece?');
@@ -160,18 +177,46 @@ try {
   const total = tests.length;
   const passed = tests.filter((t) => t.pass).length;
   const criticalFailed = tests.filter((t) => t.critical && !t.pass).length;
+  const memoryRecallPass = tests.find((t) => t.name === 'Recuperação Imediata da Memória')?.pass ?? null;
+  const runLatencyMs = Date.now() - runStartedAt;
 
   if (serviceClient) {
-    const { error: cleanupError } = await serviceClient
-      .schema('brain')
-      .from('documents')
-      .delete()
-      .ilike('content', `%${marker}%`);
+    const { error: sloLogError } = await serviceClient.rpc('log_agent_execution', {
+      p_session_id: sessionId,
+      p_agent_name: 'Canary_BrainMemory',
+      p_action: 'memory_canary',
+      p_status: criticalFailed > 0 ? 'error' : 'success',
+      p_params: {
+        canary: 'brain_memory',
+        slo_tracked: sloTracked,
+        marker,
+        total_tests: total,
+        passed_tests: passed,
+        critical_failed: criticalFailed,
+      },
+      p_result: {
+        memory_recall_pass: memoryRecallPass,
+      },
+      p_latency_ms: runLatencyMs,
+      p_error_message: criticalFailed > 0 ? 'Critical canary failures detected' : null,
+    });
+
+    if (sloLogError) {
+      console.warn(`[WARN] Memory SLO canary log failed: ${sloLogError.message}`);
+    }
+  }
+
+  if (serviceClient) {
+    const { data: deletedRows, error: cleanupError } = await serviceClient.rpc(
+      'cleanup_brain_canary_marker',
+      { p_marker: marker }
+    );
 
     if (cleanupError) {
       console.warn(`[WARN] Canary marker cleanup failed: ${cleanupError.message}`);
     } else {
-      console.log('[INFO] Canary marker cleanup executed (service role).');
+      const deletedCount = Number.isFinite(Number(deletedRows)) ? Number(deletedRows) : 0;
+      console.log(`[INFO] Canary marker cleanup executed (service role). deleted_rows=${deletedCount}`);
     }
   } else {
     console.log('[INFO] Cleanup skipped: SUPABASE_SERVICE_ROLE_KEY not set in local env.');

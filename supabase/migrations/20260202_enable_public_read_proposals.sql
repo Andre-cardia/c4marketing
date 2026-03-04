@@ -1,6 +1,5 @@
 -- Enable RLS on proposals table (ensure it is on)
 ALTER TABLE "public"."proposals" ENABLE ROW LEVEL SECURITY;
-
 -- Create policy to allow public read access (for viewing proposals via link)
 -- We check if policy exists to avoid errors on repeated runs, or we can just drop and recreate.
 -- For simplicity in this migration style, we'll try to create it.

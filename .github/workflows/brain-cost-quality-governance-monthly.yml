@@ -1,0 +1,45 @@
+name: Brain Cost Quality Governance
+
+on:
+  schedule:
+    # Day 1 monthly at 10:00 UTC = 07:00 BRT
+    - cron: "0 10 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: brain-cost-quality-governance-monthly
+  cancel-in-progress: false
+
+jobs:
+  governance-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BRAIN_GOV_DAYS: "30"
+      BRAIN_GOV_RECALL_TARGET: "95"
+      BRAIN_GOV_MAX_CRITICAL_FAILURES: "0"
+      BRAIN_COST_LIMIT_PER_INTERACTION: "0.01"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${VITE_SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "::error::Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY repository secret."
+            exit 1
+          fi
+
+      - name: Run monthly governance report
+        run: npm run check:brain:governance-cost-quality

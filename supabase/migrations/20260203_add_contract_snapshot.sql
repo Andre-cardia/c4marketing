@@ -1,7 +1,6 @@
 -- Add contract_snapshot column to acceptances
 ALTER TABLE "public"."acceptances"
 ADD COLUMN IF NOT EXISTS "contract_snapshot" JSONB;
-
 -- Drop existing foreign key constraint if it exists (generic name assumption or loop to find it)
 -- We'll try to drop the standard name 'acceptances_proposal_id_fkey'
 DO $$
@@ -15,7 +14,6 @@ BEGIN
         ALTER TABLE "public"."acceptances" DROP CONSTRAINT "acceptances_proposal_id_fkey";
     END IF;
 END $$;
-
 -- Re-add foreign key constraint with ON DELETE SET NULL
 ALTER TABLE "public"."acceptances"
 ADD CONSTRAINT "acceptances_proposal_id_fkey"

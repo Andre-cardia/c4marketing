@@ -22,7 +22,6 @@ AS $$
     ELSE 50
   END;
 $$;
-
 -- Safe timestamp parser for metadata values
 CREATE OR REPLACE FUNCTION public.try_parse_timestamptz(p_value text)
 RETURNS timestamptz
@@ -38,7 +37,6 @@ EXCEPTION WHEN others THEN
   RETURN NULL;
 END;
 $$;
-
 -- 2) Publish a new document version with superseding semantics
 CREATE OR REPLACE FUNCTION public.publish_brain_document_version(
   p_content text,
@@ -209,7 +207,6 @@ BEGIN
     v_superseded_count;
 END;
 $$;
-
 -- 3) Invalidate obsolete embeddings (metadata-level invalidation)
 CREATE OR REPLACE FUNCTION public.invalidate_obsolete_brain_embeddings(
   p_document_key text DEFAULT NULL
@@ -239,7 +236,6 @@ BEGIN
   RETURN v_updated;
 END;
 $$;
-
 -- 4) Upgrade retrieval RPC to support normative mode (optional)
 CREATE OR REPLACE FUNCTION public.match_brain_documents(
   query_embedding extensions.vector(1536),
@@ -418,23 +414,17 @@ AS $$
     d.embedding OPERATOR(extensions.<=>) query_embedding
   LIMIT match_count;
 $$;
-
 -- 5) Helper indexes for normative lookups
 CREATE INDEX IF NOT EXISTS idx_brain_documents_document_key
   ON brain.documents ((metadata->>'document_key'));
-
 CREATE INDEX IF NOT EXISTS idx_brain_documents_status
   ON brain.documents ((coalesce(nullif(lower(metadata->>'status'), ''), 'active')));
-
 CREATE INDEX IF NOT EXISTS idx_brain_documents_is_current
   ON brain.documents ((coalesce(nullif(lower(metadata->>'is_current'), ''), 'true')));
-
 CREATE INDEX IF NOT EXISTS idx_brain_documents_authority_type
   ON brain.documents ((coalesce(nullif(lower(metadata->>'authority_type'), ''), 'memo')));
-
 CREATE INDEX IF NOT EXISTS idx_brain_documents_source
   ON brain.documents ((metadata->>'source_table'), (metadata->>'source_id'));
-
 -- 6) Grants
 GRANT EXECUTE ON FUNCTION public.brain_authority_rank(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.try_parse_timestamptz(text) TO authenticated, service_role;

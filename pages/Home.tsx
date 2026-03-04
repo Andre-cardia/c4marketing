@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setError('ERRO DE CONFIGURAÇÃO: As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas. O sistema não pode se conectar ao banco de dados.');
+      setError(`ERRO DE CONFIGURAÇÃO: ${supabaseConfigError || 'As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas.'} O sistema não pode se conectar ao banco de dados.`);
     } else {
       checkUser();
     }
@@ -218,7 +218,7 @@ const Home: React.FC = () => {
                       ? 'Acesse o painel administrativo'
                       : mode === 'register'
                       ? 'Defina sua senha de acesso'
-                      : 'Enviaremos um link para seu e-mail'}
+                      : 'Informe seu e-mail para receber o link'}
                   </p>
                 </div>
               </div>
@@ -355,17 +355,28 @@ const Home: React.FC = () => {
             </form>
 
             {/* Mode Toggle */}
-            <div className="mt-8 text-center">
+            <div className="mt-8 text-center space-y-2">
               {mode === 'login' ? (
-                <p className="text-sm text-slate-600">
-                  Primeiro acesso?{' '}
-                  <button
-                    onClick={() => { setMode('register'); setError(null); setSuccessMessage(null); }}
-                    className="text-brand-coral font-bold hover:text-white transition-colors"
-                  >
-                    Criar senha
-                  </button>
-                </p>
+                <>
+                  <p className="text-sm text-slate-600">
+                    Primeiro acesso?{' '}
+                    <button
+                      onClick={() => { setMode('register'); setError(null); setSuccessMessage(null); }}
+                      className="text-brand-coral font-bold hover:text-white transition-colors"
+                    >
+                      Criar senha
+                    </button>
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Esqueceu a senha?{' '}
+                    <button
+                      onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
+                      className="text-brand-coral font-bold hover:text-white transition-colors"
+                    >
+                      Recuperar senha
+                    </button>
+                  </p>
+                </>
               ) : (
                 <p className="text-sm text-slate-600">
                   {mode === 'forgot-password' ? 'Lembrou a senha?' : 'Já tem conta?'}{' '}

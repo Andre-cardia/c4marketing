@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
             ? forcedAgentRaw
             : null
         const forcedAgentAllowedRoles: Record<string, string[]> = {
-            Agent_MarketingTraffic: ['gestor', 'operacional', 'admin'],
+            Agent_MarketingTraffic: ['gestor'],
         }
 
         const getProjectRefFromSupabaseUrl = () => {
@@ -239,6 +239,21 @@ Deno.serve(async (req) => {
             })
         }
 
+        const normalizeRoleValue = (value: string) =>
+            (value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+
+        const normalizedUserRole = normalizeRoleValue(userRole)
+        // Guardrail de produto: o Segundo Cérebro é exclusivo para perfil gestor.
+        if (normalizedUserRole !== 'gestor') {
+            return new Response(JSON.stringify({
+                error: 'Acesso negado. O Segundo Cérebro está disponível somente para usuários com perfil gestor.',
+                meta: { forbidden_role: userRole, required_role: 'gestor' }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403
+            })
+        }
+
         if (forcedAgentRaw && !forcedAgent) {
             return new Response(JSON.stringify({
                 answer: `Agente forçado inválido: "${forcedAgentRaw}".`,
@@ -271,6 +286,123 @@ Deno.serve(async (req) => {
         const hasAny = (text: string, terms: string[]) => {
             const normalized = normalizeText(text)
             return terms.some((term) => normalized.includes(normalizeText(term)))
+        }
+
+        const monthNamesPt = [
+            'janeiro',
+            'fevereiro',
+            'marco',
+            'abril',
+            'maio',
+            'junho',
+            'julho',
+            'agosto',
+            'setembro',
+            'outubro',
+            'novembro',
+            'dezembro',
+        ]
+
+        const hasExplicitMonthToken = (text: string): boolean => {
+            const normalized = normalizeText(text)
+            if (monthNamesPt.some((month) => new RegExp(`\\b${month}\\b`).test(normalized))) {
+                return true
+            }
+            return /\b(0?[1-9]|1[0-2])\s*\/\s*20\d{2}\b/.test(normalized)
+        }
+
+        const extractStrategicIntentKeywords = (text: string): string[] => {
+            const normalized = normalizeText(text)
+            const base: string[] = []
+
+            const add = (...values: string[]) => {
+                for (const value of values) {
+                    const norm = normalizeText(value).trim()
+                    if (!norm || base.includes(norm)) continue
+                    base.push(norm)
+                }
+            }
+
+            if (hasAny(normalized, ['missao'])) add('missao', 'missão')
+            if (hasAny(normalized, ['visao'])) add('visao', 'visão')
+            if (hasAny(normalized, ['valores', 'valor'])) add('valores')
+            if (hasAny(normalized, ['end game', 'endgame'])) add('end game', 'endgame')
+            if (hasAny(normalized, ['meta', 'metas', 'objetivo', 'objetivos'])) add('meta', 'metas', 'objetivo')
+            if (hasAny(normalized, ['financeir', 'mrr', 'arr', 'receita'])) add('financeira', 'financeiro', 'mrr', 'arr', 'receita')
+            if (hasAny(normalized, ['comercial', 'vendas', 'pipeline'])) add('comercial', 'vendas', 'pipeline')
+            if (hasAny(normalized, ['operacion', 'operacional', 'operacao', 'operação'])) add('operacional', 'operacao', 'operação')
+            if (hasAny(normalized, ['estrateg', 'estratég'])) add('estrategia', 'estratégia')
+            if (hasAny(normalized, ['c4'])) add('c4', 'c4 marketing')
+            for (const month of monthNamesPt) {
+                if (new RegExp(`\\b${month}\\b`).test(normalized)) add(month)
+            }
+
+            const yearMatches = normalized.match(/\b20\d{2}\b/g) || []
+            for (const year of yearMatches.slice(0, 2)) {
+                add(year)
+            }
+
+            return base
+        }
+
+        const extractFinancialAdjustmentCompanyHint = (text: string): string | null => {
+            const raw = String(text || '')
+            const match = raw.match(
+                /(?:contrato\s+(?:da|do|de|com)|cliente|empresa|projeto)\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 .&-]{2,60}?)(?=,|\.|\?|!|$)/i
+            )
+            if (!match) return null
+            const candidate = String(match[1] || '').trim()
+            if (!candidate) return null
+            if (candidate.split(/\s+/).length > 8) return null
+            if (/^(fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i.test(candidate)) {
+                return null
+            }
+            return candidate
+        }
+
+        const parseCurrencyToNumber = (raw: string): number | null => {
+            const sanitized = String(raw || '').replace(/[^\d.,-]/g, '').trim()
+            if (!sanitized) return null
+
+            const hasComma = sanitized.includes(',')
+            const hasDot = sanitized.includes('.')
+            let normalized = sanitized
+
+            if (hasComma && hasDot) {
+                normalized = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.')
+                    ? sanitized.replace(/\./g, '').replace(',', '.')
+                    : sanitized.replace(/,/g, '')
+            } else if (hasComma) {
+                normalized = sanitized.replace(/\./g, '').replace(',', '.')
+            } else {
+                normalized = sanitized.replace(/,/g, '')
+            }
+
+            const parsed = Number(normalized)
+            return Number.isFinite(parsed) ? parsed : null
+        }
+
+        const extractMrrTargetFromStrategicDocs = (docs: any[]): number | null => {
+            if (!Array.isArray(docs) || docs.length === 0) return null
+            const candidates: number[] = []
+
+            for (const doc of docs) {
+                const content = String(doc?.content || '')
+                if (!content) continue
+                const normalizedContent = normalizeText(content)
+                const hasGoalHint = /meta|objetivo|north star/.test(normalizedContent)
+                const hasFinancialHint = /mrr|receita recorrente|receita/.test(normalizedContent)
+                if (!hasGoalHint || !hasFinancialHint) continue
+
+                const moneyMatches = Array.from(content.matchAll(/r\$\s*([\d.,]+)/gi))
+                for (const moneyMatch of moneyMatches) {
+                    const parsed = parseCurrencyToNumber(moneyMatch[1] || '')
+                    if (parsed && parsed > 0) candidates.push(parsed)
+                }
+            }
+
+            if (candidates.length === 0) return null
+            return Math.max(...candidates)
         }
 
         const toIsoDate = (year: number, month: number, day: number): string | null => {
@@ -316,6 +448,29 @@ Deno.serve(async (req) => {
             dez: 12,
         }
 
+        const extractMonthMentions = (text: string): Array<{ month: number; year: number; token: string; index: number }> => {
+            const normalized = normalizeText(text)
+            const currentYear = Number((clientToday || runtimeToday).slice(0, 4))
+            const mentions: Array<{ month: number; year: number; token: string; index: number }> = []
+            const regex = /\b(janeiro|jan|fevereiro|fev|marco|mar|abril|abr|maio|mai|junho|jun|julho|jul|agosto|ago|setembro|set|outubro|out|novembro|nov|dezembro|dez)\b(?:\s*(?:de|\/|-)?\s*(20\d{2}))?/g
+            let match: RegExpExecArray | null
+
+            while ((match = regex.exec(normalized)) !== null) {
+                const token = String(match[1] || '').trim()
+                const month = monthNameToNumber[token]
+                if (!month) continue
+                const year = match[2] ? Number(match[2]) : currentYear
+                mentions.push({
+                    month,
+                    year,
+                    token,
+                    index: typeof match.index === 'number' ? match.index : 0,
+                })
+            }
+
+            return mentions
+        }
+
         const extractReferenceDateFromText = (text: string): string | null => {
             const raw = String(text || '').trim()
             if (!raw) return null
@@ -359,6 +514,65 @@ Deno.serve(async (req) => {
         }
 
         const inferredReferenceDate = extractReferenceDateFromText(query)
+        const monthMentionsInQuery = extractMonthMentions(query)
+        const strategicIntentKeywords = extractStrategicIntentKeywords(query)
+        const hasStrategicCoreTerms = hasAny(query, [
+            'missao',
+            'missão',
+            'visao',
+            'visão',
+            'valores',
+            'end game',
+            'endgame',
+            'end-game',
+        ])
+        const hasStrategicGoalTerms =
+            hasAny(query, ['meta', 'metas', 'objetivo', 'objetivos']) &&
+            hasAny(query, ['financeir', 'comercial', 'operacion', 'estrateg'])
+        const shouldForceStrategicRag = hasStrategicCoreTerms || hasStrategicGoalTerms
+        const hasGoalAttainmentPhrasing = hasAny(query, [
+            'bater a meta',
+            'batemos a meta',
+            'atingimos a meta',
+            'atingiu a meta',
+            'atingir a meta',
+            'cumprimos a meta',
+            'meta foi atingida',
+            'conseguimos bater',
+            'conseguimos atingir',
+            'alcancamos a meta',
+            'alcançamos a meta',
+            'meta de',
+            'meta do',
+            'meta da',
+        ])
+        const looksLikeMetaAdsContext = hasAny(query, ['meta ads', 'facebook ads', 'instagram ads'])
+        const isMonthlyGoalCheckIntent =
+            hasAny(query, ['meta', 'metas', 'objetivo', 'objetivos'])
+            && hasGoalAttainmentPhrasing
+            && hasExplicitMonthToken(query)
+            && !looksLikeMetaAdsContext
+        const isFinancialStartAdjustmentIntent =
+            hasAny(query, ['ajust', 'corrig', 'alter', 'mudar'])
+            && hasAny(query, ['faturamento', 'financeir', 'receita', 'mrr', 'arr'])
+            && hasAny(query, ['inici', 'inicio', 'comec', 'começ'])
+        const financialAdjustmentCompanyHint = extractFinancialAdjustmentCompanyHint(query)
+        const financialAdjustmentBillingStartDate = (() => {
+            if (monthMentionsInQuery.length === 0) return null
+            const lastMonthMention = monthMentionsInQuery[monthMentionsInQuery.length - 1]
+            return toIsoDate(lastMonthMention.year, lastMonthMention.month, 1)
+        })()
+        const financialAdjustmentOriginReferenceDate = (() => {
+            if (monthMentionsInQuery.length === 0) return null
+            const mentionsContractClosure = hasAny(query, ['fechad', 'assinad', 'aceit', 'ultimo contrato', 'último contrato'])
+            if (!mentionsContractClosure) return null
+            const firstMonthMention = monthMentionsInQuery[0]
+            return toIsoDate(
+                firstMonthMention.year,
+                firstMonthMention.month,
+                getEndOfMonthDay(firstMonthMention.year, firstMonthMention.month),
+            )
+        })()
 
         const isTruthyFlag = (value: string | null | undefined) =>
             ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
@@ -415,6 +629,12 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                 && normalized !== 'concluído'
                 && normalized !== 'finalizado'
         }
+
+        const isRecentApprovedProjectIntent = (text: string) =>
+            hasAny(text, ['projeto', 'projetos'])
+            && hasAny(text, ['novo', 'novos', 'recente', 'recentes', 'ultimo', 'último', 'ultimos', 'últimos'])
+            && hasAny(text, ['aprovad', 'aceit', 'ativo', 'ativos', 'ativa', 'ativas'])
+        const recentProjectWindowDays = 45
 
         const stripBareTypedJsonObjects = (value: string): string => {
             if (!value) return value
@@ -498,6 +718,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             'execute_move_task',
             'execute_update_project_status',
             'execute_update_task',
+            'execute_adjust_financial_start_date',
             'execute_batch_move_tasks',
             'execute_batch_delete_tasks',
             'execute_schedule_task',
@@ -675,6 +896,47 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                 return { rpc_name: call.rpc_name, params }
             })
 
+        // Reforço determinístico para perguntas compostas:
+        // garante cobertura de usuários/projetos mesmo quando o roteador gerar chamada parcial.
+        const enforceCompositeCoverage = (text: string, baseCalls: DbQueryCall[]): DbQueryCall[] => {
+            const calls = [...(baseCalls || [])]
+            const hasCall = (rpc: string) => calls.some((c) => c.rpc_name === rpc)
+            const mentionsUsers = hasAny(text, [
+                'usuario', 'usuário', 'usuarios', 'usuários',
+                'colaborador', 'colaboradores', 'equipe', 'time',
+                'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cio',
+                'cargo', 'funcao', 'função', 'papel',
+                'presidente', 'fundador', 'dono', 'diretor executivo'
+            ])
+            const mentionsAccess = hasAny(text, ['acesso', 'acessos', 'acessou', 'logou', 'login', 'entrou'])
+            const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
+
+            if (mentionsUsers && !mentionsAccess && !hasCall('query_all_users')) {
+                calls.push({ rpc_name: 'query_all_users', params: {} })
+            }
+
+            if (mentionsProjects && !hasCall('query_all_projects')) {
+                const projectParams: Record<string, any> = {}
+                if (hasAny(text, ['trafego', 'tráfego', 'traffic', 'gestao de trafego', 'gestão de tráfego'])) {
+                    projectParams.p_service_type = 'traffic'
+                } else if (hasAny(text, ['site', 'website'])) {
+                    projectParams.p_service_type = 'website'
+                } else if (hasAny(text, ['landing', 'lp', 'pagina de captura', 'página de captura'])) {
+                    projectParams.p_service_type = 'landing_page'
+                }
+
+                if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                    projectParams.p_status_filter = 'Ativo'
+                } else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) {
+                    projectParams.p_status_filter = 'Inativo'
+                }
+
+                calls.push({ rpc_name: 'query_all_projects', params: projectParams })
+            }
+
+            return dedupeDbCalls(enrichDbCalls(calls))
+        }
+
         const isExplicitMemorySaveIntent = (text: string) => hasAny(text, [
             'guarde isso', 'guarde esta informacao', 'guarde essa informacao',
             'grave isso', 'grave essa informacao', 'grave esta informacao',
@@ -760,6 +1022,240 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             }
 
             return savedId
+        }
+
+        type ExplicitFactRecord = {
+            fact: string;
+            created_at: string | null;
+            scope: 'session' | 'user';
+        }
+
+        const sortExplicitFacts = (items: ExplicitFactRecord[]): ExplicitFactRecord[] => {
+            return [...items].sort((a, b) => {
+                if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
+                const aTs = a.created_at ? Date.parse(a.created_at) : 0
+                const bTs = b.created_at ? Date.parse(b.created_at) : 0
+                const safeA = Number.isFinite(aTs) ? aTs : 0
+                const safeB = Number.isFinite(bTs) ? bTs : 0
+                return safeB - safeA
+            })
+        }
+
+        const dedupeExplicitFacts = (items: ExplicitFactRecord[], limit: number): ExplicitFactRecord[] => {
+            const merged: ExplicitFactRecord[] = []
+            const seen = new Set<string>()
+            for (const item of items) {
+                const key = item.fact.toLowerCase()
+                if (seen.has(key)) continue
+                seen.add(key)
+                merged.push(item)
+                if (merged.length >= limit) break
+            }
+            return merged
+        }
+
+        const parseExplicitFactFromContent = (content: string): string => {
+            const raw = String(content || '').replace(/\s+/g, ' ').trim()
+            if (!raw) return ''
+            const match = raw.match(/FATO EXPL[IÍ]CITO INFORMADO PELO USU[ÁA]RIO \([^)]+\):\s*(.+)$/i)
+            return (match?.[1] || raw).replace(/\s+/g, ' ').trim()
+        }
+
+        const parseExplicitFactFromCognitiveContent = (content: string): string | null => {
+            const raw = String(content || '').replace(/\s+/g, ' ').trim()
+            if (!raw) return null
+
+            const summaryMatch = raw.match(/Resumo salvo:\s*"([^"]+)"/i)
+            if (summaryMatch?.[1]) {
+                const fact = summaryMatch[1].trim()
+                return fact.length >= 8 ? fact : null
+            }
+
+            return null
+        }
+
+        const extractLatestExplicitFactFromMessages = (
+            messages: Array<{ role: string; content: string }>,
+            scope: 'session' | 'user'
+        ): ExplicitFactRecord | null => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i]
+                if (msg.role !== 'assistant') continue
+                const fact = parseExplicitFactFromCognitiveContent(msg.content)
+                if (!fact) continue
+                return {
+                    fact,
+                    created_at: null,
+                    scope,
+                }
+            }
+            return null
+        }
+
+        const extractLatestExplicitSaveCommandFromMessages = (
+            messages: Array<{ role: string; content: string }>,
+            scope: 'session' | 'user'
+        ): ExplicitFactRecord | null => {
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const msg = messages[i]
+                if (msg.role !== 'user') continue
+                if (!isExplicitMemorySaveIntent(msg.content)) continue
+                const fact = extractMemoryFactText(msg.content)
+                if (!fact || fact.length < 8) continue
+                return {
+                    fact,
+                    created_at: null,
+                    scope,
+                }
+            }
+            return null
+        }
+
+        let explicitFactsCache: ExplicitFactRecord[] | null = null
+        const loadRecentExplicitFacts = async (limit = 6): Promise<ExplicitFactRecord[]> => {
+            if (explicitFactsCache) return explicitFactsCache
+            try {
+                // Preferred deterministic path (requires RPC migration).
+                // If unavailable, fallback to semantic retrieval below.
+                const { data: rpcFacts, error: rpcFactsError } = await supabaseAdmin.rpc(
+                    'get_recent_explicit_user_facts',
+                    {
+                        p_user_id: userId,
+                        p_session_id: session_id ?? null,
+                        p_limit: limit,
+                    }
+                )
+                if (!rpcFactsError && Array.isArray(rpcFacts) && rpcFacts.length > 0) {
+                    const fromRpc = rpcFacts
+                        .map((row: any) => ({
+                            fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
+                            created_at: row?.created_at || null,
+                            scope: row?.scope === 'session' ? 'session' : 'user',
+                        }))
+                        .filter((row) => row.fact.length > 0)
+                    explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(fromRpc), limit)
+                    if (explicitFactsCache.length > 0) {
+                        return explicitFactsCache
+                    }
+                } else if (rpcFactsError) {
+                    console.warn('get_recent_explicit_user_facts unavailable; using semantic fallback:', rpcFactsError.message)
+                }
+
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const topK = Math.max(8, Math.min(30, limit * 4))
+                const queryEmbedding = await embedder('fato explicito informado pelo usuario memoria salva')
+                const recallFilters = {
+                    tenant_id: userId,
+                    type_allowlist: ['session_summary', 'official_doc', 'database_record'],
+                    type_blocklist: ['chat_log'],
+                    artifact_kind: null,
+                    source_table: 'user_facts',
+                    client_id: null,
+                    project_id: null,
+                    source_id: null,
+                    status: 'active',
+                    time_window_minutes: null,
+                }
+                const { data: docsRaw, error: docsError } = await supabaseAdmin.rpc('match_brain_documents', {
+                    query_embedding: queryEmbedding,
+                    match_count: topK,
+                    filters: recallFilters,
+                })
+                if (docsError) {
+                    throw new Error(`match_brain_documents explicit facts failed: ${docsError.message}`)
+                }
+                const docs = Array.isArray(docsRaw) ? docsRaw : []
+
+                const candidates: ExplicitFactRecord[] = docs
+                    .filter((doc: any) => isExplicitUserFactDoc(doc))
+                    .map((doc: any) => {
+                        const meta = doc?.metadata || {}
+                        const fact = parseExplicitFactFromContent(doc?.content || '')
+                        const savedAt = typeof meta?.saved_at === 'string'
+                            ? meta.saved_at
+                            : (typeof meta?.created_at === 'string' ? meta.created_at : null)
+                        const scope: 'session' | 'user' =
+                            session_id && String(meta?.session_id || '') === String(session_id)
+                                ? 'session'
+                                : 'user'
+                        return { fact, created_at: savedAt, scope }
+                    })
+                    .filter((item) => item.fact.length > 0)
+                explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(candidates), limit)
+                return explicitFactsCache
+            } catch (explicitFactError: any) {
+                console.error('explicit facts retrieval failed:', explicitFactError?.message || explicitFactError)
+                explicitFactsCache = []
+                return explicitFactsCache
+            }
+        }
+
+        const loadLatestExplicitFactFromCognitiveLogs = async (): Promise<ExplicitFactRecord | null> => {
+            try {
+                const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
+                const queryEmbedding = await embedder('Resumo salvo')
+                const buildCandidates = (docs: any[]): ExplicitFactRecord[] => {
+                    return docs
+                        .map((doc: any) => {
+                            const meta = doc?.metadata || {}
+                            const fact = parseExplicitFactFromCognitiveContent(doc?.content || '')
+                            if (!fact) return null
+                            const savedAt = typeof meta?.saved_at === 'string'
+                                ? meta.saved_at
+                                : (typeof meta?.created_at === 'string' ? meta.created_at : null)
+                            const scope: 'session' | 'user' =
+                                session_id && String(meta?.session_id || '') === String(session_id)
+                                    ? 'session'
+                                    : 'user'
+                            return { fact, created_at: savedAt, scope }
+                        })
+                        .filter((row: ExplicitFactRecord | null): row is ExplicitFactRecord => !!row)
+                        .sort((a, b) => {
+                            if (a.scope !== b.scope) return a.scope === 'session' ? -1 : 1
+                            const aTs = a.created_at ? Date.parse(a.created_at) : 0
+                            const bTs = b.created_at ? Date.parse(b.created_at) : 0
+                            const safeA = Number.isFinite(aTs) ? aTs : 0
+                            const safeB = Number.isFinite(bTs) ? bTs : 0
+                            return safeB - safeA
+                        })
+                }
+
+                // 1) Prioriza janela recente para responder "acabei de salvar".
+                // 2) Se não houver resultado, cai para histórico completo.
+                for (const timeWindowMinutes of [240, null] as Array<number | null>) {
+                    const filters = {
+                        tenant_id: userId,
+                        type_allowlist: ['chat_log', 'session_summary'],
+                        type_blocklist: [],
+                        artifact_kind: null,
+                        source_table: 'chat_messages',
+                        client_id: null,
+                        project_id: null,
+                        source_id: null,
+                        status: 'active',
+                        time_window_minutes: timeWindowMinutes,
+                    }
+                    const { data, error } = await supabaseAdmin.rpc('match_brain_documents', {
+                        query_embedding: queryEmbedding,
+                        match_count: 100,
+                        filters,
+                    })
+                    if (error) {
+                        throw new Error(`match_brain_documents cognitive fallback failed: ${error.message}`)
+                    }
+
+                    const docs = Array.isArray(data) ? data : []
+                    const candidates = buildCandidates(docs)
+                    if (candidates.length > 0) {
+                        return candidates[0]
+                    }
+                }
+
+                return null
+            } catch (cognitiveFallbackError: any) {
+                console.error('explicit fact cognitive fallback failed:', cognitiveFallbackError?.message || cognitiveFallbackError)
+                return null
+            }
         }
 
         const memoryWriteEvents: Array<{ stage: string; status: 'ok' | 'error'; id?: string; detail?: string }> = []
@@ -889,9 +1385,21 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             'conversas passadas',
             'conversa anterior',
         ])
+        const isExplicitMemoryRecallIntent = hasAny(query, [
+            'o que eu pedi para salvar',
+            'o que pedi para salvar',
+            'qual informacao eu pedi para salvar',
+            'qual informação eu pedi para salvar',
+            'acabei de pedir para salvar',
+            'qual foi a ultima informacao salva',
+            'qual foi a última informação salva',
+            'me lembra do que pedi para salvar',
+            'o que voce salvou',
+            'o que você salvou',
+        ])
 
         const shouldInjectCrossSessionMemory =
-            isPastConversationIntent || sessionMessages.length === 0
+            isPastConversationIntent || isExplicitMemoryRecallIntent || sessionMessages.length === 0
 
         // Resposta determinística para pergunta de memória sem histórico disponível.
         // Evita o modelo responder que "não tem acesso" ao histórico.
@@ -950,6 +1458,114 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             }
         }
 
+        // Recuperação determinística da última memória explícita salva.
+        // Evita inconsistência em perguntas diretas sobre "o que acabei de pedir para salvar?".
+        if (isExplicitMemoryRecallIntent) {
+            let latestFact: string | null = null
+            let latestScope: 'session' | 'user' | 'none' = 'none'
+            let latestSource:
+                | 'session_history'
+                | 'session_save_command'
+                | 'cross_session_history'
+                | 'cross_session_save_command'
+                | 'explicit_fact_store'
+                | 'cognitive_fallback'
+                | 'none' = 'none'
+            let recallCandidates = 0
+
+            const sessionHistoryFact = extractLatestExplicitFactFromMessages(sessionMessages, 'session')
+            if (sessionHistoryFact) {
+                latestFact = sessionHistoryFact.fact
+                latestScope = sessionHistoryFact.scope
+                latestSource = 'session_history'
+            }
+
+            if (!latestFact) {
+                const sessionSaveCommandFact = extractLatestExplicitSaveCommandFromMessages(sessionMessages, 'session')
+                if (sessionSaveCommandFact) {
+                    latestFact = sessionSaveCommandFact.fact
+                    latestScope = sessionSaveCommandFact.scope
+                    latestSource = 'session_save_command'
+                }
+            }
+
+            if (!latestFact && crossSessionMessages.length > 0) {
+                const crossSessionPlainMessages = crossSessionMessages.map((m) => ({
+                    role: m.role,
+                    content: m.content,
+                }))
+
+                const crossHistoryFact = extractLatestExplicitFactFromMessages(crossSessionPlainMessages, 'user')
+                if (crossHistoryFact) {
+                    latestFact = crossHistoryFact.fact
+                    latestScope = crossHistoryFact.scope
+                    latestSource = 'cross_session_history'
+                } else {
+                    const crossSaveCommandFact = extractLatestExplicitSaveCommandFromMessages(crossSessionPlainMessages, 'user')
+                    if (crossSaveCommandFact) {
+                        latestFact = crossSaveCommandFact.fact
+                        latestScope = crossSaveCommandFact.scope
+                        latestSource = 'cross_session_save_command'
+                    }
+                }
+            }
+
+            if (!latestFact) {
+                const recentFacts = await loadRecentExplicitFacts(6)
+                recallCandidates = recentFacts.length
+                const bestExplicitFact =
+                    recentFacts.find((item) => item.scope === 'session')
+                    || recentFacts[0]
+                    || null
+                if (bestExplicitFact) {
+                    latestFact = bestExplicitFact.fact
+                    latestScope = bestExplicitFact.scope
+                    latestSource = 'explicit_fact_store'
+                }
+
+                if (!latestFact) {
+                    const cognitiveFallbackFact = await loadLatestExplicitFactFromCognitiveLogs()
+                    if (cognitiveFallbackFact) {
+                        latestFact = cognitiveFallbackFact.fact
+                        latestScope = cognitiveFallbackFact.scope
+                        latestSource = 'cognitive_fallback'
+                    }
+                }
+            }
+
+            if (latestFact) {
+                const recallAnswer = `A última informação que você pediu para salvar foi: "${latestFact}".`
+                await persistCognitiveMemorySafe('assistant', recallAnswer, 'assistant_explicit_memory_recall_hit')
+                return new Response(JSON.stringify({
+                    answer: recallAnswer,
+                    documents: [],
+                    meta: {
+                        memory_recall: 'hit',
+                        memory_recall_scope: latestScope,
+                        memory_recall_source: latestSource,
+                        memory_recall_candidates: recallCandidates,
+                        memory_write_events: memoryWriteEvents,
+                    }
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                })
+            }
+
+            const recallMissAnswer = 'Não encontrei uma memória explícita salva recentemente para recuperar agora.'
+            await persistCognitiveMemorySafe('assistant', recallMissAnswer, 'assistant_explicit_memory_recall_miss')
+            return new Response(JSON.stringify({
+                answer: recallMissAnswer,
+                documents: [],
+                meta: {
+                    memory_recall: 'miss',
+                    memory_recall_scope: 'none',
+                    memory_write_events: memoryWriteEvents,
+                }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+        }
+
         // 2. Router Step
         const routerInput: RouterInput = {
             tenant_id: userId,
@@ -957,6 +1573,13 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             user_role: userRole,
             user_message: query,
         }
+
+        const isCompositeUserProjectCountIntent =
+            hasAny(query, ['quantos', 'quantas', 'total', 'totais', 'numero', 'número'])
+            && hasAny(query, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            && hasAny(query, ['projeto', 'projetos'])
+            && !isExplicitMemoryRecallIntent
+            && !isExplicitMemorySaveIntent(query)
 
         // LLM Router com Function Calling — o LLM escolhe qual RPC usar
         const availableTools = [
@@ -1247,6 +1870,24 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             {
                 type: "function" as const,
                 function: {
+                    name: "execute_adjust_financial_start_date",
+                    description: "Ajustar a data de início de faturamento de um contrato no financeiro (sem alterar a data de fechamento). Use para casos como 'contrato fechado em fevereiro, faturamento inicia em abril'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_acceptance_id: { type: "number", description: "ID do aceite/contrato. Opcional se p_company_name ou p_origin_reference_date for informado." },
+                            p_company_name: { type: "string", description: "Nome da empresa/cliente (partial match)." },
+                            p_billing_start_date: { type: "string", format: "date", description: "Data de início do faturamento no formato YYYY-MM-DD." },
+                            p_origin_reference_date: { type: "string", format: "date", description: "Mês de referência do fechamento do contrato (ex: último dia de fevereiro/2026) para resolver o último contrato daquele mês quando não houver nome." },
+                            p_notes: { type: "string", description: "Observação da alteração financeira." }
+                        },
+                        required: ["p_billing_start_date"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
                     name: "execute_batch_move_tasks",
                     description: "Mover TODAS as tarefas de um status para outro em um projeto (operação em lote). Use para 'mova todas as tarefas do backlog para em execução', 'mova tudo de X para Y no projeto Z'.",
                     parameters: {
@@ -1380,6 +2021,8 @@ Exemplos:
 - "defina o André como responsável pela tarefa X" → execute_update_task(p_task_title: "X", p_new_assignee: "André")
 - "mude o prazo da tarefa Y para 28/02" → execute_update_task(p_task_title: "Y", p_new_due_date: "2026-02-28")
 - "atualize a descrição da tarefa X no projeto Duarte Vinhos" → execute_update_task(p_task_title: "X", p_project_name: "Duarte Vinhos", p_new_description: "...")
+- "ajuste o início de faturamento do contrato da Dainese para abril de 2026" → execute_adjust_financial_start_date(p_company_name: "Dainese", p_billing_start_date: "2026-04-01")
+- "último contrato fechado em fevereiro, mas faturamento começa em abril; ajuste no financeiro" → execute_adjust_financial_start_date(p_origin_reference_date: "2026-02-28", p_billing_start_date: "2026-04-01")
 - "marque o projeto Duarte Vinhos como concluído" → execute_update_project_status(p_project_name: "Duarte Vinhos", p_new_status: "Inativo")
 - "pause o projeto Amplexo" → execute_update_project_status(p_project_name: "Amplexo", p_new_status: "Pausado")
 - "mova todas as tarefas do backlog para em execução no projeto Duarte Vinhos" → execute_batch_move_tasks(p_project_name: "Duarte Vinhos", p_from_status: "backlog", p_to_status: "in_progress")
@@ -1397,6 +2040,7 @@ Quando o usuário pedir para CRIAR tarefa/pendência/atividade, SEMPRE use execu
 Quando o usuário pedir para DELETAR/APAGAR/EXCLUIR tarefa, SEMPRE use execute_delete_task.
 Quando o usuário pedir para MOVER tarefa ou MUDAR STATUS de tarefa, use execute_move_task. Mapeie: "em execução"→in_progress, "aprovação"→approval, "finalizado/concluído/feito"→done, "pausado"→paused, "backlog"→backlog.
 Quando o usuário pedir para EDITAR/ATUALIZAR campos de tarefa (responsável, descrição, prazo, prioridade, título), use execute_update_task.
+Quando o usuário pedir para AJUSTAR/CORRIGIR início de faturamento/receita no financeiro, use execute_adjust_financial_start_date.
 Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use execute_update_project_status.
 Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
@@ -1469,6 +2113,7 @@ Retorne apenas function calls (sem texto livre).`
                     'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_move_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_adjust_financial_start_date': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_project_status': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_batch_move_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_batch_delete_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
@@ -1485,6 +2130,7 @@ Retorne apenas function calls (sem texto livre).`
                 // Complementa consultas em perguntas compostas para evitar respostas parciais.
                 const supplementalDbCalls = inferSupplementalDbCalls(input.user_message)
                 let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
+                dbCalls = enforceCompositeCoverage(input.user_message, dbCalls)
 
                 // Guardrail de intenção: consultas de tarefas devem sempre executar query_all_tasks
                 // e priorizá-la como chamada principal para evitar GenUI de projetos indevido.
@@ -1702,7 +2348,46 @@ Retorne apenas function calls (sem texto livre).`
             } as RouteDecision
         }
 
-        const decision = await routeRequestHybrid(routerInput, { callRouterLLM })
+        const forcedCompositeCalls: DbQueryCall[] = []
+        if (isCompositeUserProjectCountIntent) {
+            forcedCompositeCalls.push({ rpc_name: 'query_all_users', params: {} })
+            const projectParams: Record<string, any> = {}
+            if (hasAny(query, ['ativo', 'ativos', 'ativa', 'ativas'])) {
+                projectParams.p_status_filter = 'Ativo'
+            }
+            forcedCompositeCalls.push({ rpc_name: 'query_all_projects', params: projectParams })
+        }
+
+        const decision: RouteDecision = forcedCompositeCalls.length > 0
+            ? {
+                artifact_kind: 'project',
+                task_kind: 'factual_lookup',
+                risk_level: 'low',
+                agent: 'Agent_BrainOps',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                filters: {
+                    tenant_id: userId,
+                    type_allowlist: ['official_doc', 'session_summary'],
+                    type_blocklist: ['chat_log'],
+                    artifact_kind: null,
+                    source_table: null,
+                    client_id: null,
+                    project_id: null,
+                    source_id: null,
+                    status: 'active',
+                    time_window_minutes: null,
+                },
+                top_k: 0,
+                tools_allowed: ['db_read'],
+                tool_hint: 'db_query',
+                db_query_params: {
+                    rpc_name: '__batch__',
+                    calls: forcedCompositeCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                },
+                confidence: 0.99,
+                reason: 'Deterministic composite count route: users + projects',
+            } as RouteDecision
+            : await routeRequestHybrid(routerInput, { callRouterLLM })
         let effectiveDecision = forcedAgent
             ? {
                 ...decision,
@@ -1710,6 +2395,42 @@ Retorne apenas function calls (sem texto livre).`
                 reason: `${decision.reason} | forced_agent=${forcedAgent}`,
             }
             : decision
+
+        // Normalização global de chamadas DB (inclui decisões vindas do fallback heurístico),
+        // garantindo cobertura de consultas compostas e consistência de parâmetros.
+        if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
+            const parsedCalls: DbQueryCall[] = []
+            const rawDbParams: any = effectiveDecision.db_query_params
+
+            if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                for (const call of rawDbParams.calls) {
+                    if (!call || typeof call !== 'object' || typeof call.rpc_name !== 'string') continue
+                    const { rpc_name, ...params } = call
+                    if (!dbRpcNames.has(rpc_name)) continue
+                    parsedCalls.push({ rpc_name, params })
+                }
+            } else if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                const { rpc_name, ...params } = rawDbParams
+                parsedCalls.push({ rpc_name, params })
+            }
+
+            if (parsedCalls.length > 0) {
+                const supplementalDbCalls = inferSupplementalDbCalls(query)
+                let normalizedCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(parsedCalls, supplementalDbCalls)))
+                normalizedCalls = enforceCompositeCoverage(query, normalizedCalls)
+
+                const primary = normalizedCalls[0]
+                effectiveDecision = {
+                    ...effectiveDecision,
+                    db_query_params: normalizedCalls.length > 1
+                        ? {
+                            rpc_name: '__batch__',
+                            calls: normalizedCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                        }
+                        : { rpc_name: primary.rpc_name, ...primary.params },
+                }
+            }
+        }
 
         if (effectiveDecision.agent === 'Agent_MarketingTraffic') {
             const sanitizeTrafficCalls = (calls: DbQueryCall[]) =>
@@ -1770,6 +2491,90 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        if (isFinancialStartAdjustmentIntent && financialAdjustmentBillingStartDate) {
+            const adjustmentParams: Record<string, any> = {
+                p_billing_start_date: financialAdjustmentBillingStartDate,
+                p_notes: 'Ajuste solicitado via Segundo Cérebro (financeiro).',
+            }
+            if (financialAdjustmentCompanyHint) {
+                adjustmentParams.p_company_name = financialAdjustmentCompanyHint
+            }
+            if (financialAdjustmentOriginReferenceDate) {
+                adjustmentParams.p_origin_reference_date = financialAdjustmentOriginReferenceDate
+            }
+
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_Executor',
+                artifact_kind: 'ops',
+                tool_hint: 'db_query',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                tools_allowed: ['db_write'],
+                db_query_params: {
+                    rpc_name: 'execute_adjust_financial_start_date',
+                    ...adjustmentParams,
+                },
+                reason: `${effectiveDecision.reason} | financial_adjustment=execute_adjust_financial_start_date`,
+            }
+        }
+
+        if (isMonthlyGoalCheckIntent) {
+            const financialCall: DbQueryCall = {
+                rpc_name: 'query_financial_summary',
+                params: cleanRpcParams({
+                    p_reference_date: inferredReferenceDate || clientToday || runtimeToday,
+                    p_status: 'Ativo',
+                    ...(clientTimezone ? { p_reference_tz: clientTimezone } : {}),
+                }),
+            }
+
+            const existingCalls: DbQueryCall[] = []
+            if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
+                const rawDbParams: any = effectiveDecision.db_query_params
+                if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                    for (const call of rawDbParams.calls) {
+                        if (!call || typeof call !== 'object' || typeof call.rpc_name !== 'string') continue
+                        const { rpc_name, ...params } = call
+                        if (!dbRpcNames.has(rpc_name)) continue
+                        existingCalls.push({ rpc_name, params })
+                    }
+                } else if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                    const { rpc_name, ...params } = rawDbParams
+                    existingCalls.push({ rpc_name, params })
+                }
+            }
+
+            const mergedCalls = dedupeDbCalls(enrichDbCalls([financialCall, ...existingCalls]))
+            const primary = mergedCalls[0]
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_Proposals',
+                artifact_kind: 'proposal',
+                tool_hint: 'db_query',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                tools_allowed: ['db_read', 'rag_search'],
+                db_query_params: mergedCalls.length > 1
+                    ? {
+                        rpc_name: '__batch__',
+                        calls: mergedCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                    }
+                    : { rpc_name: primary.rpc_name, ...primary.params },
+                reason: `${effectiveDecision.reason} | monthly_goal_check=db_financial_summary`,
+            }
+        }
+
+        if (shouldForceStrategicRag && effectiveDecision.tool_hint === 'db_query') {
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_BrainOps',
+                tool_hint: 'rag_search',
+                db_query_params: undefined,
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                top_k: Math.max(8, effectiveDecision.top_k || 8),
+                reason: `${effectiveDecision.reason} | strategic_intent_override=rag_search`,
+            }
+        }
+
         const isTrafficAgentContext = effectiveDecision.agent === 'Agent_MarketingTraffic'
 
         console.log(`[Router] Decision: ${effectiveDecision.agent} (Risk: ${effectiveDecision.risk_level})`)
@@ -1796,6 +2601,10 @@ Retorne apenas function calls (sem texto livre).`
         let cognitiveMemoryContext = ''
         let explicitUserFacts: string[] = []
         let executedDbRpcs: string[] = []
+        let monthlyGoalComparison: Record<string, any> | null = null
+        let strategicLexicalFallbackAttempted = false
+        let strategicLexicalFallbackDocsCount = 0
+        let strategicLexicalFallbackError: string | null = null
         const isTaskFocusedQueryForGenUi = hasAny(query, [
             'tarefa', 'tarefas',
             'pendencia', 'pendência', 'pendente', 'pendentes',
@@ -1809,6 +2618,19 @@ Retorne apenas function calls (sem texto livre).`
             'cargo', 'funcao', 'função', 'papel',
             'presidente', 'fundador', 'dono', 'diretor executivo'
         ])
+        const isCountOnlyIntent = hasAny(query, [
+            'quantos', 'quantas', 'total', 'totais', 'numero', 'número',
+        ]) && !hasAny(query, [
+            'analise', 'análise', 'compare', 'comparar', 'tendencia', 'tendência',
+            'estrategia', 'estratégia', 'motivo', 'por que', 'por quê',
+        ])
+        const canUseDbCountFastPath =
+            effectiveDecision.tool_hint === 'db_query'
+            && isCountOnlyIntent
+            && !isPastConversationIntent
+            && !isLeadershipQuery
+            && !isExplicitMemoryRecallIntent
+            && !isExplicitMemorySaveIntent(query)
         let explicitLeadershipFact: string | null = null
         const leadershipHintRegex = /(ceo|cto|cfo|coo|cmo|cio|presidente|diretor executivo|fundador|dono)/i
 
@@ -1825,6 +2647,7 @@ Retorne apenas function calls (sem texto livre).`
             'execute_delete_task',
             'execute_move_task',
             'execute_update_task',
+            'execute_adjust_financial_start_date',
             'execute_update_project_status',
             'execute_batch_move_tasks',
             'execute_batch_delete_tasks',
@@ -1964,11 +2787,28 @@ Retorne apenas function calls (sem texto livre).`
                             normalizedData = normalizedData.map((row: any) => ({
                                 ...row,
                                 acceptance_id: acceptanceByCompany.get(String(row?.company_name || '').trim()) ?? null,
+                                acceptance_timestamp:
+                                    acceptanceRows.find((acc: any) => String(acc?.company_name || '').trim() === String(row?.company_name || '').trim())?.timestamp
+                                    ?? null,
                             }))
                         }
                     }
                 } catch (enrichmentError) {
                     console.error('query_all_projects enrichment failed:', enrichmentError)
+                }
+
+                if (isRecentApprovedProjectIntent(query)) {
+                    const wantsActiveStatus = hasAny(query, ['ativo', 'ativos', 'ativa', 'ativas'])
+                    const cutoffMs = Date.now() - (recentProjectWindowDays * 24 * 60 * 60 * 1000)
+                    normalizedData = normalizedData.filter((row: any) => {
+                        const rawTs = row?.acceptance_timestamp || row?.created_at || null
+                        if (!rawTs) return false
+                        const ts = new Date(rawTs).getTime()
+                        if (Number.isNaN(ts)) return false
+                        const statusNorm = normalizeText(String(row?.client_status || ''))
+                        const statusOk = !wantsActiveStatus || statusNorm === 'ativo'
+                        return ts >= cutoffMs && statusOk
+                    })
                 }
             }
 
@@ -2020,7 +2860,7 @@ Retorne apenas function calls (sem texto livre).`
                     'get_canonical_corporate_docs',
                     {
                         query_embedding: queryEmbedding,
-                        p_user_role: userRole,
+                        p_user_role: normalizeText(userRole || '') === 'gestor' ? 'gestão' : userRole,
                         p_top_k: 6,
                     }
                 )
@@ -2106,6 +2946,58 @@ Retorne apenas function calls (sem texto livre).`
 
                 retrievedDocs = docs
 
+                const mergeUniqueDocs = (primary: any[], secondary: any[]) => {
+                    const merged: any[] = []
+                    const seen = new Set<string>()
+                    const pushDoc = (doc: any, prefix: string) => {
+                        if (!doc) return
+                        const idKey = String(doc?.id || '').trim()
+                        const contentKey = String(doc?.content || '').trim().slice(0, 140)
+                        const key = idKey || `${prefix}:${contentKey}`
+                        if (!key || seen.has(key)) return
+                        seen.add(key)
+                        merged.push(doc)
+                    }
+                    for (const doc of primary) pushDoc(doc, 'p')
+                    for (const doc of secondary) pushDoc(doc, 's')
+                    return merged
+                }
+
+                let lexicalDocsMapped: any[] = []
+                if (strategicIntentKeywords.length > 0) {
+                    strategicLexicalFallbackAttempted = true
+                    const { data: lexicalDocsRaw, error: lexicalDocsError } = await supabaseAdmin.rpc(
+                        'search_strategic_context_docs',
+                        {
+                            p_keywords: strategicIntentKeywords,
+                            p_limit: 8,
+                            p_user_tenant_id: userId,
+                        }
+                    )
+
+                    if (lexicalDocsError) {
+                        strategicLexicalFallbackError = lexicalDocsError.message
+                        console.error('[RAG] strategic lexical fallback failed:', lexicalDocsError.message)
+                    } else if (Array.isArray(lexicalDocsRaw) && lexicalDocsRaw.length > 0) {
+                        lexicalDocsMapped = lexicalDocsRaw.map((row: any) => ({
+                            id: row?.id,
+                            content: String(row?.content || '').trim(),
+                            metadata: {
+                                ...(row?.metadata || {}),
+                                source_scope: row?.source_scope || null,
+                                retrieval_origin: 'strategic_lexical_fallback',
+                            },
+                            similarity: null,
+                        })).filter((row: any) => row.content.length > 0)
+                        strategicLexicalFallbackDocsCount = lexicalDocsMapped.length
+                    }
+                }
+
+                if (lexicalDocsMapped.length > 0) {
+                    // For strategic intents, lexical matches are prioritized and then merged with vector docs.
+                    retrievedDocs = mergeUniqueDocs(lexicalDocsMapped, retrievedDocs)
+                }
+
                 if (!retrievedDocs.length) {
                     return `CONSULTA REALIZADA NA ${label.toUpperCase()}, mas nenhum documento relevante foi encontrado para esta pergunta.`
                 }
@@ -2190,7 +3082,9 @@ Retorne apenas function calls (sem texto livre).`
         }
 
         // Canonical retrieval — executado ANTES de qualquer outra busca.
-        const { text: canonicalBlock, count: canonicalDocsCount } = await runCanonicalRetrieval()
+        const { text: canonicalBlock, count: canonicalDocsCount } = canUseDbCountFastPath
+            ? { text: '', count: 0 }
+            : await runCanonicalRetrieval()
 
         if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
             // === SQL DIRETO (listagens, contagens, filtros exatos) ===
@@ -2319,6 +3213,50 @@ Retorne apenas function calls (sem texto livre).`
                     sections.push(`CONSULTA COMPLEMENTAR (MEMÓRIA VETORIAL):\n${leadershipVectorContext}`)
                 }
 
+                if (isMonthlyGoalCheckIntent) {
+                    const strategicGoalContext = await runVectorRetrieval({
+                        topK: 8,
+                        overrideFilters: {
+                            artifact_kind: null,
+                            source_table: ['corporate_identity', 'user_facts'],
+                            type_allowlist: ['official_doc', 'session_summary'],
+                            type_blocklist: ['chat_log'],
+                            status: 'active',
+                        },
+                        retrievalLabel: 'base vetorial de metas estratégicas',
+                    })
+                    sections.push(`CONSULTA COMPLEMENTAR (METAS ESTRATÉGICAS):\n${strategicGoalContext}`)
+
+                    const financialRows = Array.isArray(rawDbRecordsByRpcForGenUI['query_financial_summary'])
+                        ? rawDbRecordsByRpcForGenUI['query_financial_summary']
+                        : []
+                    if (financialRows.length > 0) {
+                        const financeRecord = financialRows[0] || {}
+                        const rawMrr = Number(
+                            financeRecord?.totals?.mrr
+                            ?? financeRecord?.mrr
+                            ?? financeRecord?.receita_recorrente
+                            ?? 0
+                        )
+                        const realizedMrr = Number.isFinite(rawMrr) ? rawMrr : 0
+                        const targetMrr = extractMrrTargetFromStrategicDocs(retrievedDocs)
+                        const attained = targetMrr && targetMrr > 0 ? realizedMrr >= targetMrr : null
+                        const attainmentPct = targetMrr && targetMrr > 0
+                            ? Number(((realizedMrr / targetMrr) * 100).toFixed(2))
+                            : null
+
+                        monthlyGoalComparison = {
+                            reference_date: inferredReferenceDate || clientToday || runtimeToday,
+                            realized_mrr: Number(realizedMrr.toFixed(2)),
+                            target_mrr: targetMrr ? Number(targetMrr.toFixed(2)) : null,
+                            attained,
+                            attainment_pct: attainmentPct,
+                            target_source: targetMrr ? 'strategic_docs' : 'not_found',
+                        }
+                        sections.push(`ANÁLISE DETERMINÍSTICA DE META MENSAL:\n${JSON.stringify(monthlyGoalComparison, null, 2)}`)
+                    }
+                }
+
                 contextText = sections.join('\n\n')
             }
         } else {
@@ -2326,8 +3264,66 @@ Retorne apenas function calls (sem texto livre).`
             contextText = await runVectorRetrieval()
         }
 
-        // Guardrail global: sempre consultar memória cognitiva antes de responder.
-        cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+        // Fast-path para consultas de contagem puramente estruturadas:
+        // evita custo/latência de retrieval cognitivo quando não agrega precisão.
+        if (canUseDbCountFastPath) {
+            cognitiveMemoryContext = 'CONSULTA DE MEMÓRIA COGNITIVA: pulada por fast-path determinístico de contagem SQL.'
+        } else {
+            // Guardrail global padrão: consultar memória cognitiva antes de responder.
+            cognitiveMemoryContext = await runCognitiveMemoryRetrieval()
+        }
+        if (isPastConversationIntent || isLeadershipQuery) {
+            const recentExplicitFacts = await loadRecentExplicitFacts(6)
+            if (recentExplicitFacts.length > 0) {
+                const mergedFacts = Array.from(new Set([
+                    ...explicitUserFacts,
+                    ...recentExplicitFacts.map((item) => item.fact),
+                ]))
+                explicitUserFacts = mergedFacts.slice(0, 6)
+
+                if (!explicitLeadershipFact) {
+                    const leadershipFact = recentExplicitFacts.find((item) => leadershipHintRegex.test(item.fact))
+                    if (leadershipFact) {
+                        explicitLeadershipFact = leadershipFact.fact
+                    }
+                }
+            }
+        }
+
+        const countRows = (value: any): any[] => (Array.isArray(value) ? value : [])
+        const countActiveProjects = (rows: any[]): number => {
+            if (!Array.isArray(rows) || rows.length === 0) return 0
+            const activeRows = rows.filter((row: any) => {
+                const status = normalizeText(String(row?.client_status || row?.status || row?.project_status || ''))
+                return status === 'ativo'
+            })
+            return activeRows.length > 0 ? activeRows.length : rows.length
+        }
+
+        const buildDeterministicDbCountAnswer = (): string | null => {
+            if (!canUseDbCountFastPath) return null
+            if (executedDbRpcs.some((rpc) => executorRpcNames.has(rpc))) return null
+
+            const wantsUsers = hasAny(query, ['usuario', 'usuário', 'usuarios', 'usuários', 'colaborador', 'colaboradores', 'equipe', 'time'])
+            const wantsProjects = hasAny(query, ['projeto', 'projetos'])
+
+            const usersRows = countRows(rawDbRecordsByRpcForGenUI['query_all_users'])
+            const projectRows = countRows(rawDbRecordsByRpcForGenUI['query_all_projects'])
+            const usersCount = usersRows.length
+            const activeProjectsCount = countActiveProjects(projectRows)
+
+            if (wantsUsers && wantsProjects && (usersRows.length > 0 || projectRows.length > 0)) {
+                return `Hoje temos ${usersCount} usuários cadastrados e ${activeProjectsCount} projetos ativos no sistema.`
+            }
+            if (wantsUsers && usersRows.length > 0) {
+                return `Hoje temos ${usersCount} usuários cadastrados no sistema.`
+            }
+            if (wantsProjects && projectRows.length > 0) {
+                return `Hoje temos ${activeProjectsCount} projetos ativos no sistema.`
+            }
+
+            return null
+        }
 
         // 4. Generation Step — com identidade do usuário e histórico
         const agentName = (effectiveDecision.agent as any) || "Agent_Projects"
@@ -2355,6 +3351,8 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
 - Para perguntas de faturamento/MRR/ARR, use apenas números explícitos da consulta SQL financeira (query_financial_summary). Nunca derive valores financeiros de listas de projetos sem valor.
 - Se a consulta financeira indicar contratos ativos sem mensalidade cadastrada, destaque essa limitação e informe que o MRR/ARR pode estar subestimado.
+- Se houver o bloco "ANÁLISE DETERMINÍSTICA DE META MENSAL", priorize esse bloco para concluir se a meta foi atingida.
+- Em perguntas de meta mensal (ex: "batemos a meta de fevereiro?"), explicite a data de referência usada (YYYY-MM-DD). Se houver meta numérica explícita no contexto, conclua com SIM/NÃO na primeira frase e mostre a conta de atingimento. Se não houver meta mensal explícita, diga isso e informe o realizado do mês.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
 ${hasGenUiData
@@ -2437,6 +3435,8 @@ ${identityBlock}
 ${responseStyleBlock}
 
 ${consolidatedMemoryBlock}
+${crossSessionMemoryBlock}
+${explicitLeadershipFactBlock}
 
 === CAMADA 1: MEMÓRIA VOLÁTIL (HISTÓRICO DA SESSÃO) ===
 O histórico abaixo é o contexto imediato da nossa conversa atual.
@@ -2457,35 +3457,44 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         // Mensagem atual do usuário
         messages.push({ role: 'user', content: query })
 
-        const chatResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: messages as any,
-            temperature: 0.1
-        })
+        const deterministicDbAnswer = buildDeterministicDbCountAnswer()
+        let usedDeterministicDbAnswer = false
+        let answer = ''
 
-        const endTime = performance.now()
-        totalLatencyMs = Math.round(endTime - startTime)
-        const usage = chatResponse.usage
-        if (usage) {
-            const mainModel = 'gpt-4o'; // Modelo principal dos agentes
-            const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
-                (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
+        if (deterministicDbAnswer) {
+            answer = deterministicDbAnswer
+            usedDeterministicDbAnswer = true
+        } else {
+            const chatResponse = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: messages as any,
+                temperature: 0.1
+            })
 
-            totalInputTokens += usage.prompt_tokens;
-            totalOutputTokens += usage.completion_tokens;
-            totalCostEst += chatCost;
+            const endTime = performance.now()
+            totalLatencyMs = Math.round(endTime - startTime)
+            const usage = chatResponse.usage
+            if (usage) {
+                const mainModel = 'gpt-4o'; // Modelo principal dos agentes
+                const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
+                    (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
 
-            modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
-            modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
-            modelUsage['gpt-4o'].cost += chatCost;
+                totalInputTokens += usage.prompt_tokens;
+                totalOutputTokens += usage.completion_tokens;
+                totalCostEst += chatCost;
+
+                modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
+                modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
+                modelUsage['gpt-4o'].cost += chatCost;
+            }
+
+            answer = chatResponse.choices[0].message.content || ''
         }
-
-        let answer = chatResponse.choices[0].message.content || ''
         let suggestedSessionTitle: string | null = null
 
         const llmGeneratedGenUi = /"type"\s*:\s*"(?:task_list|project_list|client_list|proposal_list|user_list|access_list)"/.test(answer);
 
-        if (isTrafficAgentContext && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && rpcNameForGenUI === 'query_all_tasks') {
+        if (!usedDeterministicDbAnswer && isTrafficAgentContext && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && rpcNameForGenUI === 'query_all_tasks') {
             // Traffic Agent: filtrar tasks pelo cliente/projeto mencionado na query antes de injetar GenUI.
             const normalizedQuery = normalizeText(query)
             const trafficFilteredTasks = rawDbRecordsForGenUI.filter((task: any) => {
@@ -2500,7 +3509,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
         }
 
         // FORÇA BRUTA: Injetar componente UI na resposta final via backend (apenas para agentes não-Traffic)
-        if (hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && !isTrafficAgentContext) {
+        if (!usedDeterministicDbAnswer && hasGenUiData && rawDbRecordsForGenUI && Array.isArray(rawDbRecordsForGenUI) && rawDbRecordsForGenUI.length > 0 && !llmGeneratedGenUi && !isTrafficAgentContext) {
             // ANTI-DUPLICAÇÃO: Remover blocos ```json que o LLM já tenha gerado por conta própria
             // ou blocos de json truncados, para evitar duplicação com a injenção do GenUI
             answer = answer.replace(/```json[\s\S]*?(?:```|$)/g, '').trim();
@@ -2737,7 +3746,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             return sanitizeSessionTitle(base)
         }
 
-        const shouldSuggestSessionTitle = !!session_id && sessionMessages.length <= 1 && query.trim().length >= 8
+        const shouldSuggestSessionTitle = !!session_id && sessionMessages.length <= 1 && query.trim().length >= 8 && !usedDeterministicDbAnswer
         if (shouldSuggestSessionTitle) {
             try {
                 const titleResponse = await openai.chat.completions.create({
@@ -2844,6 +3853,17 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 normative_governance_enabled: normativeGovernanceEnabled,
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
+                financial_start_adjustment_intent: isFinancialStartAdjustmentIntent,
+                financial_adjustment_billing_start_date: financialAdjustmentBillingStartDate,
+                financial_adjustment_origin_reference_date: financialAdjustmentOriginReferenceDate,
+                financial_adjustment_company_hint: financialAdjustmentCompanyHint,
+                monthly_goal_check_intent: isMonthlyGoalCheckIntent,
+                monthly_goal_reference_date: isMonthlyGoalCheckIntent ? (inferredReferenceDate || clientToday || runtimeToday) : null,
+                monthly_goal_comparison: monthlyGoalComparison,
+                strategic_intent_keywords: strategicIntentKeywords,
+                strategic_lexical_fallback_attempted: strategicLexicalFallbackAttempted,
+                strategic_lexical_docs_loaded: strategicLexicalFallbackDocsCount,
+                ...(strategicLexicalFallbackError ? { strategic_lexical_fallback_error: strategicLexicalFallbackError } : {}),
                 memory_write_events: memoryWriteEvents,
                 latency_ms: totalLatencyMs,
                 cost_est: totalCostEst,

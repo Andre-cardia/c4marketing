@@ -80,6 +80,40 @@ interface Suggestion {
     total_tasks?: number;
 }
 
+interface MemorySLOTargets {
+    recall_hit_rate_min: number;
+    critical_canary_failures_max: number;
+}
+
+interface MemorySLORecall {
+    total_requests: number;
+    hits: number;
+    misses: number;
+    hit_rate: number | null;
+}
+
+interface MemorySLOCanary {
+    runs: number;
+    critical_failures: number;
+    last_status: string;
+    last_run_at: string | null;
+}
+
+interface MemorySLOAlerts {
+    recall_below_slo: boolean;
+    canary_critical_failures: boolean;
+    overall: 'ok' | 'alert' | 'no_data' | string;
+}
+
+interface MemorySLOSummary {
+    period_days: number;
+    cutoff_date: string;
+    targets: MemorySLOTargets;
+    recall: MemorySLORecall;
+    canary: MemorySLOCanary;
+    alerts: MemorySLOAlerts;
+}
+
 // ─── Task Telemetry Types ──────────────────────────────────────────────────────
 
 interface TaskSummary {
@@ -211,6 +245,8 @@ const BrainTelemetry: React.FC = () => {
     const [taskDays, setTaskDays] = useState<Period>(30);
     const [summary, setSummary] = useState<TelemetrySummary | null>(null);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [memorySlo, setMemorySlo] = useState<MemorySLOSummary | null>(null);
+    const [memorySloError, setMemorySloError] = useState<string | null>(null);
     const [taskTelemetry, setTaskTelemetry] = useState<TaskTelemetry | null>(null);
     const [loading, setLoading] = useState(true);
     const [taskLoading, setTaskLoading] = useState(false);
@@ -237,13 +273,20 @@ const BrainTelemetry: React.FC = () => {
     const fetchData = useCallback(async (selectedDays: Period) => {
         setLoading(true);
         setError(null);
+        setMemorySloError(null);
         try {
             const [
                 { data: summaryData, error: summaryErr },
                 { data: suggestionsData, error: suggestionsErr },
+                { data: memorySloData, error: memorySloErr },
             ] = await Promise.all([
                 supabase.rpc('query_telemetry_summary', { p_days: selectedDays }),
                 supabase.rpc('query_autonomy_suggestions'),
+                supabase.rpc('query_memory_slo', {
+                    p_days: 1,
+                    p_target_recall_hit_rate: 95,
+                    p_max_critical_canary_failures: 0,
+                }),
             ]);
 
             if (summaryErr) throw summaryErr;
@@ -251,6 +294,11 @@ const BrainTelemetry: React.FC = () => {
 
             setSummary(summaryData as TelemetrySummary);
             setSuggestions((suggestionsData as Suggestion[]) || []);
+            if (memorySloErr) {
+                setMemorySloError(memorySloErr.message || 'Erro ao carregar SLO de memoria.');
+            } else {
+                setMemorySlo(memorySloData as MemorySLOSummary);
+            }
         } catch (err: any) {
             setError(err.message || 'Erro ao carregar dados de telemetria.');
         } finally {
@@ -319,6 +367,7 @@ const BrainTelemetry: React.FC = () => {
     }));
 
     const maxProjectCount = Math.max(...(summary?.most_active_projects || []).map((p) => p.count), 1);
+    const memorySloAlert = memorySlo?.alerts?.overall === 'alert';
 
     // ── Suggestion badge config ───────────────────────────────────────────────
 
@@ -402,6 +451,71 @@ const BrainTelemetry: React.FC = () => {
                     bgColor="bg-orange-50 dark:bg-orange-900/20"
                     sub="por execução"
                 />
+            </div>
+
+            {/* ── Memory SLO ── */}
+            <div
+                className={`rounded-2xl border p-4 ${
+                    memorySloAlert
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                        : 'bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800'
+                }`}
+            >
+                <div className="flex items-center gap-2 mb-3">
+                    <ShieldAlert size={16} className={memorySloAlert ? 'text-red-500' : 'text-brand-coral'} />
+                    <h2 className="text-sm font-bold text-neutral-800 dark:text-white">SLO Memoria Cognitiva (24h)</h2>
+                    {memorySlo?.alerts?.overall && (
+                        <span
+                            className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                                memorySloAlert
+                                    ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
+                                    : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300'
+                            }`}
+                        >
+                            {memorySlo.alerts.overall.toUpperCase()}
+                        </span>
+                    )}
+                </div>
+
+                {memorySloError ? (
+                    <p className="text-xs text-red-500">{memorySloError}</p>
+                ) : !memorySlo ? (
+                    <p className="text-xs text-neutral-400">SLO de memoria ainda nao disponivel.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
+                            <p className="text-neutral-500 dark:text-neutral-400">Recall hit-rate</p>
+                            <p className="text-lg font-bold text-neutral-900 dark:text-white">
+                                {typeof memorySlo.recall.hit_rate === 'number'
+                                    ? `${memorySlo.recall.hit_rate.toFixed(2)}%`
+                                    : 'n/a'}
+                            </p>
+                            <p className="text-neutral-400">
+                                alvo {'>='} {memorySlo.targets.recall_hit_rate_min}% | total {memorySlo.recall.total_requests}
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
+                            <p className="text-neutral-500 dark:text-neutral-400">Falhas criticas de canario</p>
+                            <p className="text-lg font-bold text-neutral-900 dark:text-white">
+                                {memorySlo.canary.critical_failures}
+                            </p>
+                            <p className="text-neutral-400">
+                                max {memorySlo.targets.critical_canary_failures_max} | runs {memorySlo.canary.runs}
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/50">
+                            <p className="text-neutral-500 dark:text-neutral-400">Ultimo canario</p>
+                            <p className="text-sm font-bold text-neutral-900 dark:text-white">
+                                {memorySlo.canary.last_status || 'no_data'}
+                            </p>
+                            <p className="text-neutral-400">
+                                {memorySlo.canary.last_run_at
+                                    ? new Date(memorySlo.canary.last_run_at).toLocaleString('pt-BR')
+                                    : 'sem registro'}
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ── KPI Cards — tokens ── */}

@@ -25,7 +25,6 @@ BEGIN
   LIMIT p_limit;
 END;
 $$;
-
 -- 2. Update sync queue item status
 CREATE OR REPLACE FUNCTION public.update_sync_item_status(
   p_id bigint,
@@ -45,7 +44,6 @@ BEGIN
   WHERE id = p_id;
 END;
 $$;
-
 -- 3. Upsert brain document (replaces old + inserts new, with embedding)
 --    We already have insert_brain_document, but let's make sure it handles dedup.
 --    (Already created in 20260216_update_brain_insert.sql, just granting here)

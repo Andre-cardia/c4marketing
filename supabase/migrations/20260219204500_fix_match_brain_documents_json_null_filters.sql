@@ -160,5 +160,4 @@ AS $$
     d.embedding OPERATOR(extensions.<=>) query_embedding
   LIMIT match_count;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.match_brain_documents(extensions.vector, int, jsonb) TO authenticated, service_role;

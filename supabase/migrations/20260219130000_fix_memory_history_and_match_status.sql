@@ -31,9 +31,7 @@ AS $$
   ORDER BY m.created_at DESC
   LIMIT GREATEST(COALESCE(p_limit, 20), 1);
 $$;
-
 GRANT EXECUTE ON FUNCTION public.get_user_recent_history(uuid, int, uuid) TO service_role;
-
 CREATE OR REPLACE FUNCTION public.match_brain_documents(
   query_embedding vector(1536),
   match_count int,

@@ -110,10 +110,7 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_batch_move_tasks TO authenticated, service_role;
-
-
 -- ============================================================
 -- 2. execute_batch_delete_tasks  (deletar todas as tarefas de um status)
 -- ============================================================
@@ -213,5 +210,4 @@ BEGIN
             CASE WHEN v_client_name IS NOT NULL THEN ' no projeto ' || v_client_name ELSE '' END)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_batch_delete_tasks TO authenticated, service_role;

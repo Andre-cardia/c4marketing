@@ -86,6 +86,5 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_all_projects TO authenticated;
 GRANT EXECUTE ON FUNCTION public.query_all_projects TO service_role;

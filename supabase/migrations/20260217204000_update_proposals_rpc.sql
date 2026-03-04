@@ -4,7 +4,6 @@
 -- ============================================================
 
 DROP FUNCTION IF EXISTS public.query_all_proposals();
-
 CREATE OR REPLACE FUNCTION public.query_all_proposals(
   p_status_filter text DEFAULT 'all' -- 'all', 'open', 'accepted'
 )
@@ -42,5 +41,4 @@ BEGIN
   RETURN COALESCE(result, '[]'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_all_proposals(text) TO authenticated, service_role;

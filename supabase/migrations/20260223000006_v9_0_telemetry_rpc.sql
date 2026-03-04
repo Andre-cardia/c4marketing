@@ -92,10 +92,7 @@ BEGIN
         'most_active_projects', coalesce(v_top_projects, '[]'::jsonb)
     );
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.query_telemetry_summary TO authenticated, service_role;
-
-
 -- ============================================================
 -- 2. query_autonomy_suggestions  (sugestões proativas do agente)
 -- ============================================================
@@ -187,5 +184,4 @@ BEGIN
 
     RETURN v_suggestions;
 END; $$;
-
 GRANT EXECUTE ON FUNCTION public.query_autonomy_suggestions TO authenticated, service_role;

@@ -154,5 +154,4 @@ BEGIN
   RETURN COALESCE(result, '{}'::json);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.query_financial_summary(date, text, text, text) TO authenticated, service_role;
