@@ -154,10 +154,34 @@ const Users: React.FC = () => {
     };
 
     const handleDeleteUser = async (id: string) => {
-        if (!confirm('Tem certeza que deseja remover este usuário?')) return;
-        const { error } = await supabase.from('app_users').delete().eq('id', id);
-        if (error) alert('Erro ao deletar.');
-        else fetchUsers();
+        if (!confirm('Tem certeza que deseja remover este usuário? Ele será excluído do sistema de autenticação e não poderá mais fazer login.')) return;
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ userId: id }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Erro ao deletar usuário.');
+            }
+
+            fetchUsers();
+        } catch (error: any) {
+            console.error('Error deleting user:', error);
+            alert(`Erro ao deletar: ${error.message}`);
+        }
     };
 
     const handleUpdateRole = async (userId: string, newRole: string) => {
