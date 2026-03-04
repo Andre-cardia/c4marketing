@@ -288,6 +288,32 @@ Deno.serve(async (req) => {
             return terms.some((term) => normalized.includes(normalizeText(term)))
         }
 
+        const extractStrategicIntentKeywords = (text: string): string[] => {
+            const normalized = normalizeText(text)
+            const base: string[] = []
+
+            const add = (...values: string[]) => {
+                for (const value of values) {
+                    const norm = normalizeText(value).trim()
+                    if (!norm || base.includes(norm)) continue
+                    base.push(norm)
+                }
+            }
+
+            if (hasAny(normalized, ['missao'])) add('missao', 'missão')
+            if (hasAny(normalized, ['visao'])) add('visao', 'visão')
+            if (hasAny(normalized, ['valores', 'valor'])) add('valores')
+            if (hasAny(normalized, ['end game', 'endgame'])) add('end game', 'endgame')
+            if (hasAny(normalized, ['meta', 'metas', 'objetivo', 'objetivos'])) add('meta', 'metas', 'objetivo')
+            if (hasAny(normalized, ['financeir', 'mrr', 'arr', 'receita'])) add('financeira', 'financeiro', 'mrr', 'arr', 'receita')
+            if (hasAny(normalized, ['comercial', 'vendas', 'pipeline'])) add('comercial', 'vendas', 'pipeline')
+            if (hasAny(normalized, ['operacion', 'operacional', 'operacao', 'operação'])) add('operacional', 'operacao', 'operação')
+            if (hasAny(normalized, ['estrateg', 'estratég'])) add('estrategia', 'estratégia')
+            if (hasAny(normalized, ['c4'])) add('c4', 'c4 marketing')
+
+            return base
+        }
+
         const toIsoDate = (year: number, month: number, day: number): string | null => {
             if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
             const dt = new Date(Date.UTC(year, month - 1, day))
@@ -374,6 +400,21 @@ Deno.serve(async (req) => {
         }
 
         const inferredReferenceDate = extractReferenceDateFromText(query)
+        const strategicIntentKeywords = extractStrategicIntentKeywords(query)
+        const hasStrategicCoreTerms = hasAny(query, [
+            'missao',
+            'missão',
+            'visao',
+            'visão',
+            'valores',
+            'end game',
+            'endgame',
+            'end-game',
+        ])
+        const hasStrategicGoalTerms =
+            hasAny(query, ['meta', 'metas', 'objetivo', 'objetivos']) &&
+            hasAny(query, ['financeir', 'comercial', 'operacion', 'estrateg'])
+        const shouldForceStrategicRag = hasStrategicCoreTerms || hasStrategicGoalTerms
 
         const isTruthyFlag = (value: string | null | undefined) =>
             ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
@@ -2269,6 +2310,18 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        if (shouldForceStrategicRag && effectiveDecision.tool_hint === 'db_query') {
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_BrainOps',
+                tool_hint: 'rag_search',
+                db_query_params: undefined,
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                top_k: Math.max(8, effectiveDecision.top_k || 8),
+                reason: `${effectiveDecision.reason} | strategic_intent_override=rag_search`,
+            }
+        }
+
         const isTrafficAgentContext = effectiveDecision.agent === 'Agent_MarketingTraffic'
 
         console.log(`[Router] Decision: ${effectiveDecision.agent} (Risk: ${effectiveDecision.risk_level})`)
@@ -2295,6 +2348,9 @@ Retorne apenas function calls (sem texto livre).`
         let cognitiveMemoryContext = ''
         let explicitUserFacts: string[] = []
         let executedDbRpcs: string[] = []
+        let strategicLexicalFallbackAttempted = false
+        let strategicLexicalFallbackDocsCount = 0
+        let strategicLexicalFallbackError: string | null = null
         const isTaskFocusedQueryForGenUi = hasAny(query, [
             'tarefa', 'tarefas',
             'pendencia', 'pendência', 'pendente', 'pendentes',
@@ -2634,6 +2690,58 @@ Retorne apenas function calls (sem texto livre).`
                 }
 
                 retrievedDocs = docs
+
+                const mergeUniqueDocs = (primary: any[], secondary: any[]) => {
+                    const merged: any[] = []
+                    const seen = new Set<string>()
+                    const pushDoc = (doc: any, prefix: string) => {
+                        if (!doc) return
+                        const idKey = String(doc?.id || '').trim()
+                        const contentKey = String(doc?.content || '').trim().slice(0, 140)
+                        const key = idKey || `${prefix}:${contentKey}`
+                        if (!key || seen.has(key)) return
+                        seen.add(key)
+                        merged.push(doc)
+                    }
+                    for (const doc of primary) pushDoc(doc, 'p')
+                    for (const doc of secondary) pushDoc(doc, 's')
+                    return merged
+                }
+
+                let lexicalDocsMapped: any[] = []
+                if (strategicIntentKeywords.length > 0) {
+                    strategicLexicalFallbackAttempted = true
+                    const { data: lexicalDocsRaw, error: lexicalDocsError } = await supabaseAdmin.rpc(
+                        'search_strategic_context_docs',
+                        {
+                            p_keywords: strategicIntentKeywords,
+                            p_limit: 8,
+                            p_user_tenant_id: userId,
+                        }
+                    )
+
+                    if (lexicalDocsError) {
+                        strategicLexicalFallbackError = lexicalDocsError.message
+                        console.error('[RAG] strategic lexical fallback failed:', lexicalDocsError.message)
+                    } else if (Array.isArray(lexicalDocsRaw) && lexicalDocsRaw.length > 0) {
+                        lexicalDocsMapped = lexicalDocsRaw.map((row: any) => ({
+                            id: row?.id,
+                            content: String(row?.content || '').trim(),
+                            metadata: {
+                                ...(row?.metadata || {}),
+                                source_scope: row?.source_scope || null,
+                                retrieval_origin: 'strategic_lexical_fallback',
+                            },
+                            similarity: null,
+                        })).filter((row: any) => row.content.length > 0)
+                        strategicLexicalFallbackDocsCount = lexicalDocsMapped.length
+                    }
+                }
+
+                if (lexicalDocsMapped.length > 0) {
+                    // For strategic intents, lexical matches are prioritized and then merged with vector docs.
+                    retrievedDocs = mergeUniqueDocs(lexicalDocsMapped, retrievedDocs)
+                }
 
                 if (!retrievedDocs.length) {
                     return `CONSULTA REALIZADA NA ${label.toUpperCase()}, mas nenhum documento relevante foi encontrado para esta pergunta.`
@@ -3444,6 +3552,10 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 normative_governance_enabled: normativeGovernanceEnabled,
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
+                strategic_intent_keywords: strategicIntentKeywords,
+                strategic_lexical_fallback_attempted: strategicLexicalFallbackAttempted,
+                strategic_lexical_docs_loaded: strategicLexicalFallbackDocsCount,
+                ...(strategicLexicalFallbackError ? { strategic_lexical_fallback_error: strategicLexicalFallbackError } : {}),
                 memory_write_events: memoryWriteEvents,
                 latency_ms: totalLatencyMs,
                 cost_est: totalCostEst,
