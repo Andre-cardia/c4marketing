@@ -2729,13 +2729,28 @@ Cobertura do script:
 3. cálculo de MRR mensal por lógica local;
 4. paridade mês a mês com `query_financial_summary` (RPC oficial).
 
-Resultado executado em 4 de março de 2026:
+Resultado executado em 4 de março de 2026 (rodada inicial):
 
 - `Synthetic tests`: `3/3` PASS
 - `billing_start_date transition`: `17/17` PASS
 - `expiration_date transition`: sem contratos ativos com `expiration_date` (sem falha de regra)
 - `RPC parity`: `12/12` PASS
 - falhas totais: `0`
+
+Atualização complementar em 4 de março de 2026 (item 6 executado):
+
+- contrato de teste controlado criado no Supabase:
+  - `company_name=ZZ_TEST_EXPIRATION_RULE`
+  - `id=44`
+  - `monthly_fee=0` (sem impacto no MRR real)
+  - `billing_start_date=2026-01-10`
+  - `expiration_date=2026-01-31`
+- reexecução do checker após fixture:
+  - `Synthetic tests`: `3/3` PASS
+  - `billing_start_date transition`: `18/18` PASS
+  - `expiration_date transition`: `1/1` PASS
+  - `RPC parity`: `12/12` PASS
+  - falhas totais: `0`
 
 ### 10.4 Arquivos impactados no ciclo v9.6
 
@@ -2768,7 +2783,7 @@ Resultado executado em 4 de março de 2026:
 | Ajuste financeiro por linguagem natural | Pronto | `execute_adjust_financial_start_date` ativo |
 | Cálculo financeiro por início de faturamento | Pronto | `query_financial_summary` alinhada |
 | Dashboard financeiro (MRR mensal) | Pronto | commit `0ba0692` + validação de valores |
-| Validação automática de regra financeira | Pronto | `check:finance:dashboard-rules` com `0` falhas |
+| Validação automática de regra financeira | Pronto | `check:finance:dashboard-rules` com `0` falhas + `expiration_date transition 1/1 PASS` |
 | Gate temporal de memória viva total (T+7/T+30/streak) | Em acompanhamento | depende de calendário operacional |
 
 ### 10.6 Próximos passos objetivos (v9.6 → v9.7)
@@ -2776,7 +2791,7 @@ Resultado executado em 4 de março de 2026:
 1. manter execução diária oficial (`canário + long horizon + SLO + streak`) até completar os 14 dias de estabilidade;
 2. registrar o fechamento formal de `T+7` em **9 de março de 2026** e anexar evidência no relatório técnico;
 3. registrar o fechamento formal de `T+30` em **1 de abril de 2026** e consolidar decisão de maturidade total;
-4. adicionar contrato de teste controlado com `expiration_date` para validação automática contínua de saída de MRR.
+4. manter o contrato de teste controlado com `expiration_date` (`ZZ_TEST_EXPIRATION_RULE`) e monitorar a validação contínua de saída de MRR no checker.
 
 ### 10.7 Encerramento da v9.6
 
