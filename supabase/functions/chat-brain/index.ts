@@ -288,6 +288,29 @@ Deno.serve(async (req) => {
             return terms.some((term) => normalized.includes(normalizeText(term)))
         }
 
+        const monthNamesPt = [
+            'janeiro',
+            'fevereiro',
+            'marco',
+            'abril',
+            'maio',
+            'junho',
+            'julho',
+            'agosto',
+            'setembro',
+            'outubro',
+            'novembro',
+            'dezembro',
+        ]
+
+        const hasExplicitMonthToken = (text: string): boolean => {
+            const normalized = normalizeText(text)
+            if (monthNamesPt.some((month) => new RegExp(`\\b${month}\\b`).test(normalized))) {
+                return true
+            }
+            return /\b(0?[1-9]|1[0-2])\s*\/\s*20\d{2}\b/.test(normalized)
+        }
+
         const extractStrategicIntentKeywords = (text: string): string[] => {
             const normalized = normalizeText(text)
             const base: string[] = []
@@ -310,8 +333,76 @@ Deno.serve(async (req) => {
             if (hasAny(normalized, ['operacion', 'operacional', 'operacao', 'operação'])) add('operacional', 'operacao', 'operação')
             if (hasAny(normalized, ['estrateg', 'estratég'])) add('estrategia', 'estratégia')
             if (hasAny(normalized, ['c4'])) add('c4', 'c4 marketing')
+            for (const month of monthNamesPt) {
+                if (new RegExp(`\\b${month}\\b`).test(normalized)) add(month)
+            }
+
+            const yearMatches = normalized.match(/\b20\d{2}\b/g) || []
+            for (const year of yearMatches.slice(0, 2)) {
+                add(year)
+            }
 
             return base
+        }
+
+        const extractFinancialAdjustmentCompanyHint = (text: string): string | null => {
+            const raw = String(text || '')
+            const match = raw.match(
+                /(?:contrato\s+(?:da|do|de|com)|cliente|empresa|projeto)\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9 .&-]{2,60}?)(?=,|\.|\?|!|$)/i
+            )
+            if (!match) return null
+            const candidate = String(match[1] || '').trim()
+            if (!candidate) return null
+            if (candidate.split(/\s+/).length > 8) return null
+            if (/^(fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)$/i.test(candidate)) {
+                return null
+            }
+            return candidate
+        }
+
+        const parseCurrencyToNumber = (raw: string): number | null => {
+            const sanitized = String(raw || '').replace(/[^\d.,-]/g, '').trim()
+            if (!sanitized) return null
+
+            const hasComma = sanitized.includes(',')
+            const hasDot = sanitized.includes('.')
+            let normalized = sanitized
+
+            if (hasComma && hasDot) {
+                normalized = sanitized.lastIndexOf(',') > sanitized.lastIndexOf('.')
+                    ? sanitized.replace(/\./g, '').replace(',', '.')
+                    : sanitized.replace(/,/g, '')
+            } else if (hasComma) {
+                normalized = sanitized.replace(/\./g, '').replace(',', '.')
+            } else {
+                normalized = sanitized.replace(/,/g, '')
+            }
+
+            const parsed = Number(normalized)
+            return Number.isFinite(parsed) ? parsed : null
+        }
+
+        const extractMrrTargetFromStrategicDocs = (docs: any[]): number | null => {
+            if (!Array.isArray(docs) || docs.length === 0) return null
+            const candidates: number[] = []
+
+            for (const doc of docs) {
+                const content = String(doc?.content || '')
+                if (!content) continue
+                const normalizedContent = normalizeText(content)
+                const hasGoalHint = /meta|objetivo|north star/.test(normalizedContent)
+                const hasFinancialHint = /mrr|receita recorrente|receita/.test(normalizedContent)
+                if (!hasGoalHint || !hasFinancialHint) continue
+
+                const moneyMatches = Array.from(content.matchAll(/r\$\s*([\d.,]+)/gi))
+                for (const moneyMatch of moneyMatches) {
+                    const parsed = parseCurrencyToNumber(moneyMatch[1] || '')
+                    if (parsed && parsed > 0) candidates.push(parsed)
+                }
+            }
+
+            if (candidates.length === 0) return null
+            return Math.max(...candidates)
         }
 
         const toIsoDate = (year: number, month: number, day: number): string | null => {
@@ -357,6 +448,29 @@ Deno.serve(async (req) => {
             dez: 12,
         }
 
+        const extractMonthMentions = (text: string): Array<{ month: number; year: number; token: string; index: number }> => {
+            const normalized = normalizeText(text)
+            const currentYear = Number((clientToday || runtimeToday).slice(0, 4))
+            const mentions: Array<{ month: number; year: number; token: string; index: number }> = []
+            const regex = /\b(janeiro|jan|fevereiro|fev|marco|mar|abril|abr|maio|mai|junho|jun|julho|jul|agosto|ago|setembro|set|outubro|out|novembro|nov|dezembro|dez)\b(?:\s*(?:de|\/|-)?\s*(20\d{2}))?/g
+            let match: RegExpExecArray | null
+
+            while ((match = regex.exec(normalized)) !== null) {
+                const token = String(match[1] || '').trim()
+                const month = monthNameToNumber[token]
+                if (!month) continue
+                const year = match[2] ? Number(match[2]) : currentYear
+                mentions.push({
+                    month,
+                    year,
+                    token,
+                    index: typeof match.index === 'number' ? match.index : 0,
+                })
+            }
+
+            return mentions
+        }
+
         const extractReferenceDateFromText = (text: string): string | null => {
             const raw = String(text || '').trim()
             if (!raw) return null
@@ -400,6 +514,7 @@ Deno.serve(async (req) => {
         }
 
         const inferredReferenceDate = extractReferenceDateFromText(query)
+        const monthMentionsInQuery = extractMonthMentions(query)
         const strategicIntentKeywords = extractStrategicIntentKeywords(query)
         const hasStrategicCoreTerms = hasAny(query, [
             'missao',
@@ -415,6 +530,49 @@ Deno.serve(async (req) => {
             hasAny(query, ['meta', 'metas', 'objetivo', 'objetivos']) &&
             hasAny(query, ['financeir', 'comercial', 'operacion', 'estrateg'])
         const shouldForceStrategicRag = hasStrategicCoreTerms || hasStrategicGoalTerms
+        const hasGoalAttainmentPhrasing = hasAny(query, [
+            'bater a meta',
+            'batemos a meta',
+            'atingimos a meta',
+            'atingiu a meta',
+            'atingir a meta',
+            'cumprimos a meta',
+            'meta foi atingida',
+            'conseguimos bater',
+            'conseguimos atingir',
+            'alcancamos a meta',
+            'alcançamos a meta',
+            'meta de',
+            'meta do',
+            'meta da',
+        ])
+        const looksLikeMetaAdsContext = hasAny(query, ['meta ads', 'facebook ads', 'instagram ads'])
+        const isMonthlyGoalCheckIntent =
+            hasAny(query, ['meta', 'metas', 'objetivo', 'objetivos'])
+            && hasGoalAttainmentPhrasing
+            && hasExplicitMonthToken(query)
+            && !looksLikeMetaAdsContext
+        const isFinancialStartAdjustmentIntent =
+            hasAny(query, ['ajust', 'corrig', 'alter', 'mudar'])
+            && hasAny(query, ['faturamento', 'financeir', 'receita', 'mrr', 'arr'])
+            && hasAny(query, ['inici', 'inicio', 'comec', 'começ'])
+        const financialAdjustmentCompanyHint = extractFinancialAdjustmentCompanyHint(query)
+        const financialAdjustmentBillingStartDate = (() => {
+            if (monthMentionsInQuery.length === 0) return null
+            const lastMonthMention = monthMentionsInQuery[monthMentionsInQuery.length - 1]
+            return toIsoDate(lastMonthMention.year, lastMonthMention.month, 1)
+        })()
+        const financialAdjustmentOriginReferenceDate = (() => {
+            if (monthMentionsInQuery.length === 0) return null
+            const mentionsContractClosure = hasAny(query, ['fechad', 'assinad', 'aceit', 'ultimo contrato', 'último contrato'])
+            if (!mentionsContractClosure) return null
+            const firstMonthMention = monthMentionsInQuery[0]
+            return toIsoDate(
+                firstMonthMention.year,
+                firstMonthMention.month,
+                getEndOfMonthDay(firstMonthMention.year, firstMonthMention.month),
+            )
+        })()
 
         const isTruthyFlag = (value: string | null | undefined) =>
             ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase().trim())
@@ -560,6 +718,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             'execute_move_task',
             'execute_update_project_status',
             'execute_update_task',
+            'execute_adjust_financial_start_date',
             'execute_batch_move_tasks',
             'execute_batch_delete_tasks',
             'execute_schedule_task',
@@ -1711,6 +1870,24 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             {
                 type: "function" as const,
                 function: {
+                    name: "execute_adjust_financial_start_date",
+                    description: "Ajustar a data de início de faturamento de um contrato no financeiro (sem alterar a data de fechamento). Use para casos como 'contrato fechado em fevereiro, faturamento inicia em abril'.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            p_acceptance_id: { type: "number", description: "ID do aceite/contrato. Opcional se p_company_name ou p_origin_reference_date for informado." },
+                            p_company_name: { type: "string", description: "Nome da empresa/cliente (partial match)." },
+                            p_billing_start_date: { type: "string", format: "date", description: "Data de início do faturamento no formato YYYY-MM-DD." },
+                            p_origin_reference_date: { type: "string", format: "date", description: "Mês de referência do fechamento do contrato (ex: último dia de fevereiro/2026) para resolver o último contrato daquele mês quando não houver nome." },
+                            p_notes: { type: "string", description: "Observação da alteração financeira." }
+                        },
+                        required: ["p_billing_start_date"]
+                    }
+                }
+            },
+            {
+                type: "function" as const,
+                function: {
                     name: "execute_batch_move_tasks",
                     description: "Mover TODAS as tarefas de um status para outro em um projeto (operação em lote). Use para 'mova todas as tarefas do backlog para em execução', 'mova tudo de X para Y no projeto Z'.",
                     parameters: {
@@ -1844,6 +2021,8 @@ Exemplos:
 - "defina o André como responsável pela tarefa X" → execute_update_task(p_task_title: "X", p_new_assignee: "André")
 - "mude o prazo da tarefa Y para 28/02" → execute_update_task(p_task_title: "Y", p_new_due_date: "2026-02-28")
 - "atualize a descrição da tarefa X no projeto Duarte Vinhos" → execute_update_task(p_task_title: "X", p_project_name: "Duarte Vinhos", p_new_description: "...")
+- "ajuste o início de faturamento do contrato da Dainese para abril de 2026" → execute_adjust_financial_start_date(p_company_name: "Dainese", p_billing_start_date: "2026-04-01")
+- "último contrato fechado em fevereiro, mas faturamento começa em abril; ajuste no financeiro" → execute_adjust_financial_start_date(p_origin_reference_date: "2026-02-28", p_billing_start_date: "2026-04-01")
 - "marque o projeto Duarte Vinhos como concluído" → execute_update_project_status(p_project_name: "Duarte Vinhos", p_new_status: "Inativo")
 - "pause o projeto Amplexo" → execute_update_project_status(p_project_name: "Amplexo", p_new_status: "Pausado")
 - "mova todas as tarefas do backlog para em execução no projeto Duarte Vinhos" → execute_batch_move_tasks(p_project_name: "Duarte Vinhos", p_from_status: "backlog", p_to_status: "in_progress")
@@ -1861,6 +2040,7 @@ Quando o usuário pedir para CRIAR tarefa/pendência/atividade, SEMPRE use execu
 Quando o usuário pedir para DELETAR/APAGAR/EXCLUIR tarefa, SEMPRE use execute_delete_task.
 Quando o usuário pedir para MOVER tarefa ou MUDAR STATUS de tarefa, use execute_move_task. Mapeie: "em execução"→in_progress, "aprovação"→approval, "finalizado/concluído/feito"→done, "pausado"→paused, "backlog"→backlog.
 Quando o usuário pedir para EDITAR/ATUALIZAR campos de tarefa (responsável, descrição, prazo, prioridade, título), use execute_update_task.
+Quando o usuário pedir para AJUSTAR/CORRIGIR início de faturamento/receita no financeiro, use execute_adjust_financial_start_date.
 Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use execute_update_project_status.
 Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
@@ -1933,6 +2113,7 @@ Retorne apenas function calls (sem texto livre).`
                     'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_move_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
+                    'execute_adjust_financial_start_date': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_update_project_status': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_batch_move_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_batch_delete_tasks': { agent: 'Agent_Executor', artifact_kind: 'ops' },
@@ -2310,6 +2491,78 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        if (isFinancialStartAdjustmentIntent && financialAdjustmentBillingStartDate) {
+            const adjustmentParams: Record<string, any> = {
+                p_billing_start_date: financialAdjustmentBillingStartDate,
+                p_notes: 'Ajuste solicitado via Segundo Cérebro (financeiro).',
+            }
+            if (financialAdjustmentCompanyHint) {
+                adjustmentParams.p_company_name = financialAdjustmentCompanyHint
+            }
+            if (financialAdjustmentOriginReferenceDate) {
+                adjustmentParams.p_origin_reference_date = financialAdjustmentOriginReferenceDate
+            }
+
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_Executor',
+                artifact_kind: 'ops',
+                tool_hint: 'db_query',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                tools_allowed: ['db_write'],
+                db_query_params: {
+                    rpc_name: 'execute_adjust_financial_start_date',
+                    ...adjustmentParams,
+                },
+                reason: `${effectiveDecision.reason} | financial_adjustment=execute_adjust_financial_start_date`,
+            }
+        }
+
+        if (isMonthlyGoalCheckIntent) {
+            const financialCall: DbQueryCall = {
+                rpc_name: 'query_financial_summary',
+                params: cleanRpcParams({
+                    p_reference_date: inferredReferenceDate || clientToday || runtimeToday,
+                    p_status: 'Ativo',
+                    ...(clientTimezone ? { p_reference_tz: clientTimezone } : {}),
+                }),
+            }
+
+            const existingCalls: DbQueryCall[] = []
+            if (effectiveDecision.tool_hint === 'db_query' && effectiveDecision.db_query_params) {
+                const rawDbParams: any = effectiveDecision.db_query_params
+                if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                    for (const call of rawDbParams.calls) {
+                        if (!call || typeof call !== 'object' || typeof call.rpc_name !== 'string') continue
+                        const { rpc_name, ...params } = call
+                        if (!dbRpcNames.has(rpc_name)) continue
+                        existingCalls.push({ rpc_name, params })
+                    }
+                } else if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                    const { rpc_name, ...params } = rawDbParams
+                    existingCalls.push({ rpc_name, params })
+                }
+            }
+
+            const mergedCalls = dedupeDbCalls(enrichDbCalls([financialCall, ...existingCalls]))
+            const primary = mergedCalls[0]
+            effectiveDecision = {
+                ...effectiveDecision,
+                agent: 'Agent_Proposals',
+                artifact_kind: 'proposal',
+                tool_hint: 'db_query',
+                retrieval_policy: 'STRICT_DOCS_ONLY',
+                tools_allowed: ['db_read', 'rag_search'],
+                db_query_params: mergedCalls.length > 1
+                    ? {
+                        rpc_name: '__batch__',
+                        calls: mergedCalls.map((call) => ({ rpc_name: call.rpc_name, ...call.params })),
+                    }
+                    : { rpc_name: primary.rpc_name, ...primary.params },
+                reason: `${effectiveDecision.reason} | monthly_goal_check=db_financial_summary`,
+            }
+        }
+
         if (shouldForceStrategicRag && effectiveDecision.tool_hint === 'db_query') {
             effectiveDecision = {
                 ...effectiveDecision,
@@ -2348,6 +2601,7 @@ Retorne apenas function calls (sem texto livre).`
         let cognitiveMemoryContext = ''
         let explicitUserFacts: string[] = []
         let executedDbRpcs: string[] = []
+        let monthlyGoalComparison: Record<string, any> | null = null
         let strategicLexicalFallbackAttempted = false
         let strategicLexicalFallbackDocsCount = 0
         let strategicLexicalFallbackError: string | null = null
@@ -2393,6 +2647,7 @@ Retorne apenas function calls (sem texto livre).`
             'execute_delete_task',
             'execute_move_task',
             'execute_update_task',
+            'execute_adjust_financial_start_date',
             'execute_update_project_status',
             'execute_batch_move_tasks',
             'execute_batch_delete_tasks',
@@ -2958,6 +3213,50 @@ Retorne apenas function calls (sem texto livre).`
                     sections.push(`CONSULTA COMPLEMENTAR (MEMÓRIA VETORIAL):\n${leadershipVectorContext}`)
                 }
 
+                if (isMonthlyGoalCheckIntent) {
+                    const strategicGoalContext = await runVectorRetrieval({
+                        topK: 8,
+                        overrideFilters: {
+                            artifact_kind: null,
+                            source_table: ['corporate_identity', 'user_facts'],
+                            type_allowlist: ['official_doc', 'session_summary'],
+                            type_blocklist: ['chat_log'],
+                            status: 'active',
+                        },
+                        retrievalLabel: 'base vetorial de metas estratégicas',
+                    })
+                    sections.push(`CONSULTA COMPLEMENTAR (METAS ESTRATÉGICAS):\n${strategicGoalContext}`)
+
+                    const financialRows = Array.isArray(rawDbRecordsByRpcForGenUI['query_financial_summary'])
+                        ? rawDbRecordsByRpcForGenUI['query_financial_summary']
+                        : []
+                    if (financialRows.length > 0) {
+                        const financeRecord = financialRows[0] || {}
+                        const rawMrr = Number(
+                            financeRecord?.totals?.mrr
+                            ?? financeRecord?.mrr
+                            ?? financeRecord?.receita_recorrente
+                            ?? 0
+                        )
+                        const realizedMrr = Number.isFinite(rawMrr) ? rawMrr : 0
+                        const targetMrr = extractMrrTargetFromStrategicDocs(retrievedDocs)
+                        const attained = targetMrr && targetMrr > 0 ? realizedMrr >= targetMrr : null
+                        const attainmentPct = targetMrr && targetMrr > 0
+                            ? Number(((realizedMrr / targetMrr) * 100).toFixed(2))
+                            : null
+
+                        monthlyGoalComparison = {
+                            reference_date: inferredReferenceDate || clientToday || runtimeToday,
+                            realized_mrr: Number(realizedMrr.toFixed(2)),
+                            target_mrr: targetMrr ? Number(targetMrr.toFixed(2)) : null,
+                            attained,
+                            attainment_pct: attainmentPct,
+                            target_source: targetMrr ? 'strategic_docs' : 'not_found',
+                        }
+                        sections.push(`ANÁLISE DETERMINÍSTICA DE META MENSAL:\n${JSON.stringify(monthlyGoalComparison, null, 2)}`)
+                    }
+                }
+
                 contextText = sections.join('\n\n')
             }
         } else {
@@ -3052,6 +3351,8 @@ ESTILO DE RESPOSTA (OBRIGATÓRIO):
 - Nunca invente nomes de pessoas, cargos, números ou fatos.
 - Para perguntas de faturamento/MRR/ARR, use apenas números explícitos da consulta SQL financeira (query_financial_summary). Nunca derive valores financeiros de listas de projetos sem valor.
 - Se a consulta financeira indicar contratos ativos sem mensalidade cadastrada, destaque essa limitação e informe que o MRR/ARR pode estar subestimado.
+- Se houver o bloco "ANÁLISE DETERMINÍSTICA DE META MENSAL", priorize esse bloco para concluir se a meta foi atingida.
+- Em perguntas de meta mensal (ex: "batemos a meta de fevereiro?"), explicite a data de referência usada (YYYY-MM-DD). Se houver meta numérica explícita no contexto, conclua com SIM/NÃO na primeira frase e mostre a conta de atingimento. Se não houver meta mensal explícita, diga isso e informe o realizado do mês.
 - Se não houver evidência explícita no CONTEXTO RECUPERADO, responda que a informação não foi encontrada nas bases consultadas.
 - Se existir um bloco "FATO EXPLÍCITO PRIORITÁRIO", ele prevalece para responder perguntas sobre liderança/cargo corporativo.
 ${hasGenUiData
@@ -3552,6 +3853,13 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 normative_governance_enabled: normativeGovernanceEnabled,
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
+                financial_start_adjustment_intent: isFinancialStartAdjustmentIntent,
+                financial_adjustment_billing_start_date: financialAdjustmentBillingStartDate,
+                financial_adjustment_origin_reference_date: financialAdjustmentOriginReferenceDate,
+                financial_adjustment_company_hint: financialAdjustmentCompanyHint,
+                monthly_goal_check_intent: isMonthlyGoalCheckIntent,
+                monthly_goal_reference_date: isMonthlyGoalCheckIntent ? (inferredReferenceDate || clientToday || runtimeToday) : null,
+                monthly_goal_comparison: monthlyGoalComparison,
                 strategic_intent_keywords: strategicIntentKeywords,
                 strategic_lexical_fallback_attempted: strategicLexicalFallbackAttempted,
                 strategic_lexical_docs_loaded: strategicLexicalFallbackDocsCount,
