@@ -68,37 +68,6 @@ Deno.serve(async (req) => {
             Agent_MarketingTraffic: ['gestor'],
         }
 
-        const getProjectRefFromSupabaseUrl = () => {
-            try {
-                const url = Deno.env.get('SUPABASE_URL') ?? ''
-                const host = new URL(url).hostname
-                return host.split('.')[0] || null
-            } catch {
-                return null
-            }
-        }
-
-        const decodeJwtPayload = (token: string): Record<string, any> | null => {
-            try {
-                const parts = token.split('.')
-                if (parts.length !== 3) return null
-                const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-                const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
-                const json = atob(padded)
-                return JSON.parse(json)
-            } catch {
-                return null
-            }
-        }
-
-        const getProjectRefFromPayload = (payload: Record<string, any> | null): string | null => {
-            if (!payload) return null
-            if (typeof payload.ref === 'string' && payload.ref) return payload.ref
-            const iss = typeof payload.iss === 'string' ? payload.iss : ''
-            const match = iss.match(/https:\/\/([a-z0-9]+)\.supabase\.co\/auth\/v1/i)
-            return match?.[1] ?? null
-        }
-
         const applyProfileByEmail = async (email: string | null) => {
             if (!email) return
             const { data: profile } = await supabaseAdmin
@@ -142,52 +111,7 @@ Deno.serve(async (req) => {
                 }
                 await applyProfileByEmail(user.email || null)
             } else {
-                // Fallback resiliente: JWT pode estar inválido para verificação, mas ainda conter claims úteis.
-                // Usado para evitar bloqueio completo do chat quando a sessão local está inconsistente.
-                const payload = decodeJwtPayload(authToken)
-                const expectedRef = getProjectRefFromSupabaseUrl()
-                const tokenRef = getProjectRefFromPayload(payload)
-                const tokenSub = typeof payload?.sub === 'string' ? payload.sub : null
-                const tokenRole = typeof payload?.role === 'string' ? payload.role : 'authenticated'
-                const refMatches = !expectedRef || !tokenRef || tokenRef === expectedRef
-
-                if (tokenSub && refMatches) {
-                    userId = tokenSub
-                    userRole = tokenRole || 'authenticated'
-
-                    let fallbackEmail = typeof payload?.email === 'string' ? payload.email : null
-                    let fallbackName =
-                        payload?.user_metadata?.full_name
-                        || payload?.user_metadata?.name
-                        || (fallbackEmail ? fallbackEmail.split('@')[0] : 'Usuário')
-
-                    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(tokenSub)
-                    if (!adminUserError && adminUserData?.user) {
-                        const adminUser = adminUserData.user
-                        fallbackEmail = fallbackEmail || adminUser.email || null
-                        fallbackName =
-                            adminUser.user_metadata?.full_name
-                            || adminUser.user_metadata?.name
-                            || fallbackName
-                    } else if (adminUserError) {
-                        console.error('chat-brain auth.admin.getUserById fallback error:', adminUserError.message)
-                    }
-
-                    userProfile = {
-                        name: fallbackName,
-                        full_name: fallbackName,
-                        email: fallbackEmail,
-                        role: userRole,
-                    }
-                    await applyProfileByEmail(fallbackEmail)
-                    console.warn(`chat-brain auth fallback engaged for user ${userId}`)
-                } else {
-                    console.error('chat-brain auth fallback failed (claims missing or ref mismatch)', {
-                        expectedRef,
-                        tokenRef,
-                        hasSub: !!tokenSub,
-                    })
-                }
+                console.error('chat-brain auth rejected: no user resolved from token')
             }
         }
 
@@ -752,6 +676,123 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             return unique
         }
 
+        type LiveStateDocRow = {
+            domain: string
+            content: string
+            updated_at: string
+            is_stale: boolean
+            document_id: string | null
+        }
+
+        const liveStateDomainPriority = [
+            'overview',
+            'comercial',
+            'crm',
+            'clientes',
+            'propostas',
+            'contratos',
+            'financeiro',
+            'projetos',
+            'tarefas',
+            'prazos',
+            'usuarios',
+            'acoes',
+        ]
+        const liveStateDomainRank = new Map(liveStateDomainPriority.map((domain, idx) => [domain, idx]))
+        const liveStateTrafficAllowed = new Set(['overview', 'clientes', 'projetos', 'tarefas', 'prazos'])
+
+        const toUniqueLiveStateDomains = (domains: string[]) => {
+            const normalized = domains
+                .map((domain) => String(domain || '').trim().toLowerCase())
+                .filter((domain) => liveStateDomainRank.has(domain))
+
+            if (!normalized.includes('overview')) normalized.unshift('overview')
+
+            const unique = Array.from(new Set(normalized))
+            unique.sort((a, b) => (liveStateDomainRank.get(a) ?? 99) - (liveStateDomainRank.get(b) ?? 99))
+            return unique
+        }
+
+        const inferLiveStateDomainsFromText = (text: string): string[] => {
+            const inferred: string[] = ['overview']
+            const normalized = normalizeText(text)
+
+            if (hasAny(normalized, ['crm', 'lead', 'leads', 'oportunidade', 'oportunidades', 'followup', 'follow up', 'follow-up', 'kanban', 'pipeline', 'funil', 'novo lead', 'contato realizado', 'reuniao agendada', 'proposta aceita', 'proposta perdida'])) inferred.push('crm', 'comercial')
+            if (hasAny(normalized, ['comercial', 'pipeline', 'vendas', 'funil'])) inferred.push('comercial')
+            if (hasAny(normalized, ['cliente', 'clientes'])) inferred.push('clientes', 'comercial')
+            if (hasAny(normalized, ['proposta', 'propostas', 'orcamento', 'orçamento'])) inferred.push('propostas', 'comercial')
+            if (hasAny(normalized, ['contrato', 'contratos', 'aceite', 'aditivo', 'vigencia', 'vigência', 'mensalidade'])) inferred.push('contratos', 'clientes', 'financeiro')
+            if (hasAny(normalized, ['mrr', 'arr', 'faturamento', 'receita', 'recorrente', 'financeir'])) inferred.push('financeiro', 'contratos')
+            if (hasAny(normalized, ['projeto', 'projetos'])) inferred.push('projetos')
+            if (hasAny(normalized, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'prazo', 'deadline', 'atrasad', 'vencid'])) inferred.push('tarefas', 'prazos')
+            if (hasAny(normalized, ['usuario', 'usuário', 'usuarios', 'usuários', 'acesso', 'acessos', 'equipe', 'time'])) inferred.push('usuarios')
+            if (hasAny(normalized, ['acao', 'ação', 'acoes', 'ações', 'evento', 'eventos', 'log', 'logs', 'execucao', 'execução'])) inferred.push('acoes')
+
+            return toUniqueLiveStateDomains(inferred)
+        }
+
+        const inferLiveStateDomainsFromDbCalls = (calls: DbQueryCall[]): string[] => {
+            const inferred: string[] = ['overview']
+            for (const call of calls || []) {
+                switch (call.rpc_name) {
+                    case 'query_all_clients':
+                        inferred.push('clientes', 'contratos', 'comercial')
+                        break
+                    case 'query_all_proposals':
+                        inferred.push('propostas', 'comercial')
+                        break
+                    case 'query_financial_summary':
+                    case 'execute_adjust_financial_start_date':
+                        inferred.push('financeiro', 'contratos', 'clientes')
+                        break
+                    case 'query_all_projects':
+                    case 'query_survey_responses':
+                    case 'execute_update_project_status':
+                        inferred.push('projetos')
+                        break
+                    case 'query_all_tasks':
+                    case 'execute_create_traffic_task':
+                    case 'execute_delete_task':
+                    case 'execute_move_task':
+                    case 'execute_update_task':
+                    case 'execute_batch_move_tasks':
+                    case 'execute_batch_delete_tasks':
+                    case 'execute_schedule_task':
+                    case 'query_task_distribution_chart':
+                        inferred.push('tarefas', 'prazos', 'projetos')
+                        break
+                    case 'query_all_users':
+                    case 'query_access_summary':
+                        inferred.push('usuarios')
+                        break
+                    default:
+                        break
+                }
+            }
+            return toUniqueLiveStateDomains(inferred)
+        }
+
+        const parseDbCallsFromDecisionParams = (rawDbParams: any): DbQueryCall[] => {
+            if (!rawDbParams || typeof rawDbParams !== 'object') return []
+            const parsed: DbQueryCall[] = []
+
+            if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                for (const rawCall of rawDbParams.calls) {
+                    if (!rawCall || typeof rawCall !== 'object') continue
+                    const { rpc_name, ...rpcParams } = rawCall
+                    if (typeof rpc_name !== 'string' || !dbRpcNames.has(rpc_name)) continue
+                    parsed.push({ rpc_name, params: rpcParams })
+                }
+                return parsed
+            }
+
+            if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                const { rpc_name, ...rpcParams } = rawDbParams
+                parsed.push({ rpc_name, params: rpcParams })
+            }
+            return parsed
+        }
+
         const inferSupplementalDbCalls = (text: string): DbQueryCall[] => {
             const calls: DbQueryCall[] = []
 
@@ -1126,8 +1167,8 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                     }
                 )
                 if (!rpcFactsError && Array.isArray(rpcFacts) && rpcFacts.length > 0) {
-                    const fromRpc = rpcFacts
-                        .map((row: any) => ({
+                    const fromRpc: ExplicitFactRecord[] = rpcFacts
+                        .map((row: any): ExplicitFactRecord => ({
                             fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
                             created_at: row?.created_at || null,
                             scope: row?.scope === 'session' ? 'session' : 'user',
@@ -2070,16 +2111,22 @@ Retorne apenas function calls (sem texto livre).`
                 modelUsage['gpt-4o-mini'].output_tokens += routerUsage.completion_tokens;
                 modelUsage['gpt-4o-mini'].cost += routerCost;
 
-                supabaseAdmin.rpc('log_agent_execution', {
-                    p_session_id: session_id,
-                    p_agent_name: 'Router_GPT4oMini',
-                    p_action: 'route',
-                    p_status: 'success',
-                    p_cost_est: routerCost,
-                    p_tokens_input: routerUsage.prompt_tokens,
-                    p_tokens_output: routerUsage.completion_tokens,
-                    p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
-                }).catch(() => { })
+                void (async () => {
+                    try {
+                        await supabaseAdmin.rpc('log_agent_execution', {
+                            p_session_id: session_id,
+                            p_agent_name: 'Router_GPT4oMini',
+                            p_action: 'route',
+                            p_status: 'success',
+                            p_cost_est: routerCost,
+                            p_tokens_input: routerUsage.prompt_tokens,
+                            p_tokens_output: routerUsage.completion_tokens,
+                            p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
+                        })
+                    } catch {
+                        // best effort telemetry
+                    }
+                })()
             }
 
             if (rawToolCalls.length > 0) {
@@ -2605,6 +2652,10 @@ Retorne apenas function calls (sem texto livre).`
         let strategicLexicalFallbackAttempted = false
         let strategicLexicalFallbackDocsCount = 0
         let strategicLexicalFallbackError: string | null = null
+        let liveStateDocs: LiveStateDocRow[] = []
+        let liveStateContext = ''
+        let liveStateRequestedDomains: string[] = []
+        let liveStateLookupError: string | null = null
         const isTaskFocusedQueryForGenUi = hasAny(query, [
             'tarefa', 'tarefas',
             'pendencia', 'pendência', 'pendente', 'pendentes',
@@ -2740,7 +2791,7 @@ Retorne apenas function calls (sem texto livre).`
                             p_result: {},
                             p_latency_ms: rpcLatencyMs,
                             p_error_message: rpcError.message,
-                        }).catch(() => { })
+                        })
                     } catch (_e) { /* fail-safe */ }
                 }
 
@@ -2761,7 +2812,7 @@ Retorne apenas function calls (sem texto livre).`
             // mas as rotas do app usam acceptance_id. Aqui anexamos acceptance_id por empresa.
             if (rpc_name === 'query_all_projects' && Array.isArray(normalizedData) && normalizedData.length > 0) {
                 try {
-                    const companyNames = Array.from(
+                    const requestedCompanyNames = Array.from(
                         new Set(
                             normalizedData
                                 .map((row: any) => String(row?.company_name || '').trim())
@@ -2769,27 +2820,37 @@ Retorne apenas function calls (sem texto livre).`
                         )
                     )
 
-                    if (companyNames.length > 0) {
+                    if (requestedCompanyNames.length > 0) {
                         const { data: acceptanceRows, error: acceptanceError } = await supabaseAdmin
                             .from('acceptances')
-                            .select('id, company_name, timestamp')
-                            .in('company_name', companyNames)
+                            .select('id, company_name, company_alias, timestamp')
                             .order('timestamp', { ascending: false })
 
                         if (!acceptanceError && Array.isArray(acceptanceRows)) {
+                            const normalizeCompanyKey = (value: any) =>
+                                String(value || '').trim().toLowerCase()
+
                             const acceptanceByCompany = new Map<string, number>()
+                            const acceptanceTimestampByCompany = new Map<string, string | null>()
                             for (const acc of acceptanceRows as any[]) {
-                                const company = String(acc?.company_name || '').trim()
-                                if (!company || acceptanceByCompany.has(company)) continue
-                                acceptanceByCompany.set(company, Number(acc.id))
+                                const legalName = String(acc?.company_name || '').trim()
+                                const aliasName = String(acc?.company_alias || '').trim()
+                                const displayName = aliasName || legalName
+                                const keys = [displayName, legalName, aliasName]
+                                    .map(normalizeCompanyKey)
+                                    .filter((key) => key.length > 0)
+
+                                for (const key of keys) {
+                                    if (acceptanceByCompany.has(key)) continue
+                                    acceptanceByCompany.set(key, Number(acc.id))
+                                    acceptanceTimestampByCompany.set(key, acc?.timestamp ?? null)
+                                }
                             }
 
                             normalizedData = normalizedData.map((row: any) => ({
                                 ...row,
-                                acceptance_id: acceptanceByCompany.get(String(row?.company_name || '').trim()) ?? null,
-                                acceptance_timestamp:
-                                    acceptanceRows.find((acc: any) => String(acc?.company_name || '').trim() === String(row?.company_name || '').trim())?.timestamp
-                                    ?? null,
+                                acceptance_id: acceptanceByCompany.get(normalizeCompanyKey(row?.company_name)) ?? null,
+                                acceptance_timestamp: acceptanceTimestampByCompany.get(normalizeCompanyKey(row?.company_name)) ?? null,
                             }))
                         }
                     }
@@ -2919,7 +2980,7 @@ Retorne apenas function calls (sem texto livre).`
                     : baseFilters
 
                 let docs = await matchBrainDocuments({
-                    supabase: supabaseAdmin,
+                    supabase: supabaseAdmin as any,
                     queryText: query,
                     filters: primaryFilters as any,
                     options: {
@@ -2933,7 +2994,7 @@ Retorne apenas function calls (sem texto livre).`
                 if (!hasForcedPolicy && canUseNormative && docs.length === 0) {
                     console.warn('[RAG] NORMATIVE_FIRST returned empty, falling back to STRICT_DOCS_ONLY')
                     docs = await matchBrainDocuments({
-                        supabase: supabaseAdmin,
+                        supabase: supabaseAdmin as any,
                         queryText: query,
                         filters: baseFilters as any,
                         options: {
@@ -3027,7 +3088,7 @@ Retorne apenas function calls (sem texto livre).`
             try {
                 const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
                 cognitiveMemoryDocs = await matchBrainDocuments({
-                    supabase: supabaseAdmin,
+                    supabase: supabaseAdmin as any,
                     queryText: query,
                     filters: {
                         tenant_id: userId,
@@ -3081,6 +3142,83 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        const runLiveStateRetrieval = async (): Promise<string> => {
+            try {
+                const plannedCalls = effectiveDecision.tool_hint === 'db_query'
+                    ? parseDbCallsFromDecisionParams(effectiveDecision.db_query_params)
+                    : []
+
+                const inferredDomains = toUniqueLiveStateDomains([
+                    ...inferLiveStateDomainsFromText(query),
+                    ...inferLiveStateDomainsFromDbCalls(plannedCalls),
+                ])
+
+                let targetDomains = inferredDomains.slice(0, 6)
+                if (isTrafficAgentContext) {
+                    targetDomains = targetDomains.filter((domain) => liveStateTrafficAllowed.has(domain))
+                }
+                if (!targetDomains.includes('overview')) targetDomains.unshift('overview')
+                liveStateRequestedDomains = toUniqueLiveStateDomains(targetDomains).slice(0, 6)
+
+                console.log(`[Tool] live_state_docs → domains: ${liveStateRequestedDomains.join(',') || 'overview'}`)
+
+                const { data, error } = await supabaseAdmin.rpc('get_live_state_documents', {
+                    p_domains: liveStateRequestedDomains,
+                    p_max_age_minutes: 360,
+                })
+
+                if (error) {
+                    liveStateLookupError = error.message
+                    console.error('[LiveState] get_live_state_documents error:', error.message)
+                    return ''
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    liveStateDocs = []
+                    return 'CONSULTA DOC-FIRST (LIVE STATE): nenhum documento vivo disponível para os domínios solicitados.'
+                }
+
+                const toIsoOrRaw = (value: any) => {
+                    if (!value) return 'n/a'
+                    const parsed = new Date(value)
+                    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString()
+                }
+
+                const sanitizedRows: LiveStateDocRow[] = data
+                    .map((row: any) => ({
+                        domain: String(row?.domain || '').toLowerCase().trim(),
+                        content: String(row?.content || '').trim(),
+                        updated_at: String(row?.updated_at || ''),
+                        is_stale: row?.is_stale === true,
+                        document_id: row?.document_id ? String(row.document_id) : null,
+                    }))
+                    .filter((row) => row.domain.length > 0 && row.content.length > 0)
+                    .sort((a, b) => (liveStateDomainRank.get(a.domain) ?? 99) - (liveStateDomainRank.get(b.domain) ?? 99))
+
+                liveStateDocs = sanitizedRows
+
+                const staleCount = liveStateDocs.filter((row) => row.is_stale).length
+                const docsText = liveStateDocs
+                    .map((row) => [
+                        `### LIVE STATE: ${row.domain.toUpperCase()} | atualizado_em=${toIsoOrRaw(row.updated_at)} | stale=${row.is_stale ? 'sim' : 'nao'}`,
+                        row.content,
+                    ].join('\n'))
+                    .join('\n\n')
+
+                const staleHint = staleCount > 0
+                    ? `\nATENÇÃO: ${staleCount} documento(s) vivo(s) podem estar defasados e exigem validação complementar no banco.`
+                    : ''
+
+                return `CONSULTA DOC-FIRST (LIVE STATE): domínios priorizados = ${liveStateRequestedDomains.join(', ')}.${staleHint}\n\n${docsText}`
+            } catch (liveStateError: any) {
+                liveStateLookupError = liveStateError?.message || String(liveStateError)
+                console.error('[LiveState] retrieval failed:', liveStateLookupError)
+                return ''
+            }
+        }
+
+        liveStateContext = await runLiveStateRetrieval()
+
         // Canonical retrieval — executado ANTES de qualquer outra busca.
         const { text: canonicalBlock, count: canonicalDocsCount } = canUseDbCountFastPath
             ? { text: '', count: 0 }
@@ -3110,7 +3248,8 @@ Retorne apenas function calls (sem texto livre).`
             }
             if (finalCalls.length === 0) {
                 // Guardrail: sempre consultar alguma base antes de responder
-                contextText = await runVectorRetrieval()
+                const vectorContext = await runVectorRetrieval()
+                contextText = [liveStateContext, vectorContext].filter((block) => String(block || '').trim().length > 0).join('\n\n')
             } else {
                 if (effectiveDecision.agent === 'Agent_MarketingTraffic' && finalCalls.some((call) => call.rpc_name.startsWith('execute_'))) {
                     const writeBlockedAnswer = 'Este chat do Agente Especialista em Gestão de Tráfego é consultivo e estratégico. Não executo ações operacionais de escrita (criar, mover, editar ou excluir tarefas) aqui.'
@@ -3176,7 +3315,7 @@ Retorne apenas function calls (sem texto livre).`
                             }
                         } else if (call.rpc_name === 'query_all_tasks') {
                             const taskRows = normalizedRows
-                            const currentTaskRows = Array.isArray(rawDbRecordsForGenUI)
+                            const currentTaskRows: any[] = Array.isArray(rawDbRecordsForGenUI)
                                 ? rawDbRecordsForGenUI
                                 : []
                             rawDbRecordsForGenUI = [...currentTaskRows, ...taskRows]
@@ -3257,11 +3396,12 @@ Retorne apenas function calls (sem texto livre).`
                     }
                 }
 
-                contextText = sections.join('\n\n')
+                contextText = [liveStateContext, ...sections].filter((block) => String(block || '').trim().length > 0).join('\n\n')
             }
         } else {
             // === RAG (busca semântica) ===
-            contextText = await runVectorRetrieval()
+            const ragContext = await runVectorRetrieval()
+            contextText = [liveStateContext, ragContext].filter((block) => String(block || '').trim().length > 0).join('\n\n')
         }
 
         // Fast-path para consultas de contagem puramente estruturadas:
@@ -3853,6 +3993,11 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 normative_governance_enabled: normativeGovernanceEnabled,
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
+                live_state_domains_requested: liveStateRequestedDomains,
+                live_state_docs_loaded: liveStateDocs.length,
+                live_state_docs_stale: liveStateDocs.filter((d) => d.is_stale).length,
+                live_state_doc_ids: liveStateDocs.map((d) => d.document_id).filter((id): id is string => !!id),
+                ...(liveStateLookupError ? { live_state_lookup_error: liveStateLookupError } : {}),
                 financial_start_adjustment_intent: isFinancialStartAdjustmentIntent,
                 financial_adjustment_billing_start_date: financialAdjustmentBillingStartDate,
                 financial_adjustment_origin_reference_date: financialAdjustmentOriginReferenceDate,
