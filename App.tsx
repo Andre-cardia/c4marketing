@@ -37,6 +37,7 @@ import ResetPasswordHandler from './components/ResetPasswordHandler';
 import SetPassword from './pages/SetPassword';
 import DashboardLayout from './components/DashboardLayout';
 import CRM from './pages/CRM';
+import CRMChat from './pages/CRMChat';
 
 const App: React.FC = () => {
 
@@ -65,6 +66,7 @@ const App: React.FC = () => {
               <Route path="/proposals/new" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><CreateProposal /></DashboardLayout></ProtectedRoute>} />
               <Route path="/proposals" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><Proposals /></DashboardLayout></ProtectedRoute>} />
               <Route path="/crm" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'leitor']}><DashboardLayout><CRM /></DashboardLayout></ProtectedRoute>} />
+              <Route path="/crm-chat" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'leitor']}><DashboardLayout><CRMChat /></DashboardLayout></ProtectedRoute>} />
               <Route path="/commercial-dashboard" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><CommercialDashboard /></DashboardLayout></ProtectedRoute>} />
               <Route path="/projects" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><Projects /></DashboardLayout></ProtectedRoute>} />
               <Route path="/projects/:id/traffic" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><TrafficManagement /></DashboardLayout></ProtectedRoute>} />

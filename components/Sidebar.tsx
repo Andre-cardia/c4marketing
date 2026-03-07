@@ -16,6 +16,7 @@ import {
     Target,
     LogOut,
     Activity,
+    MessageSquare,
     SquareKanban
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -89,6 +90,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             label: 'CRM',
             icon: SquareKanban,
             path: '/crm',
+            roles: ['admin', 'gestor', 'comercial', 'leitor']
+        },
+        {
+            label: 'Chat CRM',
+            icon: MessageSquare,
+            path: '/crm-chat',
             roles: ['admin', 'gestor', 'comercial', 'leitor']
         },
         {
