@@ -1,8 +1,9 @@
 
-import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 import { BrainDocType, MatchFilters, RetrievedDoc, RetrievalPolicy } from "./brain-types.ts";
 
-type SupabaseClient = ReturnType<typeof createClient>;
+type SupabaseClient = {
+    rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
 
 export interface MatchOptions {
     topK: number;
@@ -41,7 +42,7 @@ export async function matchBrainDocuments(params: {
         throw new Error(`match_brain_documents failed: ${error.message}`);
     }
 
-    const docs: RetrievedDoc[] = (data ?? [])
+    const docs: RetrievedDoc[] = ((Array.isArray(data) ? data : []) as any[])
         .map((row: any) => ({
             id: row.id,
             content: row.content,

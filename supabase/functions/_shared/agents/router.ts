@@ -128,7 +128,7 @@ function makeDecision(
         agent: AgentName;
         retrieval_policy: RetrievalPolicy;
         top_k: number;
-        tools_allowed: Array<"rag_search" | "db_read" | "brain_sync">;
+        tools_allowed: Array<"rag_search" | "db_read" | "brain_sync" | "db_write">;
         tool_hint?: "rag_search" | "db_query";
         db_query_params?: Record<string, any>;
         confidence: number;
