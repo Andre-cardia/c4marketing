@@ -90,13 +90,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             label: 'CRM',
             icon: SquareKanban,
             path: '/crm',
-            roles: ['admin', 'gestor', 'comercial', 'leitor']
+            roles: ['gestor', 'comercial']
         },
         {
             label: 'Chat CRM',
             icon: MessageSquare,
             path: '/crm-chat',
-            roles: ['admin', 'gestor', 'comercial', 'leitor']
+            roles: ['gestor', 'comercial']
         },
         {
             label: 'Dashboard Fin.',

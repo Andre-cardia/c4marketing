@@ -5,6 +5,7 @@ import {
   corsHeaders,
   evolutionRequest,
   extractConnectedNumber,
+  extractQrCode,
   extractPairingCode,
   extractProfileName,
   getErrorMessage,
@@ -32,6 +33,16 @@ function buildWebhookUrl(instanceName: string) {
   const config = getEvolutionConfig();
   if (!config.webhookUrl) return null;
   return `${config.webhookUrl}&instance=${encodeURIComponent(instanceName)}`;
+}
+
+function buildWebhookPayload(webhookUrl: string) {
+  return {
+    enabled: true,
+    url: webhookUrl,
+    events: [...EVOLUTION_WEBHOOK_EVENTS],
+    base64: true,
+    byEvents: false,
+  };
 }
 
 function sanitizeInstanceName(value: string | null | undefined, fallbackLabel: string) {
@@ -170,13 +181,7 @@ async function ensureRemoteInstance(instanceRow: any) {
     readStatus: settings.read_status ?? false,
     syncFullHistory: settings.sync_full_history ?? false,
     webhook: webhookUrl
-      ? {
-          enabled: true,
-          url: webhookUrl,
-          webhookByEvents: false,
-          webhookBase64: true,
-          events: [...EVOLUTION_WEBHOOK_EVENTS],
-        }
+      ? buildWebhookPayload(webhookUrl)
       : undefined,
   };
 
@@ -199,11 +204,7 @@ async function configureRemoteWebhook(instanceRow: any) {
   const response = await evolutionRequest(config, `/webhook/set/${instanceRow.evolution_instance_name}`, {
     method: 'POST',
     body: JSON.stringify({
-      enabled: true,
-      url: webhookUrl,
-      webhookByEvents: false,
-      webhookBase64: true,
-      events: [...EVOLUTION_WEBHOOK_EVENTS],
+      webhook: buildWebhookPayload(webhookUrl),
     }),
   });
 
@@ -433,25 +434,36 @@ Deno.serve(async (req) => {
       await ensureRemoteInstance(instance);
       await configureRemoteWebhook(instance);
 
-      const ownerNumber = normalizePhoneDigits(body.number || instance.settings?.owner_number || '');
+      const connectMode = String(body.connect_mode || 'qrcode').trim().toLowerCase();
+      const shouldUsePairing = connectMode === 'pairing';
+      const ownerNumber = shouldUsePairing
+        ? normalizePhoneDigits(body.number || instance.settings?.owner_number || '')
+        : '';
       const query = ownerNumber ? `?number=${encodeURIComponent(ownerNumber)}` : '';
       const config = getEvolutionConfig();
       const connect = await evolutionRequest(config, `/instance/connect/${instance.evolution_instance_name}${query}`, {
         method: 'GET',
       });
+      const qrCode = extractQrCode(connect);
+      const pairingCode = extractPairingCode(connect);
+      const hasConnectArtifact = Boolean(qrCode || pairingCode);
 
       const nextSettings = {
         ...(instance.settings || {}),
-        owner_number: ownerNumber || instance.settings?.owner_number || '',
-        last_pairing_code: extractPairingCode(connect),
+        owner_number: shouldUsePairing
+          ? ownerNumber || instance.settings?.owner_number || ''
+          : instance.settings?.owner_number || '',
+        last_pairing_code: pairingCode || (shouldUsePairing ? instance.settings?.last_pairing_code || null : null),
+        last_connect_mode: shouldUsePairing ? 'pairing' : 'qrcode',
+        last_connect_response: connect,
       };
 
       const { data: updatedInstance, error: updateError } = await supabaseAdmin
         .from('crm_chat_instances')
         .update({
-          status: 'qrcode',
-          qr_code: connect?.code || instance.qr_code,
-          qr_code_updated_at: new Date().toISOString(),
+          status: hasConnectArtifact ? 'qrcode' : 'connecting',
+          qr_code: qrCode || (hasConnectArtifact ? instance.qr_code : null),
+          qr_code_updated_at: qrCode ? new Date().toISOString() : instance.qr_code_updated_at,
           settings: nextSettings,
           webhook_url: buildWebhookUrl(instance.evolution_instance_name),
           webhook_configured: true,
