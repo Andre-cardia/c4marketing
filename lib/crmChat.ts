@@ -130,6 +130,36 @@ export interface EvolutionOverview {
   };
 }
 
+export interface CRMChatDiagnostics {
+  timestamp: string;
+  supabaseUrl: string | null;
+  hasAnonKey: boolean;
+  session: {
+    hasSession: boolean;
+    email: string | null;
+    expiresAt: number | null;
+    tokenLooksValid: boolean;
+  };
+  getUser: {
+    ok: boolean;
+    error: string | null;
+    email: string | null;
+  };
+  refreshSession: {
+    ok: boolean;
+    error: string | null;
+    hasSession: boolean;
+  };
+  evolutionManager: {
+    ok: boolean;
+    status: number | null;
+    body: Record<string, any> | null;
+    error: string | null;
+  };
+}
+
+export type EvolutionConnectMode = 'qrcode' | 'pairing';
+
 export const createEmptyChatInstanceForm = (): CRMChatInstanceFormState => ({
   label: '',
   evolution_instance_name: '',
@@ -281,6 +311,157 @@ async function parseInvokeError(error: any, fallback: string): Promise<string> {
   return details;
 }
 
+function isInvalidJwtMessage(message: string): boolean {
+  const normalized = (message || '').toLowerCase();
+  return normalized.includes('invalid jwt')
+    || normalized.includes('jwt expired')
+    || normalized.includes('token is expired')
+    || normalized.includes('jwt malformed')
+    || normalized.includes('session from session_id claim in jwt does not exist')
+    || normalized.includes('sessao invalida')
+    || normalized.includes('sessão inválida')
+    || normalized.includes('sessao expirada')
+    || normalized.includes('sessão expirada');
+}
+
+function normalizeAccessToken(token?: string | null): string | null {
+  if (!token) return null;
+  const cleaned = token.trim().replace(/^Bearer\s+/i, '');
+  const parts = cleaned.split('.');
+  if (parts.length !== 3) return null;
+  if (!parts[0] || !parts[1] || !parts[2]) return null;
+  return cleaned;
+}
+
+async function getValidAccessToken(): Promise<string | null> {
+  const readSessionToken = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    return normalizeAccessToken(sessionData.session?.access_token ?? null);
+  };
+
+  const hasValidRemoteUser = async () => {
+    const { data, error } = await supabase.auth.getUser();
+    return !error && !!data?.user;
+  };
+
+  const localToken = await readSessionToken();
+  if (localToken && await hasValidRemoteUser()) return localToken;
+
+  // Mitiga corrida de inicialização do Supabase Auth ao abrir a tela.
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const retryToken = await readSessionToken();
+  if (retryToken && await hasValidRemoteUser()) return retryToken;
+
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+  if (!refreshError && refreshed.session?.access_token && await hasValidRemoteUser()) {
+    return normalizeAccessToken(refreshed.session.access_token);
+  }
+
+  return null;
+}
+
+async function callEvolutionManagerDirect<T>(body: Record<string, any>, bearerToken: string): Promise<T> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Supabase env ausente no frontend (URL/ANON_KEY).');
+  }
+
+  const safeToken = normalizeAccessToken(bearerToken);
+  if (!safeToken) {
+    throw new Error('invalid_jwt_format');
+  }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/evolution-manager`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: anonKey,
+      Authorization: `Bearer ${safeToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseBody = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const details = responseBody?.error || responseBody?.message || `HTTP ${res.status}`;
+    throw new Error(details);
+  }
+
+  return (responseBody ?? {}) as T;
+}
+
+export async function runCRMChatDiagnostics(): Promise<CRMChatDiagnostics> {
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || null;
+  const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const normalizedToken = normalizeAccessToken(session?.access_token ?? null);
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+
+  const diagnostics: CRMChatDiagnostics = {
+    timestamp: new Date().toISOString(),
+    supabaseUrl,
+    hasAnonKey: !!anonKey,
+    session: {
+      hasSession: !!session,
+      email: session?.user?.email ?? null,
+      expiresAt: session?.expires_at ?? null,
+      tokenLooksValid: !!normalizedToken,
+    },
+    getUser: {
+      ok: !userError && !!userData?.user,
+      error: userError?.message ?? null,
+      email: userData?.user?.email ?? null,
+    },
+    refreshSession: {
+      ok: !refreshError && !!refreshed.session,
+      error: refreshError?.message ?? null,
+      hasSession: !!refreshed.session,
+    },
+    evolutionManager: {
+      ok: false,
+      status: null,
+      body: null,
+      error: null,
+    },
+  };
+
+  if (!supabaseUrl || !anonKey || !normalizedToken) {
+    diagnostics.evolutionManager.error = 'Pré-condições ausentes para chamar a Edge Function.';
+    return diagnostics;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/evolution-manager`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${normalizedToken}`,
+      },
+      body: JSON.stringify({ action: 'overview', instanceId: null }),
+    });
+
+    const body = await res.json().catch(() => null);
+    diagnostics.evolutionManager = {
+      ok: res.ok,
+      status: res.status,
+      body,
+      error: res.ok ? null : (body?.error || body?.message || `HTTP ${res.status}`),
+    };
+  } catch (error: any) {
+    diagnostics.evolutionManager.error = error?.message || 'Falha de rede ao chamar evolution-manager.';
+  }
+
+  return diagnostics;
+}
+
 export async function fetchCRMChatConversations(): Promise<CRMChatConversation[]> {
   const { data, error } = await supabase
     .from('crm_chat_conversations')
@@ -364,16 +545,38 @@ export async function updateCRMConversation(
 }
 
 export async function evolutionManagerInvoke<T>(body: Record<string, any>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('evolution-manager', {
-    body,
-  });
+  const buildReauthMessage = () =>
+    'Sua sessão expirou ou ficou inválida. Atualize a página ou faça login novamente para continuar usando o CRM Chat.';
 
-  if (error) {
-    const details = await parseInvokeError(error, 'Falha ao executar ação da Evolution API');
-    throw new Error(details);
+  const initialToken = await getValidAccessToken();
+  if (!initialToken) {
+    throw new Error(buildReauthMessage());
   }
 
-  return (data ?? {}) as T;
+  try {
+    return await callEvolutionManagerDirect<T>(body, initialToken);
+  } catch (error: any) {
+    const details = error?.message || 'Falha ao executar ação da Evolution API';
+    if (!isInvalidJwtMessage(details)) {
+      throw new Error(details);
+    }
+
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    const retryToken = normalizeAccessToken(refreshed.session?.access_token ?? null);
+    if (refreshError || !retryToken) {
+      throw new Error(buildReauthMessage());
+    }
+
+    try {
+      return await callEvolutionManagerDirect<T>(body, retryToken);
+    } catch (retryError: any) {
+      const retryDetails = retryError?.message || 'Falha ao executar ação da Evolution API';
+      if (isInvalidJwtMessage(retryDetails)) {
+        throw new Error(buildReauthMessage());
+      }
+      throw new Error(retryDetails);
+    }
+  }
 }
 
 export async function getEvolutionOverview(instanceId?: string): Promise<EvolutionOverview> {
@@ -397,10 +600,15 @@ export async function syncEvolutionInstance(instanceId: string) {
   });
 }
 
-export async function connectEvolutionInstance(instanceId: string) {
+export async function connectEvolutionInstance(
+  instanceId: string,
+  options?: { connectMode?: EvolutionConnectMode; number?: string | null }
+) {
   return evolutionManagerInvoke<{ instance: CRMChatInstance; connect?: Record<string, any> | null }>({
     action: 'connect_instance',
     instanceId,
+    connect_mode: options?.connectMode || 'qrcode',
+    number: options?.number || null,
   });
 }
 

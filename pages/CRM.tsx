@@ -42,7 +42,7 @@ import {
 
 const CRM: React.FC = () => {
     const { userRole, loading: roleLoading } = useUserRole();
-    const isReadOnly = userRole === 'leitor';
+    const isReadOnly = false;
 
     const [loading, setLoading] = useState(true);
     const [loadingDetails, setLoadingDetails] = useState(false);
@@ -229,6 +229,14 @@ const CRM: React.FC = () => {
             setLoading(false);
         }
     };
+
+    if (!roleLoading && !['gestor', 'comercial'].includes(userRole || '')) {
+        return (
+            <div className="flex min-h-[420px] items-center justify-center rounded-c4 border border-slate-200 bg-white text-slate-500 dark:border-neutral-800 dark:bg-black/30 dark:text-neutral-400">
+                <p>Acesso restrito a gestores e comercial.</p>
+            </div>
+        );
+    }
 
     const fetchLeadDetails = async (leadId: string) => {
         setLoadingDetails(true);

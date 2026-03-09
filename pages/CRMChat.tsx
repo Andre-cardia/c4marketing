@@ -17,17 +17,20 @@ import {
   User,
   Wifi,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useNavigate } from 'react-router-dom';
 
 import { useUserRole } from '../lib/UserRoleContext';
 import {
   CRMChatConversation,
   CRMChatConversationStatus,
+  CRMChatDiagnostics,
   CRMChatInstance,
   CRMChatInstanceFormState,
   CRMChatLeadSummary,
   CRMChatMessage,
   CRMChatUser,
+  EvolutionConnectMode,
   EvolutionOverview,
   connectEvolutionInstance,
   createEmptyChatInstanceForm,
@@ -47,6 +50,7 @@ import {
   getUserDisplayLabel,
   mapInstanceToForm,
   normalizeConversationSearch,
+  runCRMChatDiagnostics,
   saveEvolutionInstance,
   sendEvolutionText,
   syncEvolutionInstance,
@@ -59,6 +63,17 @@ const statusOptions: Array<{ value: CRMChatConversationStatus; label: string }> 
   { value: 'resolved', label: 'Resolvida' },
   { value: 'archived', label: 'Arquivada' },
 ];
+
+const REAUTH_MESSAGE = 'Sua sessão expirou ou ficou inválida. Atualize a página ou faça login novamente para continuar usando o CRM Chat.';
+
+function isReauthMessage(message?: string | null) {
+  const normalized = (message || '').toLowerCase();
+  return normalized.includes('sessão expirou')
+    || normalized.includes('sessao expirou')
+    || normalized.includes('sessão inválida')
+    || normalized.includes('sessao invalida')
+    || normalized.includes('sua sessão expirou ou ficou inválida');
+}
 
 const SettingsToggle: React.FC<{
   label: string;
@@ -92,7 +107,7 @@ const SettingsToggle: React.FC<{
 const CRMChat: React.FC = () => {
   const navigate = useNavigate();
   const { userRole, loading: roleLoading } = useUserRole();
-  const isReadOnly = userRole === 'leitor';
+  const isReadOnly = false;
 
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -104,6 +119,10 @@ const CRMChat: React.FC = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [authExpired, setAuthExpired] = useState(false);
+  const [runningDiagnostics, setRunningDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<CRMChatDiagnostics | null>(null);
+  const [generatedQrPreview, setGeneratedQrPreview] = useState<string | null>(null);
   const [overview, setOverview] = useState<EvolutionOverview | null>(null);
   const [instance, setInstance] = useState<CRMChatInstance | null>(null);
   const [instanceForm, setInstanceForm] = useState<CRMChatInstanceFormState>(createEmptyChatInstanceForm());
@@ -129,6 +148,58 @@ const CRMChat: React.FC = () => {
   );
   const canSendMessages = !isReadOnly && !!selectedConversation && !!instance?.id && instance.status === 'connected';
 
+  const handleReauthRequired = (message?: string | null) => {
+    setAuthExpired(true);
+    setNotice(null);
+    setPageError(message || REAUTH_MESSAGE);
+    setLoading(false);
+    setRefreshing(false);
+    setLoadingMessages(false);
+    setSavingInstance(false);
+    setSyncingInstance(false);
+    setConnectingInstance(false);
+    setSavingContext(false);
+    setSendingMessage(false);
+  };
+
+  const handleRunDiagnostics = async () => {
+    setRunningDiagnostics(true);
+    try {
+      const result = await runCRMChatDiagnostics();
+      setDiagnostics(result);
+    } catch (error: any) {
+      setDiagnostics({
+        timestamp: new Date().toISOString(),
+        supabaseUrl: null,
+        hasAnonKey: false,
+        session: {
+          hasSession: false,
+          email: null,
+          expiresAt: null,
+          tokenLooksValid: false,
+        },
+        getUser: {
+          ok: false,
+          error: error?.message || 'Falha ao executar diagnóstico.',
+          email: null,
+        },
+        refreshSession: {
+          ok: false,
+          error: null,
+          hasSession: false,
+        },
+        evolutionManager: {
+          ok: false,
+          status: null,
+          body: null,
+          error: null,
+        },
+      });
+    } finally {
+      setRunningDiagnostics(false);
+    }
+  };
+
   const qrPreviewSrc = useMemo(() => {
     const raw = instance?.qr_code || '';
     if (!raw) return null;
@@ -136,8 +207,45 @@ const CRMChat: React.FC = () => {
     if (raw.startsWith('iVBOR') || raw.startsWith('/9j/') || raw.startsWith('R0lGOD')) {
       return `data:image/png;base64,${raw}`;
     }
-    return null;
-  }, [instance]);
+    return generatedQrPreview;
+  }, [generatedQrPreview, instance]);
+
+  useEffect(() => {
+    const raw = instance?.qr_code || '';
+
+    if (!raw) {
+      setGeneratedQrPreview(null);
+      return;
+    }
+
+    if (raw.startsWith('data:image') || raw.startsWith('iVBOR') || raw.startsWith('/9j/') || raw.startsWith('R0lGOD')) {
+      setGeneratedQrPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    QRCode.toDataURL(raw, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 260,
+    })
+      .then((dataUrl) => {
+        if (!cancelled) {
+          setGeneratedQrPreview(dataUrl);
+        }
+      })
+      .catch((error) => {
+        console.warn('Falha ao gerar QR visual a partir do payload textual:', error);
+        if (!cancelled) {
+          setGeneratedQrPreview(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [instance?.qr_code]);
 
   const filteredConversations = useMemo(() => {
     const term = normalizeConversationSearch(conversationSearch);
@@ -165,7 +273,7 @@ const CRMChat: React.FC = () => {
     if (!roleLoading) {
       loadDashboard();
     }
-  }, [roleLoading]);
+  }, [roleLoading, authExpired]);
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -210,6 +318,7 @@ const CRMChat: React.FC = () => {
   }, [instance]);
 
   useEffect(() => {
+    if (authExpired) return;
     const interval = window.setInterval(() => {
       loadDashboard({ silent: true, preserveSelection: true });
       if (selectedConversationId) {
@@ -218,9 +327,10 @@ const CRMChat: React.FC = () => {
     }, 15000);
 
     return () => window.clearInterval(interval);
-  }, [selectedConversationId]);
+  }, [selectedConversationId, authExpired]);
 
   const loadDashboard = async (options?: { silent?: boolean; preserveSelection?: boolean }) => {
+    if (authExpired) return;
     const silent = options?.silent ?? false;
     if (!silent) {
       setLoading(true);
@@ -254,7 +364,11 @@ const CRMChat: React.FC = () => {
       setInstance(nextOverview.instance || fetchedInstance);
     } catch (error: any) {
       console.error('Erro ao carregar central de conversas:', error);
-      setPageError(error.message || 'Não foi possível carregar a central de conversas.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível carregar a central de conversas.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -262,6 +376,7 @@ const CRMChat: React.FC = () => {
   };
 
   const loadMessages = async (conversationId: string, silent = false) => {
+    if (authExpired) return;
     if (!silent) setLoadingMessages(true);
 
     try {
@@ -269,7 +384,9 @@ const CRMChat: React.FC = () => {
       setMessages(data);
     } catch (error: any) {
       console.error('Erro ao carregar mensagens:', error);
-      if (!silent) {
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else if (!silent) {
         setPageError(error.message || 'Não foi possível carregar as mensagens.');
       }
     } finally {
@@ -278,6 +395,7 @@ const CRMChat: React.FC = () => {
   };
 
   const handleSaveInstance = async () => {
+    if (authExpired) return;
     setSavingInstance(true);
     setPageError(null);
     setNotice(null);
@@ -306,14 +424,18 @@ const CRMChat: React.FC = () => {
       await loadDashboard({ silent: true, preserveSelection: true });
     } catch (error: any) {
       console.error('Erro ao salvar instância:', error);
-      setPageError(error.message || 'Não foi possível salvar a instância.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível salvar a instância.');
+      }
     } finally {
       setSavingInstance(false);
     }
   };
 
   const handleSyncInstance = async () => {
-    if (!instance?.id) return;
+    if (!instance?.id || authExpired) return;
     setSyncingInstance(true);
     setPageError(null);
     setNotice(null);
@@ -325,33 +447,58 @@ const CRMChat: React.FC = () => {
       setNotice('Status da instância sincronizado.');
     } catch (error: any) {
       console.error('Erro ao sincronizar instância:', error);
-      setPageError(error.message || 'Não foi possível sincronizar a instância.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível sincronizar a instância.');
+      }
     } finally {
       setSyncingInstance(false);
     }
   };
 
-  const handleConnectInstance = async () => {
-    if (!instance?.id) return;
+  const handleConnectInstance = async (connectMode: EvolutionConnectMode) => {
+    if (!instance?.id || authExpired) return;
     setConnectingInstance(true);
     setPageError(null);
     setNotice(null);
 
     try {
-      const response = await connectEvolutionInstance(instance.id);
+      const response = await connectEvolutionInstance(instance.id, {
+        connectMode,
+        number: connectMode === 'pairing' ? instanceForm.owner_number : null,
+      });
       setInstance(response.instance);
       setOverview((current) => current ? { ...current, instance: response.instance } : current);
-      setNotice('Solicitação de QR/pairing enviada para a Evolution API.');
+      const connectPayload = response.connect || {};
+      const qrCode = response.instance.qr_code || connectPayload.code || connectPayload.qrcode?.base64 || connectPayload.qrcode;
+      const pairingCode = response.instance.settings?.last_pairing_code || connectPayload.pairingCode || connectPayload.response?.pairingCode;
+
+      if (qrCode) {
+        setNotice('QR code recebido da Evolution API e exibido na lateral.');
+      } else if (pairingCode) {
+        setNotice('Pairing code recebido da Evolution API e exibido na lateral.');
+      } else {
+        setNotice(
+          connectMode === 'pairing'
+            ? 'A Evolution aceitou a solicitacao de pairing, mas ainda nao devolveu codigo. Atualize o status em alguns segundos.'
+            : 'A Evolution aceitou a solicitacao de QR, mas ainda nao devolveu imagem ou codigo. Atualize o status em alguns segundos.'
+        );
+      }
     } catch (error: any) {
       console.error('Erro ao conectar instância:', error);
-      setPageError(error.message || 'Não foi possível iniciar a conexão da instância.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível iniciar a conexão da instância.');
+      }
     } finally {
       setConnectingInstance(false);
     }
   };
 
   const handleSaveConversationContext = async () => {
-    if (!selectedConversation) return;
+    if (!selectedConversation || authExpired) return;
     setSavingContext(true);
     setPageError(null);
     setNotice(null);
@@ -380,7 +527,11 @@ const CRMChat: React.FC = () => {
       setNotice('Contexto da conversa atualizado.');
     } catch (error: any) {
       console.error('Erro ao salvar contexto da conversa:', error);
-      setPageError(error.message || 'Não foi possível salvar o contexto da conversa.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível salvar o contexto da conversa.');
+      }
     } finally {
       setSavingContext(false);
     }
@@ -388,7 +539,7 @@ const CRMChat: React.FC = () => {
 
   const handleSendMessage = async (event?: React.FormEvent) => {
     event?.preventDefault();
-    if (!selectedConversation || !instance?.id || instance.status !== 'connected' || !composer.trim() || sendingMessage || isReadOnly) return;
+    if (!selectedConversation || !instance?.id || instance.status !== 'connected' || !composer.trim() || sendingMessage || isReadOnly || authExpired) return;
 
     setSendingMessage(true);
     setPageError(null);
@@ -408,16 +559,20 @@ const CRMChat: React.FC = () => {
       ]);
     } catch (error: any) {
       console.error('Erro ao enviar mensagem:', error);
-      setPageError(error.message || 'Não foi possível enviar a mensagem.');
+      if (isReauthMessage(error.message)) {
+        handleReauthRequired(error.message);
+      } else {
+        setPageError(error.message || 'Não foi possível enviar a mensagem.');
+      }
     } finally {
       setSendingMessage(false);
     }
   };
 
-  if (!roleLoading && !['admin', 'gestor', 'comercial', 'leitor'].includes(userRole || '')) {
+  if (!roleLoading && !['gestor', 'comercial'].includes(userRole || '')) {
     return (
       <div className="flex min-h-[420px] items-center justify-center rounded-c4 border border-slate-200 bg-white text-slate-500 dark:border-neutral-800 dark:bg-black/30 dark:text-neutral-400">
-        <p>Acesso restrito ao time comercial.</p>
+        <p>Acesso restrito a gestores e comercial.</p>
       </div>
     );
   }
@@ -454,12 +609,20 @@ const CRMChat: React.FC = () => {
             Sincronizar status
           </button>
           <button
-            onClick={handleConnectInstance}
+            onClick={() => handleConnectInstance('qrcode')}
             disabled={!instance?.id || connectingInstance || isReadOnly}
             className="inline-flex items-center gap-2 rounded-c4 bg-brand-coral px-4 py-2 text-sm font-black text-white transition hover:bg-brand-coral/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {connectingInstance ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
             Gerar QR
+          </button>
+          <button
+            onClick={() => handleConnectInstance('pairing')}
+            disabled={!instance?.id || connectingInstance || isReadOnly || !instanceForm.owner_number.trim()}
+            className="inline-flex items-center gap-2 rounded-c4 border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:border-neutral-700"
+          >
+            {connectingInstance ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
+            Gerar pairing
           </button>
         </div>
       </div>
@@ -473,6 +636,29 @@ const CRMChat: React.FC = () => {
           }`}
         >
           {pageError || notice}
+        </div>
+      )}
+
+      {authExpired && (
+        <div className="rounded-c4 border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-semibold">
+              Diagnóstico objetivo da sessão e da Edge Function.
+            </p>
+            <button
+              type="button"
+              onClick={handleRunDiagnostics}
+              disabled={runningDiagnostics}
+              className="rounded-c4 border border-amber-300 px-3 py-1.5 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-700 dark:hover:bg-amber-900/30"
+            >
+              {runningDiagnostics ? 'Executando...' : 'Executar diagnóstico'}
+            </button>
+          </div>
+          {diagnostics && (
+            <pre className="mt-3 overflow-x-auto rounded-c4 border border-amber-200 bg-white/70 p-3 text-xs leading-5 dark:border-amber-900/50 dark:bg-black/30">
+{JSON.stringify(diagnostics, null, 2)}
+            </pre>
+          )}
         </div>
       )}
 
@@ -741,7 +927,7 @@ const CRMChat: React.FC = () => {
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-neutral-600">
-                  Número para pairing
+                  Número para pairing (opcional)
                 </label>
                 <input
                   value={instanceForm.owner_number}
@@ -749,6 +935,9 @@ const CRMChat: React.FC = () => {
                   placeholder="5511999999999"
                   className="w-full rounded-c4 border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-brand-coral dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"
                 />
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-neutral-400">
+                  Deixe em branco para tentar QR na tela. Preencha apenas se quiser pareamento por numero.
+                </p>
               </div>
 
               <div className="grid gap-2">

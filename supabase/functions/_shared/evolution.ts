@@ -223,12 +223,31 @@ function coerceString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+export function normalizeEvolutionEventType(value: string | null | undefined) {
+  const raw = coerceString(value);
+  if (!raw) return null;
+
+  return raw
+    .trim()
+    .replace(/[./\s-]+/g, '_')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/__+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase();
+}
+
 export function extractEventType(payload: Record<string, any>, url: URL) {
-  return coerceString(payload.event)
-    || coerceString(payload.type)
-    || coerceString(payload.eventType)
-    || coerceString(payload.trigger)
-    || coerceString(url.searchParams.get('event'));
+  const pathTail = coerceString(url.pathname.split('/').filter(Boolean).at(-1));
+  const pathEvent = pathTail && /[._-]/.test(pathTail) ? pathTail : null;
+  const urlEvent = coerceString(url.searchParams.get('event')) || pathEvent;
+
+  return normalizeEvolutionEventType(
+    coerceString(payload.event)
+      || coerceString(payload.type)
+      || coerceString(payload.eventType)
+      || coerceString(payload.trigger)
+      || urlEvent
+  );
 }
 
 export function extractInstanceName(payload: Record<string, any>, url: URL) {
