@@ -13,7 +13,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const isWideLayout = location.pathname.startsWith('/crm');
 
     return (
-        <div className="flex min-h-screen bg-neutral-50 dark:bg-black text-neutral-900 dark:text-neutral-100">
+        <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
             {/* Sidebar - Desktop and Mobile Drawer */}
             <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 

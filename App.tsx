@@ -44,7 +44,7 @@ const BrainWidgetWrapper = lazy(async () => ({
 
 function AppShellFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black px-6 text-white">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-6 text-white">
       <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm">
         Carregando sistema...
       </div>
@@ -58,7 +58,7 @@ const App: React.FC = () => {
     <UserRoleProvider>
       <ThemeProvider>
         <Router>
-          <div className="relative min-h-screen bg-black">
+          <div className="relative min-h-screen bg-neutral-950">
             <Suspense fallback={<AppShellFallback />}>
               <Routes>
                 {/* Public Routes */}
