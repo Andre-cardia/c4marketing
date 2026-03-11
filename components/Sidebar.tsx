@@ -15,7 +15,9 @@ import {
     BarChart3,
     Target,
     LogOut,
-    Activity
+    Activity,
+    MessageSquare,
+    SquareKanban
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUserRole } from '../lib/UserRoleContext';
@@ -82,6 +84,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             label: 'Propostas',
             icon: FileText,
             path: '/proposals',
+            roles: ['gestor', 'comercial']
+        },
+        {
+            label: 'CRM',
+            icon: SquareKanban,
+            path: '/crm',
+            roles: ['gestor', 'comercial']
+        },
+        {
+            label: 'Chat CRM',
+            icon: MessageSquare,
+            path: '/crm-chat',
             roles: ['gestor', 'comercial']
         },
         {
