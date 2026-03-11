@@ -16,7 +16,7 @@ export interface MonthlyMetrics {
     acceptedProposals: number;
     conversionRate: number;
     setupRevenue: number;
-    totalRevenue: number;  // mrr + setupRevenue
+    totalRevenue: number;  // realized total for past months, projected total for future months
     activeClients: number;
     isForecast: boolean;   // true if this month is a projection
     forecastMRR: number;   // projected MRR (equals mrr for past months, projected for future)
@@ -35,6 +35,9 @@ export interface CommercialContext {
     averageChurnRate: number;
     averageConversionRate: number;
     mrrGrowth: number; // % change from previous month
+    pendingFinancialReviews: number;
+    blockedNonRecurringContracts: number;
+    blockedNonRecurringRevenue: number;
 }
 
 export interface ChatMessage {
@@ -44,6 +47,27 @@ export interface ChatMessage {
 
 const ACTIVE_CONTRACT_STATUSES = new Set(['ativo', 'onboarding', 'em andamento']);
 const FINANCIAL_END_STATUSES = new Set(['cancelado', 'suspenso', 'finalizado', 'inativo']);
+
+function getFinancialReviewSnapshot(acc: any) {
+    const reviewSnapshot = acc?.contract_snapshot?.financial_review;
+    return reviewSnapshot && typeof reviewSnapshot === 'object' && !Array.isArray(reviewSnapshot)
+        ? reviewSnapshot
+        : null;
+}
+
+function mergeAcceptanceProposalData(acceptances: any[], proposals: any[]): any[] {
+    const proposalLookup = new Map(
+        (proposals || []).map((proposal: any) => [Number(proposal.id), proposal])
+    );
+
+    return (acceptances || []).map((acceptance: any) => ({
+        ...acceptance,
+        proposal: acceptance.proposal || proposalLookup.get(Number(acceptance.proposal_id)) || null,
+        acceptance_financial_installments: Array.isArray(acceptance.acceptance_financial_installments)
+            ? acceptance.acceptance_financial_installments
+            : [],
+    }));
+}
 
 // ─── Data Fetching ───────────────────────────────────────────────────────────
 
@@ -61,25 +85,53 @@ export async function fetchCommercialContext(
         .order('created_at', { ascending: true });
 
     // Fetch ALL acceptances with their proposal data
-    const { data: allAcceptances, error: accError } = await supabase
-        .from('acceptances')
-        .select(`
+    const enrichedAcceptancesSelect = `
             id, timestamp, billing_start_date, expiration_date, company_name, status,
+            financial_review_status, financial_review_mode,
             contract_snapshot,
             proposal_id,
-            proposal:proposals (
+            proposal:proposals!acceptances_proposal_id_fkey (
+                id,
                 monthly_fee,
                 setup_fee,
                 services,
                 contract_duration
+            ),
+            acceptance_financial_installments (
+                id,
+                label,
+                amount,
+                expected_date
             )
-        `)
+        `;
+
+    const { data: allAcceptances, error: accError } = await supabase
+        .from('acceptances')
+        .select(enrichedAcceptancesSelect)
         .order('timestamp', { ascending: true });
 
     if (accError) console.error('Erro ao buscar acceptances:', accError);
 
     const proposals = allProposals || [];
-    const acceptances = allAcceptances || [];
+    let acceptances = mergeAcceptanceProposalData(allAcceptances || [], proposals);
+
+    if (accError) {
+        const { data: legacyAcceptances, error: legacyAccError } = await supabase
+            .from('acceptances')
+            .select('id, timestamp, billing_start_date, expiration_date, company_name, status, contract_snapshot, proposal_id')
+            .order('timestamp', { ascending: true });
+
+        if (legacyAccError) {
+            console.error('Erro ao buscar acceptances no fallback legado:', legacyAccError);
+            acceptances = [];
+        } else {
+            acceptances = mergeAcceptanceProposalData(legacyAcceptances || [], proposals);
+        }
+    }
+
+    const blockedNonRecurringAcceptances = acceptances.filter((acc) =>
+        isPendingFinancialReview(acc) && getNonRecurringTotal(acc) > 0
+    );
 
     const months = computeMonthlyMetrics(year, proposals, acceptances);
 
@@ -99,8 +151,8 @@ export async function fetchCommercialContext(
         ? ((currentMRR - previousMonth.mrr) / previousMonth.mrr) * 100
         : 0;
 
-    // Predicted ARR: sum of forecastMRR for each month in the year
-    const predictedARR = months.reduce((sum, m) => sum + m.forecastMRR, 0);
+    // Predicted total revenue: realized past months + projected future months.
+    const predictedARR = months.reduce((sum, m) => sum + m.totalRevenue, 0);
     // Accumulated Revenue (YTD): sum of real revenue (MRR + Setup) for past months only
     const accRevenue = months.filter(m => !m.isForecast).reduce((sum, m) => sum + m.totalRevenue, 0);
     // Actual ARR (annualized run rate): current MRR * 12
@@ -127,6 +179,9 @@ export async function fetchCommercialContext(
         averageChurnRate: Math.round(avgChurn * 10) / 10,
         averageConversionRate: Math.round(avgConversion * 10) / 10,
         mrrGrowth: Math.round(mrrGrowth * 10) / 10,
+        pendingFinancialReviews: acceptances.filter((acc) => isPendingFinancialReview(acc)).length,
+        blockedNonRecurringContracts: blockedNonRecurringAcceptances.length,
+        blockedNonRecurringRevenue: blockedNonRecurringAcceptances.reduce((sum, acc) => sum + getNonRecurringTotal(acc), 0),
     };
 }
 
@@ -149,6 +204,9 @@ function computeMonthlyMetrics(
         const monthEnd = new Date(year, m + 1, 0, 23, 59, 59);
         const activeContractsAtMonthEnd = acceptances.filter(a => isFinanciallyActiveAtDate(a, monthEnd));
         const monthMRR = activeContractsAtMonthEnd.reduce((sum, acc) => sum + getMonthlyFee(acc), 0);
+        const monthSetupRevenue = acceptances.reduce((sum, acc) => (
+            sum + getScheduledSetupRevenueForMonth(acc, monthStart, monthEnd)
+        ), 0);
 
         // Future months: project current active MRR
         if (monthStart > now) {
@@ -157,7 +215,8 @@ function computeMonthlyMetrics(
                 monthLabel: monthLabels[m],
                 mrr: 0, arr: 0, newContracts: 0, churnedContracts: 0,
                 totalProposals: 0, acceptedProposals: 0, conversionRate: 0,
-                setupRevenue: 0, totalRevenue: 0,
+                setupRevenue: monthSetupRevenue,
+                totalRevenue: monthMRR + monthSetupRevenue,
                 activeClients: 0,
                 isForecast: true,
                 forecastMRR: monthMRR,
@@ -181,12 +240,7 @@ function computeMonthlyMetrics(
         const activeContracts = activeContractsAtMonthEnd;
 
         let mrr = monthMRR;
-        let setupRevenue = 0;
-
-        // Setup revenue: sum of setup_fee for contracts started this month
-        monthAcceptances.forEach((acc: any) => {
-            setupRevenue += getSetupFee(acc);
-        });
+        const setupRevenue = monthSetupRevenue;
 
         const churnThisMonth = acceptances.filter(a => {
             const churnDate = getFinancialEndDate(a);
@@ -219,39 +273,94 @@ function computeMonthlyMetrics(
 }
 
 function getMonthlyFee(acc: any): number {
-    // Try linked proposal first
-    if (acc.proposal && acc.proposal.monthly_fee != null) {
-        return Number(acc.proposal.monthly_fee) || 0;
+    const reviewSnapshot = getFinancialReviewSnapshot(acc);
+    if (reviewSnapshot?.monthly_fee != null) {
+        return Number(reviewSnapshot.monthly_fee) || 0;
     }
-    // Fallback to contract_snapshot.proposal.monthly_fee
+    // Try linked proposal first
     if (acc.contract_snapshot?.proposal?.monthly_fee != null) {
         return Number(acc.contract_snapshot.proposal.monthly_fee) || 0;
     }
-    // Manually created projects store value as "value" instead of "monthly_fee"
     if (acc.contract_snapshot?.proposal?.value != null) {
         return Number(acc.contract_snapshot.proposal.value) || 0;
     }
-    // Also check top-level contract_snapshot fields (some snapshots store differently)
     if (acc.contract_snapshot?.monthly_fee != null) {
         return Number(acc.contract_snapshot.monthly_fee) || 0;
+    }
+    if (acc.proposal && acc.proposal.monthly_fee != null) {
+        return Number(acc.proposal.monthly_fee) || 0;
     }
     return 0;
 }
 
 function getSetupFee(acc: any): number {
-    // Try linked proposal first
-    if (acc.proposal && acc.proposal.setup_fee != null) {
-        return Number(acc.proposal.setup_fee) || 0;
+    const reviewSnapshot = getFinancialReviewSnapshot(acc);
+    if (reviewSnapshot?.non_recurring_total != null) {
+        return Number(reviewSnapshot.non_recurring_total) || 0;
     }
-    // Fallback to contract_snapshot
     if (acc.contract_snapshot?.proposal?.setup_fee != null) {
         return Number(acc.contract_snapshot.proposal.setup_fee) || 0;
     }
-    // Also check top-level
     if (acc.contract_snapshot?.setup_fee != null) {
         return Number(acc.contract_snapshot.setup_fee) || 0;
     }
+    if (acc.proposal && acc.proposal.setup_fee != null) {
+        return Number(acc.proposal.setup_fee) || 0;
+    }
     return 0;
+}
+
+function getNonRecurringTotal(acc: any): number {
+    return getSetupFee(acc);
+}
+
+function hasFinancialReviewData(acc: any): boolean {
+    return Object.prototype.hasOwnProperty.call(acc || {}, 'financial_review_status')
+        || Object.prototype.hasOwnProperty.call(acc || {}, 'financial_review_mode')
+        || Object.prototype.hasOwnProperty.call(acc || {}, 'financial_reviewed_at')
+        || Array.isArray(acc?.acceptance_financial_installments);
+}
+
+function isPendingFinancialReview(acc: any): boolean {
+    if (!hasFinancialReviewData(acc)) return false;
+    return String(acc?.financial_review_status || 'pending').trim().toLowerCase() !== 'completed';
+}
+
+function getLegacySetupRevenueForMonth(acc: any, monthStart: Date, monthEnd: Date): number {
+    const acceptedAt = parseDateLike(acc?.timestamp);
+    if (!acceptedAt || acceptedAt < monthStart || acceptedAt > monthEnd) return 0;
+    return getSetupFee(acc);
+}
+
+function getScheduledSetupRevenueForMonth(acc: any, monthStart: Date, monthEnd: Date): number {
+    if (String(acc?.financial_review_mode || '').trim().toLowerCase() === 'no_non_recurring') {
+        return 0;
+    }
+
+    if (getSetupFee(acc) <= 0.01) {
+        return 0;
+    }
+
+    if (!hasFinancialReviewData(acc)) {
+        return getLegacySetupRevenueForMonth(acc, monthStart, monthEnd);
+    }
+
+    if (isPendingFinancialReview(acc)) return 0;
+
+    const installments = Array.isArray(acc?.acceptance_financial_installments)
+        ? acc.acceptance_financial_installments
+        : [];
+
+    if (installments.length === 0) {
+        return getLegacySetupRevenueForMonth(acc, monthStart, monthEnd);
+    }
+
+    return installments.reduce((sum: number, installment: any) => {
+        const expectedDate = parseDateLike(installment?.expected_date, true);
+        if (!expectedDate) return sum;
+        if (expectedDate < monthStart || expectedDate > monthEnd) return sum;
+        return sum + (Number(installment?.amount) || 0);
+    }, 0);
 }
 
 function normalizeContractStatus(acc: any): string {
