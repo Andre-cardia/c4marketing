@@ -42,6 +42,9 @@ export interface ChatMessage {
     content: string;
 }
 
+const ACTIVE_CONTRACT_STATUSES = new Set(['ativo', 'onboarding', 'em andamento']);
+const FINANCIAL_END_STATUSES = new Set(['cancelado', 'suspenso', 'finalizado', 'inativo']);
+
 // ─── Data Fetching ───────────────────────────────────────────────────────────
 
 /**
@@ -185,22 +188,10 @@ function computeMonthlyMetrics(
             setupRevenue += getSetupFee(acc);
         });
 
-        // Churn count: contracts churned up to this month
-        const totalChurnedUpToMonth = acceptances.filter(a => {
-            const acceptDate = new Date(a.timestamp);
-            if (acceptDate > monthEnd) return false;
-            return isChurnedContract(a);
+        const churnThisMonth = acceptances.filter(a => {
+            const churnDate = getFinancialEndDate(a);
+            return Boolean(churnDate && churnDate >= monthStart && churnDate <= monthEnd && isChurnedContract(a));
         }).length;
-
-        // Churn from previous month (for delta calculation)
-        const totalChurnedUpToPrevMonth = m > 0 ? acceptances.filter(a => {
-            const acceptDate = new Date(a.timestamp);
-            const prevMonthEnd = new Date(year, m, 0, 23, 59, 59);
-            if (acceptDate > prevMonthEnd) return false;
-            return isChurnedContract(a);
-        }).length : 0;
-
-        const churnThisMonth = totalChurnedUpToMonth - totalChurnedUpToPrevMonth;
 
         const conversionRate = monthProposals.length > 0
             ? (monthAcceptances.length / monthProposals.length) * 100
@@ -263,24 +254,23 @@ function getSetupFee(acc: any): number {
     return 0;
 }
 
+function normalizeContractStatus(acc: any): string {
+    return String(acc?.status || '').trim().toLowerCase();
+}
+
 /**
  * Checks if an acceptance is considered active.
  * Contracts without explicit status or with active-like statuses are considered active.
  */
 function isActiveContract(acc: any): boolean {
-    const status = (acc.status || '').trim();
-    // If no status set, it's active by default
+    const status = normalizeContractStatus(acc);
     if (!status) return true;
-    // Explicit active statuses
-    const activeStatuses = ['Ativo', 'Onboarding', 'Em andamento', 'ativo', 'onboarding'];
-    return activeStatuses.some(s => s.toLowerCase() === status.toLowerCase());
+    return ACTIVE_CONTRACT_STATUSES.has(status);
 }
 
 function isChurnedContract(acc: any): boolean {
-    const status = (acc.status || '').trim();
-    if (!status) return false;
-    const churnStatuses = ['Cancelado', 'Suspenso', 'Finalizado', 'cancelado', 'suspenso', 'finalizado'];
-    return churnStatuses.some(s => s.toLowerCase() === status.toLowerCase());
+    const status = normalizeContractStatus(acc);
+    return FINANCIAL_END_STATUSES.has(status);
 }
 
 function parseDateLike(value: string | null | undefined, endOfDay = false): Date | null {
@@ -306,20 +296,24 @@ function getFinancialStartDate(acc: any): Date | null {
     return parseDateLike(acc?.timestamp);
 }
 
-function isFinanciallyActiveAtDate(acc: any, referenceDate: Date): boolean {
-    if (!isActiveContract(acc)) return false;
+function getFinancialEndDate(acc: any): Date | null {
+    return parseDateLike(acc?.expiration_date, true);
+}
 
+function isFinanciallyActiveAtDate(acc: any, referenceDate: Date): boolean {
     const financialStart = getFinancialStartDate(acc);
     if (financialStart && financialStart > referenceDate) {
         return false;
     }
 
-    const expirationDate = parseDateLike(acc?.expiration_date, true);
+    const expirationDate = getFinancialEndDate(acc);
     if (expirationDate && expirationDate < referenceDate) {
         return false;
     }
 
-    return true;
+    if (isActiveContract(acc)) return true;
+    if (isChurnedContract(acc)) return Boolean(expirationDate);
+    return false;
 }
 
 // ─── AI Chat ─────────────────────────────────────────────────────────────────

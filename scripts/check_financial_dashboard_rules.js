@@ -31,6 +31,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 const activeStatuses = ['Ativo', 'Onboarding', 'Em andamento', 'ativo', 'onboarding'].map((s) => s.toLowerCase());
+const financialEndStatuses = ['Cancelado', 'Suspenso', 'Finalizado', 'Inativo', 'cancelado', 'suspenso', 'finalizado', 'inativo'].map((s) => s.toLowerCase());
 
 function parseDateLike(value, endOfDay = false) {
   const raw = String(value || '').trim();
@@ -59,9 +60,14 @@ function addDays(date, days) {
 }
 
 function isActiveContract(acc) {
-  const status = (acc?.status || '').trim();
+  const status = String(acc?.status || '').trim().toLowerCase();
   if (!status) return true;
-  return activeStatuses.includes(status.toLowerCase());
+  return activeStatuses.includes(status);
+}
+
+function isFinanciallyEndedContract(acc) {
+  const status = String(acc?.status || '').trim().toLowerCase();
+  return financialEndStatuses.includes(status);
 }
 
 function getMonthlyFee(acc) {
@@ -86,16 +92,20 @@ function getFinancialStartDate(acc) {
   return parseDateLike(acc?.timestamp);
 }
 
-function isFinanciallyActiveAtDate(acc, referenceDate) {
-  if (!isActiveContract(acc)) return false;
+function getFinancialEndDate(acc) {
+  return parseDateLike(acc?.expiration_date, true);
+}
 
+function isFinanciallyActiveAtDate(acc, referenceDate) {
   const financialStart = getFinancialStartDate(acc);
   if (financialStart && financialStart > referenceDate) return false;
 
-  const expirationDate = parseDateLike(acc?.expiration_date, true);
+  const expirationDate = getFinancialEndDate(acc);
   if (expirationDate && expirationDate < referenceDate) return false;
 
-  return true;
+  if (isActiveContract(acc)) return true;
+  if (isFinanciallyEndedContract(acc)) return Boolean(expirationDate);
+  return false;
 }
 
 function mrrAtDate(acceptances, referenceDate) {
@@ -152,6 +162,21 @@ const syntheticTests = [
     },
     beforeDate: new Date('2026-02-28T23:59:59'),
     afterDate: new Date('2026-03-01T00:00:00'),
+    expectedBefore: true,
+    expectedAfter: false,
+  },
+  {
+    name: 'cancelled contract remains active before financial end date',
+    acc: {
+      status: 'Cancelado',
+      timestamp: '2026-01-10T10:00:00.000Z',
+      billing_start_date: '2026-01-10',
+      expiration_date: '2026-03-31',
+      proposal: { monthly_fee: 1800 },
+      contract_snapshot: null,
+    },
+    beforeDate: new Date('2026-02-28T23:59:59'),
+    afterDate: new Date('2026-04-01T00:00:00'),
     expectedBefore: true,
     expectedAfter: false,
   },
