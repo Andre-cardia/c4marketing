@@ -28,6 +28,13 @@ interface SortConfigAcceptance {
     direction: SortDirection;
 }
 
+const FINANCIAL_END_ACCEPTANCE_STATUSES = new Set(['Inativo', 'Suspenso', 'Cancelado', 'Finalizado']);
+
+const toLocalDateInputValue = (date: Date = new Date()) => {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().split('T')[0];
+};
+
 const Proposals: React.FC = () => {
     const navigate = useNavigate();
     const { userRole, loading: roleLoading } = useUserRole();
@@ -123,14 +130,27 @@ const Proposals: React.FC = () => {
     };
 
     const handleStatusChange = async (id: number, newStatus: string) => {
+        const currentAcceptance = acceptances.find((acc) => acc.id === id);
+        const today = toLocalDateInputValue();
+        const shouldSetFinancialEndDate = FINANCIAL_END_ACCEPTANCE_STATUSES.has(newStatus)
+            && (!currentAcceptance?.expiration_date || currentAcceptance.expiration_date > today);
+        const nextExpirationDate = shouldSetFinancialEndDate
+            ? today
+            : (currentAcceptance?.expiration_date || '');
+
         setAcceptances(prev => prev.map(acc =>
-            acc.id === id ? { ...acc, status: newStatus } : acc
+            acc.id === id
+                ? { ...acc, status: newStatus, expiration_date: nextExpirationDate || acc.expiration_date }
+                : acc
         ));
 
         try {
             const { error } = await supabase
                 .from('acceptances')
-                .update({ status: newStatus })
+                .update({
+                    status: newStatus,
+                    ...(shouldSetFinancialEndDate ? { expiration_date: today } : {}),
+                })
                 .eq('id', id);
 
             if (error) throw error;
