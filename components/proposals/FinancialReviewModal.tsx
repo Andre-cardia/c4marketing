@@ -150,6 +150,8 @@ const FinancialReviewModal: React.FC<FinancialReviewModalProps> = ({
     const allocatedTotal = useMemo(() => (
         installments.reduce((sum, installment) => sum + (Number(installment.amount) || 0), 0)
     ), [installments]);
+    const singlePaymentAmount = Number(installments[0]?.amount) || 0;
+    const singlePaymentRemaining = Math.max(0, reviewedNonRecurringTotal - singlePaymentAmount);
 
     const validationMessage = useMemo(() => {
         if (!acceptance) return 'Nenhum aceite selecionado.';
@@ -224,6 +226,26 @@ const FinancialReviewModal: React.FC<FinancialReviewModalProps> = ({
 
     const addInstallment = () => {
         setInstallments((current) => [...current, { label: '', amount: '', expected_date: '' }]);
+    };
+
+    const convertSinglePaymentToTwoInstallments = () => {
+        const firstInstallment = installments[0];
+        const firstAmount = Number(firstInstallment?.amount) || 0;
+        const remainingAmount = Math.max(0, reviewedNonRecurringTotal - firstAmount);
+
+        setMode('installments');
+        setInstallments([
+            {
+                label: firstInstallment?.label || 'Parcela 1',
+                amount: toAmountInputValue(firstAmount),
+                expected_date: firstInstallment?.expected_date || (acceptance.acceptedAt ? acceptance.acceptedAt.split('T')[0] : ''),
+            },
+            {
+                label: 'Parcela 2',
+                amount: toAmountInputValue(remainingAmount),
+                expected_date: '',
+            },
+        ]);
     };
 
     const removeInstallment = (index: number) => {
@@ -449,6 +471,21 @@ const FinancialReviewModal: React.FC<FinancialReviewModalProps> = ({
                                         )}
                                     </div>
                                 ))}
+
+                                {mode === 'single_payment' && singlePaymentAmount > 0.01 && singlePaymentRemaining > 0.01 && (
+                                    <div className="flex flex-col gap-3 rounded-xl border border-amber-300/40 bg-amber-50/70 p-3 text-sm dark:border-amber-900/60 dark:bg-amber-950/20">
+                                        <p className="text-amber-800 dark:text-amber-200">
+                                            Ainda faltam {formatCurrency(singlePaymentRemaining)} para fechar o total. Se o cliente vai pagar em mais de uma vez, transforme este lancamento em parcelas.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={convertSinglePaymentToTwoInstallments}
+                                            className="inline-flex items-center justify-center rounded-lg border border-amber-400/40 px-3 py-2 text-xs font-bold text-amber-800 transition-colors hover:border-brand-coral hover:text-brand-coral dark:text-amber-200"
+                                        >
+                                            Transformar em 2 parcelas
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
