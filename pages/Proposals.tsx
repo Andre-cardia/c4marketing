@@ -3,6 +3,13 @@ import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Users, Building, Calendar, Link as LinkIcon, ExternalLink, Trash2, Plus, FileText, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import { getCompanyDisplayName } from '../lib/utils';
+import FinancialReviewModal, {
+    FinancialReviewAcceptanceSummary,
+    FinancialReviewInstallment,
+    FinancialReviewInstallmentInput,
+    FinancialReviewMode,
+} from '../components/proposals/FinancialReviewModal';
 
 interface Proposal {
     id: number;
@@ -12,6 +19,30 @@ interface Proposal {
     created_at: string;
     contract_duration: number;
     services?: { id: string; price: number }[];
+}
+
+interface Acceptance {
+    id: number;
+    proposal_id?: number | null;
+    name: string;
+    email?: string | null;
+    company_name: string;
+    company_alias?: string | null;
+    company_display_name?: string;
+    cnpj?: string | null;
+    timestamp: string;
+    status?: string | null;
+    expiration_date?: string | null;
+    billing_start_date?: string | null;
+    financial_review_status?: string | null;
+    financial_review_mode?: string | null;
+    financial_reviewed_at?: string | null;
+    contract_snapshot?: any;
+    proposal?: {
+        monthly_fee?: number | null;
+        setup_fee?: number | null;
+    } | null;
+    acceptance_financial_installments?: FinancialReviewInstallment[];
 }
 
 type SortKeyProposal = 'created_at' | 'company_name' | 'responsible_name';
@@ -35,13 +66,97 @@ const toLocalDateInputValue = (date: Date = new Date()) => {
     return localDate.toISOString().split('T')[0];
 };
 
+const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+
+const getFinancialReviewSnapshot = (acceptance: Acceptance) => {
+    const reviewSnapshot = acceptance.contract_snapshot?.financial_review;
+    return reviewSnapshot && typeof reviewSnapshot === 'object' && !Array.isArray(reviewSnapshot)
+        ? reviewSnapshot
+        : null;
+};
+
+const getAcceptanceMonthlyFee = (acceptance: Acceptance) => {
+    const reviewSnapshot = getFinancialReviewSnapshot(acceptance);
+    if (reviewSnapshot?.monthly_fee != null) return Number(reviewSnapshot.monthly_fee) || 0;
+    if (acceptance.contract_snapshot?.proposal?.monthly_fee != null) return Number(acceptance.contract_snapshot.proposal.monthly_fee) || 0;
+    if (acceptance.contract_snapshot?.proposal?.value != null) return Number(acceptance.contract_snapshot.proposal.value) || 0;
+    if (acceptance.contract_snapshot?.monthly_fee != null) return Number(acceptance.contract_snapshot.monthly_fee) || 0;
+    if (acceptance.proposal?.monthly_fee != null) return Number(acceptance.proposal.monthly_fee) || 0;
+    return 0;
+};
+
+const getAcceptanceNonRecurringTotal = (acceptance: Acceptance) => {
+    const reviewSnapshot = getFinancialReviewSnapshot(acceptance);
+    if (reviewSnapshot?.non_recurring_total != null) return Number(reviewSnapshot.non_recurring_total) || 0;
+    if (acceptance.contract_snapshot?.proposal?.setup_fee != null) return Number(acceptance.contract_snapshot.proposal.setup_fee) || 0;
+    if (acceptance.contract_snapshot?.setup_fee != null) return Number(acceptance.contract_snapshot.setup_fee) || 0;
+    if (acceptance.proposal?.setup_fee != null) return Number(acceptance.proposal.setup_fee) || 0;
+    return 0;
+};
+
+const hasFinancialReviewData = (acceptance: Partial<Acceptance> | Record<string, any>) => (
+    Object.prototype.hasOwnProperty.call(acceptance, 'financial_review_status')
+    || Object.prototype.hasOwnProperty.call(acceptance, 'financial_review_mode')
+    || Object.prototype.hasOwnProperty.call(acceptance, 'financial_reviewed_at')
+    || Array.isArray((acceptance as Acceptance).acceptance_financial_installments)
+);
+
+const isFinancialReviewPending = (acceptance: Acceptance) =>
+    hasFinancialReviewData(acceptance)
+        ? String(acceptance.financial_review_status || 'pending').trim().toLowerCase() !== 'completed'
+        : false;
+
+const normalizeAcceptances = (
+    rows: any[],
+    proposalLookup: Map<number, { monthly_fee?: number | null; setup_fee?: number | null }>
+) => rows.map((item: any) => ({
+    ...item,
+    proposal: item.proposal || proposalLookup.get(Number(item.proposal_id)) || null,
+    company_display_name: getCompanyDisplayName(item.company_name, item.company_alias),
+    acceptance_financial_installments: Array.isArray(item.acceptance_financial_installments)
+        ? [...item.acceptance_financial_installments].sort((left: FinancialReviewInstallment, right: FinancialReviewInstallment) => (
+            String(left.expected_date || '').localeCompare(String(right.expected_date || ''))
+        ))
+        : [],
+}));
+
+const isMissingFinancialReviewStructureError = (error: any) => {
+    const message = String(error?.message || error || '').toLowerCase();
+    return message.includes('acceptance_financial_installments')
+        || message.includes('financial_review_')
+        || message.includes('save_acceptance_financial_review')
+        || message.includes('candidate function')
+        || message.includes('schema cache')
+        || message.includes('column')
+        || message.includes('relation');
+};
+
+const mapAcceptanceToReviewSummary = (acceptance: Acceptance): FinancialReviewAcceptanceSummary => ({
+    id: acceptance.id,
+    companyDisplayName: getCompanyDisplayName(acceptance.company_name, acceptance.company_alias),
+    acceptedAt: acceptance.timestamp,
+    billingStartDate: acceptance.billing_start_date || '',
+    monthlyFee: getAcceptanceMonthlyFee(acceptance),
+    nonRecurringTotal: getAcceptanceNonRecurringTotal(acceptance),
+    financialReviewMode: acceptance.financial_review_mode,
+    installments: Array.isArray(acceptance.acceptance_financial_installments)
+        ? acceptance.acceptance_financial_installments
+        : [],
+});
+
 const Proposals: React.FC = () => {
     const navigate = useNavigate();
     const { userRole, loading: roleLoading } = useUserRole();
+    const canManageFinancialReview = userRole === 'gestor' || userRole === 'admin';
 
     const [proposals, setProposals] = useState<Proposal[]>([]);
     const [loading, setLoading] = useState(true);
-    const [acceptances, setAcceptances] = useState<any[]>([]);
+    const [acceptances, setAcceptances] = useState<Acceptance[]>([]);
+    const [financialReviewAcceptance, setFinancialReviewAcceptance] = useState<Acceptance | null>(null);
+    const [isFinancialReviewOpen, setIsFinancialReviewOpen] = useState(false);
+    const [isSavingFinancialReview, setIsSavingFinancialReview] = useState(false);
+    const [hasAutoOpenedFinancialReview, setHasAutoOpenedFinancialReview] = useState(false);
 
     // Filter & Sort State
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,13 +165,13 @@ const Proposals: React.FC = () => {
 
     // Access control - redirect if not gestor or comercial
     useEffect(() => {
-        if (!roleLoading && userRole !== 'gestor' && userRole !== 'comercial') {
+        if (!roleLoading && userRole !== 'gestor' && userRole !== 'comercial' && userRole !== 'admin') {
             navigate('/dashboard');
         }
     }, [userRole, roleLoading, navigate]);
 
     useEffect(() => {
-        if (userRole === 'gestor' || userRole === 'comercial') {
+        if (userRole === 'gestor' || userRole === 'comercial' || userRole === 'admin') {
             fetchData();
         }
     }, [userRole]);
@@ -73,8 +188,72 @@ const Proposals: React.FC = () => {
     };
 
     const fetchAcceptances = async () => {
-        const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
-        if (data) setAcceptances(data);
+        const enrichedSelect = `
+                *,
+                proposal:proposals!acceptances_proposal_id_fkey (
+                    id,
+                    monthly_fee,
+                    setup_fee
+                ),
+                acceptance_financial_installments (
+                    id,
+                    label,
+                    amount,
+                    expected_date
+                )
+            `;
+
+        let acceptanceRows: any[] = [];
+
+        const { data, error } = await supabase
+            .from('acceptances')
+            .select(enrichedSelect)
+            .order('timestamp', { ascending: false });
+
+        if (error) {
+            console.warn('Falling back to legacy acceptances query:', error.message);
+            const { data: legacyData, error: legacyError } = await supabase
+                .from('acceptances')
+                .select('*')
+                .order('timestamp', { ascending: false });
+
+            if (legacyError) {
+                console.error('Error fetching acceptances:', legacyError);
+                setAcceptances([]);
+                return;
+            }
+
+            acceptanceRows = legacyData || [];
+        } else {
+            acceptanceRows = data || [];
+        }
+
+        const proposalIds = [...new Set(
+            acceptanceRows
+                .map((item: any) => Number(item.proposal_id))
+                .filter((id) => Number.isFinite(id) && id > 0)
+        )];
+
+        const proposalLookup = new Map<number, { monthly_fee?: number | null; setup_fee?: number | null }>();
+        if (proposalIds.length > 0) {
+            const { data: proposalRows, error: proposalError } = await supabase
+                .from('proposals')
+                .select('id, monthly_fee, setup_fee')
+                .in('id', proposalIds);
+
+            if (proposalError) {
+                console.error('Error fetching acceptance proposal lookup:', proposalError);
+            } else {
+                (proposalRows || []).forEach((proposal: any) => {
+                    proposalLookup.set(Number(proposal.id), {
+                        monthly_fee: proposal.monthly_fee,
+                        setup_fee: proposal.setup_fee,
+                    });
+                });
+            }
+        }
+
+        setAcceptances(normalizeAcceptances(acceptanceRows, proposalLookup));
     };
 
     const handleDeleteProposal = async (id: number) => {
@@ -234,6 +413,153 @@ const Proposals: React.FC = () => {
         }
     };
 
+    const openFinancialReview = (acceptance: Acceptance) => {
+        setFinancialReviewAcceptance(acceptance);
+        setIsFinancialReviewOpen(true);
+    };
+
+    const closeFinancialReview = () => {
+        setIsFinancialReviewOpen(false);
+        setFinancialReviewAcceptance(null);
+    };
+
+    const saveFinancialReviewWithoutRpc = async (
+        acceptanceId: number,
+        mode: FinancialReviewMode,
+        installments: Array<{ label: string; amount: number; expected_date: string }>,
+        billingStartDate: string,
+        monthlyFee: number,
+        nonRecurringTotal: number
+    ) => {
+        const reviewedAt = new Date().toISOString();
+        const persistedNonRecurringTotal = mode === 'no_non_recurring' ? 0 : nonRecurringTotal;
+        const currentSnapshot = (
+            financialReviewAcceptance?.contract_snapshot
+            && typeof financialReviewAcceptance.contract_snapshot === 'object'
+            && !Array.isArray(financialReviewAcceptance.contract_snapshot)
+        )
+            ? { ...financialReviewAcceptance.contract_snapshot }
+            : {};
+        const currentProposalSnapshot = (
+            currentSnapshot.proposal
+            && typeof currentSnapshot.proposal === 'object'
+            && !Array.isArray(currentSnapshot.proposal)
+        )
+            ? { ...currentSnapshot.proposal }
+            : {};
+
+        currentSnapshot.proposal = {
+            ...currentProposalSnapshot,
+            monthly_fee: monthlyFee,
+            setup_fee: persistedNonRecurringTotal,
+        };
+        currentSnapshot.monthly_fee = monthlyFee;
+        currentSnapshot.setup_fee = persistedNonRecurringTotal;
+        currentSnapshot.financial_review = {
+            ...(currentSnapshot.financial_review && typeof currentSnapshot.financial_review === 'object'
+                ? currentSnapshot.financial_review
+                : {}),
+            monthly_fee: monthlyFee,
+            non_recurring_total: persistedNonRecurringTotal,
+            billing_start_date: billingStartDate || null,
+            mode,
+            reviewed_at: reviewedAt,
+        };
+
+        const { error: deleteError } = await supabase
+            .from('acceptance_financial_installments')
+            .delete()
+            .eq('acceptance_id', acceptanceId);
+
+        if (deleteError && !(mode === 'no_non_recurring' && isMissingFinancialReviewStructureError(deleteError))) {
+            throw deleteError;
+        }
+
+        if (mode !== 'no_non_recurring' && installments.length > 0) {
+            const { error: insertError } = await supabase
+                .from('acceptance_financial_installments')
+                .insert(
+                    installments.map((installment) => ({
+                        acceptance_id: acceptanceId,
+                        label: installment.label || null,
+                        amount: installment.amount,
+                        expected_date: installment.expected_date,
+                    }))
+                );
+
+            if (insertError) throw insertError;
+        }
+
+        const { error: updateError } = await supabase
+            .from('acceptances')
+            .update({
+                billing_start_date: billingStartDate || null,
+                contract_snapshot: currentSnapshot,
+                financial_review_status: 'completed',
+                financial_review_mode: mode,
+                financial_reviewed_at: reviewedAt,
+            })
+            .eq('id', acceptanceId);
+
+        if (updateError) throw updateError;
+    };
+
+    const handleSaveFinancialReview = async (
+        mode: FinancialReviewMode,
+        installments: FinancialReviewInstallmentInput[],
+        billingStartDate: string,
+        monthlyFee: number,
+        nonRecurringTotal: number
+    ) => {
+        if (!financialReviewAcceptance) return;
+
+        setIsSavingFinancialReview(true);
+        try {
+            const normalizedInstallments = installments.map((installment) => ({
+                label: installment.label.trim(),
+                amount: Number(installment.amount) || 0,
+                expected_date: installment.expected_date,
+            }));
+
+            try {
+                await saveFinancialReviewWithoutRpc(
+                    financialReviewAcceptance.id,
+                    mode,
+                    normalizedInstallments,
+                    billingStartDate,
+                    monthlyFee,
+                    nonRecurringTotal
+                );
+            } catch (fallbackError: any) {
+                if (isMissingFinancialReviewStructureError(fallbackError)) {
+                    throw new Error('A estrutura de revisao financeira ainda nao foi publicada no banco. Aplique a migration financeira mais recente e tente novamente.');
+                }
+                throw fallbackError;
+            }
+
+            closeFinancialReview();
+            await fetchAcceptances();
+        } catch (error: any) {
+            console.error('Error saving financial review:', error);
+            alert(error?.message || 'Erro ao salvar revisao financeira.');
+        } finally {
+            setIsSavingFinancialReview(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!canManageFinancialReview || hasAutoOpenedFinancialReview || isFinancialReviewOpen || acceptances.length === 0) {
+            return;
+        }
+
+        const latestPendingAcceptance = acceptances.find((acceptance) => isFinancialReviewPending(acceptance));
+        if (!latestPendingAcceptance) return;
+
+        setFinancialReviewAcceptance(latestPendingAcceptance);
+        setIsFinancialReviewOpen(true);
+        setHasAutoOpenedFinancialReview(true);
+    }, [acceptances, canManageFinancialReview, hasAutoOpenedFinancialReview, isFinancialReviewOpen]);
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'Ativo': return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
@@ -242,6 +568,47 @@ const Proposals: React.FC = () => {
             case 'Finalizado': return 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800/50 dark:text-neutral-400 dark:border-neutral-700';
             default: return 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:border-neutral-700';
         }
+    };
+
+    const getFinancialReviewPresentation = (acceptance: Acceptance) => {
+        const nonRecurringTotal = getAcceptanceNonRecurringTotal(acceptance);
+        const installments = Array.isArray(acceptance.acceptance_financial_installments)
+            ? acceptance.acceptance_financial_installments
+            : [];
+
+        if (isFinancialReviewPending(acceptance)) {
+            return {
+                label: 'Revisao pendente',
+                detail: nonRecurringTotal > 0
+                    ? `${formatCurrency(nonRecurringTotal)} bloqueados fora do MRR`
+                    : `Recorrencia inicia em ${acceptance.billing_start_date ? new Date(`${acceptance.billing_start_date}T00:00:00`).toLocaleDateString('pt-BR') : 'data pendente'}`,
+                tone: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800',
+            };
+        }
+
+        if (acceptance.financial_review_mode === 'installments') {
+            return {
+                label: 'Parcelado',
+                detail: `${installments.length} parcela${installments.length === 1 ? '' : 's'} • ${formatCurrency(nonRecurringTotal)}`,
+                tone: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800',
+            };
+        }
+
+        if (acceptance.financial_review_mode === 'single_payment') {
+            return {
+                label: 'Pagamento unico',
+                detail: `1 parcela • ${formatCurrency(nonRecurringTotal)}`,
+                tone: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800',
+            };
+        }
+
+        return {
+            label: 'Sem nao recorrente',
+            detail: acceptance.billing_start_date
+                ? `MRR inicia em ${new Date(`${acceptance.billing_start_date}T00:00:00`).toLocaleDateString('pt-BR')}`
+                : 'Nada a lancar fora do MRR',
+            tone: 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800/50 dark:text-neutral-300 dark:border-neutral-700',
+        };
     };
 
     const copyLink = (slug: string) => {
@@ -300,6 +667,7 @@ const Proposals: React.FC = () => {
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             sorted = sorted.filter(a =>
+                getCompanyDisplayName(a.company_name, a.company_alias).toLowerCase().includes(lowerTerm) ||
                 a.company_name.toLowerCase().includes(lowerTerm) ||
                 a.name.toLowerCase().includes(lowerTerm)
             );
@@ -308,8 +676,8 @@ const Proposals: React.FC = () => {
         sorted.sort((a, b) => {
             if (sortAcceptances.key === 'company_name') {
                 return sortAcceptances.direction === 'asc'
-                    ? a.company_name.localeCompare(b.company_name)
-                    : b.company_name.localeCompare(a.company_name);
+                    ? getCompanyDisplayName(a.company_name, a.company_alias).localeCompare(getCompanyDisplayName(b.company_name, b.company_alias))
+                    : getCompanyDisplayName(b.company_name, b.company_alias).localeCompare(getCompanyDisplayName(a.company_name, a.company_alias));
             } else if (sortAcceptances.key === 'name') {
                 return sortAcceptances.direction === 'asc'
                     ? a.name.localeCompare(b.name)
@@ -343,6 +711,11 @@ const Proposals: React.FC = () => {
         if (sortAcceptances.key !== key) return <ArrowUpDown className="w-4 h-4 opacity-30" />;
         return sortAcceptances.direction === 'asc' ? <ArrowUp className="w-4 h-4 text-brand-coral" /> : <ArrowDown className="w-4 h-4 text-brand-coral" />;
     };
+
+    const pendingFinancialReviewCount = acceptances.filter((acceptance) => isFinancialReviewPending(acceptance)).length;
+    const pendingBlockedFinancialReviewCount = acceptances.filter((acceptance) => (
+        isFinancialReviewPending(acceptance) && getAcceptanceNonRecurringTotal(acceptance) > 0
+    )).length;
 
     return (
         <div className="space-y-8">
@@ -488,6 +861,17 @@ const Proposals: React.FC = () => {
                 <p className="text-neutral-500 dark:text-neutral-400 text-sm">Contratos ativos e finalizados.</p>
             </div>
 
+            {pendingFinancialReviewCount > 0 && (
+                <div className="rounded-c4 border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+                    <span className="font-bold">{pendingFinancialReviewCount} aceite(s)</span> aguardando revisao financeira.
+                    {pendingBlockedFinancialReviewCount > 0 && (
+                        <span className="ml-2">
+                            {pendingBlockedFinancialReviewCount} com receita nao recorrente bloqueada na projecao.
+                        </span>
+                    )}
+                </div>
+            )}
+
             <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden transition-colors">
                 {loading ? (
                     <div className="p-8 text-center text-neutral-400">Carregando dados...</div>
@@ -526,6 +910,7 @@ const Proposals: React.FC = () => {
                                         </div>
                                     </th>
                                     <th className="p-5 font-bold">Contrato</th>
+                                    <th className="p-5 font-bold">Financeiro</th>
                                     <th
                                         className="p-5 font-bold cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors group"
                                         onClick={() => handleSortAcceptances('expiration_date')}
@@ -549,7 +934,7 @@ const Proposals: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800 text-sm text-neutral-600 dark:text-neutral-300">
                                 {filteredAcceptances.map((acc) => (
-                                    <tr key={acc.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
+                                    <tr key={acc.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors align-top">
                                         <td className="p-5">
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="w-4 h-4 text-neutral-300 dark:text-neutral-600" />
@@ -578,8 +963,11 @@ const Proposals: React.FC = () => {
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
                                                     <Building className="w-4 h-4 text-neutral-300 dark:text-neutral-600" />
-                                                    <span className="font-semibold text-neutral-700 dark:text-neutral-200">{acc.company_name}</span>
+                                                    <span className="font-semibold text-neutral-700 dark:text-neutral-200">{getCompanyDisplayName(acc.company_name, acc.company_alias)}</span>
                                                 </div>
+                                                {acc.company_alias && (
+                                                    <span className="text-[11px] text-neutral-400 pl-6">Razão social: {acc.company_name}</span>
+                                                )}
                                                 <input
                                                     type="text"
                                                     value={acc.cnpj || ''}
@@ -612,6 +1000,38 @@ const Proposals: React.FC = () => {
                                                     Cliente
                                                 </a>
                                             </div>
+                                        </td>
+                                        <td className="p-5 min-w-[240px]">
+                                            {(() => {
+                                                const financial = getFinancialReviewPresentation(acc);
+
+                                                return (
+                                                    <div className="space-y-3">
+                                                        <div className={`inline-flex rounded-lg border px-2.5 py-1 text-[11px] font-bold ${financial.tone}`}>
+                                                            {financial.label}
+                                                        </div>
+                                                        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                                                            {financial.detail}
+                                                        </div>
+                                                        {canManageFinancialReview ? (
+                                                            <button
+                                                                onClick={() => openFinancialReview(acc)}
+                                                                className="inline-flex items-center gap-2 rounded-lg border border-brand-coral/30 px-3 py-1.5 text-xs font-bold text-brand-coral hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                                            >
+                                                                {isFinancialReviewPending(acc) ? 'Revisar financeiro' : 'Editar revisao'}
+                                                            </button>
+                                                        ) : isFinancialReviewPending(acc) ? (
+                                                            <span className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-bold text-neutral-500 dark:text-neutral-300">
+                                                                Aguardando gestor
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-bold text-neutral-500 dark:text-neutral-300">
+                                                                Revisado
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="p-5">
                                             <input
@@ -650,6 +1070,14 @@ const Proposals: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <FinancialReviewModal
+                isOpen={isFinancialReviewOpen}
+                acceptance={financialReviewAcceptance ? mapAcceptanceToReviewSummary(financialReviewAcceptance) : null}
+                isSaving={isSavingFinancialReview}
+                onClose={closeFinancialReview}
+                onSave={handleSaveFinancialReview}
+            />
         </div>
     );
 };
