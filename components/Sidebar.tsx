@@ -30,21 +30,22 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(() => {
+        if (typeof window === 'undefined') return true;
+        const savedState = localStorage.getItem('sidebar-collapsed');
+        return savedState ? savedState === 'true' : true;
+    });
+    const [isDesktopHovered, setIsDesktopHovered] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const { userRole, loading, fullName, avatarUrl, email: userEmail } = useUserRole();
 
-    // Load collapse state from localStorage
     useEffect(() => {
-        const savedState = localStorage.getItem('sidebar-collapsed');
-        if (savedState) setIsCollapsed(savedState === 'true');
-    }, []);
+        localStorage.setItem('sidebar-collapsed', String(isCollapsed));
+    }, [isCollapsed]);
 
     const toggleCollapse = () => {
-        const newState = !isCollapsed;
-        setIsCollapsed(newState);
-        localStorage.setItem('sidebar-collapsed', String(newState));
+        setIsCollapsed((current) => !current);
     };
 
     const handleLogout = async () => {
@@ -129,6 +130,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
     );
 
     const isActive = (path: string) => location.pathname === path;
+    const isHoverExpanded = isCollapsed && isDesktopHovered;
+    const isVisuallyCollapsed = isCollapsed && !isDesktopHovered;
+    const desktopSidebarWidthClass = isCollapsed ? 'w-20' : 'w-64';
 
     const getUserInitials = () => {
         if (fullName) {
@@ -141,14 +145,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
     };
 
     const SidebarContent = (
-        <div className={`h-full flex flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300 overflow-x-hidden ${isCollapsed ? 'w-20' : 'w-64'}`}>
+        <div className={`h-full flex flex-col bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300 overflow-x-hidden ${isVisuallyCollapsed ? 'w-20' : 'w-64'}`}>
             {/* Logo Section */}
-            <div className={`flex flex-col justify-center transition-all duration-300 border-b border-neutral-100 dark:border-neutral-800 ${isCollapsed ? 'h-16 items-center px-2' : 'h-24 items-center px-6'}`}>
+            <div className={`flex flex-col justify-center transition-all duration-300 border-b border-neutral-100 dark:border-neutral-800 ${isVisuallyCollapsed ? 'h-16 items-center px-2' : 'h-24 items-center px-6'}`}>
                 <div className="flex flex-col items-center gap-0.5 overflow-hidden w-full">
                     <span className="font-montserrat font-extrabold text-neutral-900 dark:text-white text-lg tracking-tighter whitespace-nowrap">
-                        {isCollapsed ? 'G4' : 'GRUPO C4'}
+                        {isVisuallyCollapsed ? 'G4' : 'GRUPO C4'}
                     </span>
-                    {!isCollapsed && (
+                    {!isVisuallyCollapsed && (
                         <div className="scale-75 opacity-80">
                             <DigitalClock />
                         </div>
@@ -170,17 +174,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
                                 ? 'bg-brand-coral text-white shadow-lg shadow-brand-coral/20'
                                 : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white'
                             }`}
-                        title={isCollapsed ? item.label : ''}
+                        title={isVisuallyCollapsed ? item.label : ''}
                     >
                         <item.icon size={20} className={`min-w-[20px] ${isActive(item.path) ? 'text-white' : (item as any).isIA ? 'text-brand-coral' : ''}`} />
-                        {!isCollapsed && (
+                        {!isVisuallyCollapsed && (
                             <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
                                 {item.label}
                             </span>
                         )}
 
                         {/* Tooltip for collapsed mode */}
-                        {isCollapsed && (
+                        {isVisuallyCollapsed && (
                             <div className="absolute left-full ml-4 px-2 py-1 bg-neutral-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-neutral-800 shadow-xl">
                                 {item.label}
                             </div>
@@ -195,7 +199,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
                     onClick={toggleCollapse}
                     className="w-full flex items-center justify-center p-2 rounded-c4 bg-neutral-50 dark:bg-neutral-850 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
                 >
-                    {isCollapsed ? <ChevronRight size={18} /> : (
+                    {isCollapsed ? (
+                        <div className="flex items-center gap-2">
+                            <ChevronRight size={18} />
+                            {isHoverExpanded && (
+                                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Expandir</span>
+                            )}
+                        </div>
+                    ) : (
                         <div className="flex items-center gap-2">
                             <ChevronLeft size={18} />
                             <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Recolher</span>
@@ -206,11 +217,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
 
             {/* User Info / Profile Section */}
             <div className="p-4 border-t border-neutral-100 dark:border-neutral-800">
-                <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+                <div className={`flex items-center gap-3 ${isVisuallyCollapsed ? 'justify-center' : 'justify-between'}`}>
                     <button
                         onClick={() => navigate('/account')}
-                        className={`flex items-center gap-3 p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors group ${isCollapsed ? '' : 'flex-1'}`}
-                        title={isCollapsed ? fullName || 'Minha Conta' : ''}
+                        className={`flex items-center gap-3 p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors group ${isVisuallyCollapsed ? '' : 'flex-1'}`}
+                        title={isVisuallyCollapsed ? fullName || 'Minha Conta' : ''}
                     >
                         {avatarUrl ? (
                             <img src={avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-neutral-200 dark:border-neutral-700" />
@@ -219,7 +230,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
                                 {getUserInitials()}
                             </div>
                         )}
-                        {!isCollapsed && (
+                        {!isVisuallyCollapsed && (
                             <div className="text-left overflow-hidden">
                                 <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">{fullName || 'Usuário'}</p>
                                 <p className="text-[10px] text-neutral-500 uppercase font-black tracking-widest leading-tight">Configurações</p>
@@ -227,7 +238,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
                         )}
                     </button>
 
-                    {!isCollapsed && (
+                    {!isVisuallyCollapsed && (
                         <button
                             onClick={handleLogout}
                             className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-all"
@@ -244,8 +255,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
     return (
         <>
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:block sticky top-0 h-screen z-40">
-                {SidebarContent}
+            <aside
+                className={`hidden lg:block sticky top-0 h-screen z-40 ${desktopSidebarWidthClass} ${isCollapsed ? 'overflow-visible' : ''}`}
+                onMouseEnter={() => setIsDesktopHovered(true)}
+                onMouseLeave={() => setIsDesktopHovered(false)}
+            >
+                <div className={`h-full ${isCollapsed ? 'relative overflow-visible' : ''}`}>
+                    <div className={`${isCollapsed ? 'absolute inset-y-0 left-0' : 'h-full'} ${isHoverExpanded ? 'z-50 shadow-2xl shadow-neutral-900/10' : ''}`}>
+                        {SidebarContent}
+                    </div>
+                </div>
             </aside>
 
             {/* Mobile Drawer */}
