@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     LayoutDashboard,
     Briefcase,
@@ -30,19 +30,11 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
-    const [isCollapsed, setIsCollapsed] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        const savedState = localStorage.getItem('sidebar-collapsed');
-        return savedState ? savedState === 'true' : true;
-    });
+    const [isCollapsed, setIsCollapsed] = useState(true);
     const [isDesktopHovered, setIsDesktopHovered] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const { userRole, loading, fullName, avatarUrl, email: userEmail } = useUserRole();
-
-    useEffect(() => {
-        localStorage.setItem('sidebar-collapsed', String(isCollapsed));
-    }, [isCollapsed]);
 
     const toggleCollapse = () => {
         setIsCollapsed((current) => !current);
@@ -85,25 +77,25 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             label: 'Propostas',
             icon: FileText,
             path: '/proposals',
-            roles: ['gestor', 'comercial']
+            roles: ['admin', 'gestor', 'comercial']
         },
         {
             label: 'CRM',
             icon: SquareKanban,
             path: '/crm',
-            roles: ['gestor', 'comercial']
+            roles: ['admin', 'gestor', 'comercial']
         },
         {
             label: 'Chat CRM',
             icon: MessageSquare,
             path: '/crm-chat',
-            roles: ['gestor', 'comercial']
+            roles: ['admin', 'gestor', 'comercial']
         },
         {
             label: 'Dashboard Fin.',
             icon: BarChart3,
             path: '/commercial-dashboard',
-            roles: ['gestor', 'comercial']
+            roles: ['admin', 'gestor', 'comercial']
         },
         {
             label: 'Projetos',
