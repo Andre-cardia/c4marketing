@@ -8,11 +8,16 @@ import {
     isOneTimeProposalService,
     normalizeOneTimePaymentTerms,
 } from '../lib/proposalPaymentTerms';
+import {
+    WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER,
+    WEBSITE_MAX_LAYOUT_REVISIONS,
+} from '../lib/contractTerms';
 
 type ProposalService = {
     id: string;
     price: number;
     details?: string;
+    deliveryTimeline?: string;
     paymentTerms?: string;
     recurringPrice?: number;
     setupPrice?: number;
@@ -75,6 +80,7 @@ const CreateProposal: React.FC = () => {
         recurringPrice: isHybridService(serviceId) ? 0 : undefined,
         setupPrice: isHybridService(serviceId) ? 0 : undefined,
         details: '',
+        deliveryTimeline: serviceId === 'website' ? '' : undefined,
         paymentTerms: isOneTimeProposalService(serviceId) ? DEFAULT_ONE_TIME_PAYMENT_TERMS : undefined,
     });
 
@@ -295,8 +301,8 @@ const CreateProposal: React.FC = () => {
                                                 {isSelected && (
                                                     <div className="mt-4 pl-10 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                                          <div>
-                                                             <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Detalhamento do Serviço (Opcional)</label>
-                                                             <textarea
+                                                              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Detalhamento do Serviço (Opcional)</label>
+                                                              <textarea
                                                                 placeholder="Descreva aqui os detalhes específicos deste serviço para o contrato..."
                                                                 value={serviceData?.details || ''}
                                                                 onChange={e => {
@@ -308,8 +314,31 @@ const CreateProposal: React.FC = () => {
                                                                 }}
                                                                 className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none text-slate-900 bg-white"
                                                                  rows={2}
-                                                             />
-                                                         </div>
+                                                              />
+                                                          </div>
+                                                        {service.id === 'website' && (
+                                                            <div>
+                                                                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                                                                    Prazo Estimado do Website (Opcional)
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder={WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER}
+                                                                    value={serviceData?.deliveryTimeline || ''}
+                                                                    onChange={e => {
+                                                                        const deliveryTimeline = e.target.value;
+                                                                        setNewProposal(prev => ({
+                                                                            ...prev,
+                                                                            services: prev.services.map(s => s.id === service.id ? { ...s, deliveryTimeline } : s)
+                                                                        }));
+                                                                    }}
+                                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm text-slate-900 bg-white"
+                                                                />
+                                                                <p className="text-[10px] text-slate-400 mt-2">
+                                                                    Esse prazo aparece na cláusula do website. O contrato também incluirá até {WEBSITE_MAX_LAYOUT_REVISIONS} rodadas de ajustes e revisões no layout.
+                                                                </p>
+                                                            </div>
+                                                        )}
                                                         {isOneTimeProposalService(service.id) && (
                                                             <div>
                                                                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">

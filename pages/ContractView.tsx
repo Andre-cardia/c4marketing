@@ -12,6 +12,20 @@ import {
     isOneTimeProposalService,
     normalizeOneTimePaymentTerms,
 } from '../lib/proposalPaymentTerms';
+import {
+    C4_CONTRACT_COMPANY_CITY,
+    C4_CONTRACT_COMPANY_CNPJ,
+    C4_CONTRACT_COMPANY_NAME,
+    CURRENT_CONTRACT_BODY_VERSION,
+    formatOfficialAcceptanceTimestamp,
+    getWebsiteDeliveryTimelineClause,
+    LEGACY_CONTRACT_BODY_VERSION,
+    LEGACY_CONTRACT_SIGNATURE_CNPJ,
+    normalizeContractBodyVersion,
+    normalizeWebsiteDeliveryTimeline,
+    WEBSITE_MAX_LAYOUT_REVISIONS,
+} from '../lib/contractTerms';
+import type { ContractBodyVersion } from '../lib/contractTerms';
 
 interface Proposal {
     id: number;
@@ -23,7 +37,7 @@ interface Proposal {
     setup_fee: number;
     contract_duration: number;
     created_at: string;
-    services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
+    services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
     accepted_at?: string;
     is_legacy?: boolean;
 }
@@ -41,16 +55,19 @@ const ContractView: React.FC = () => {
     const [proposal, setProposal] = useState<Proposal | null>(null);
     const [templates, setTemplates] = useState<ContractTemplate[]>([]);
     const [loading, setLoading] = useState(true);
+    const [contractBodyVersion, setContractBodyVersion] = useState<ContractBodyVersion>(CURRENT_CONTRACT_BODY_VERSION);
 
     useEffect(() => {
         fetchContractData();
-    }, [slug]);
+    }, [slug, id]);
 
     const fetchContractData = async () => {
         try {
             let proposalData = null;
             let loadedTemplates: ContractTemplate[] = [];
             let acceptanceInfo = null;
+            let hasContractSnapshot = false;
+            let loadedBodyVersion: ContractBodyVersion = CURRENT_CONTRACT_BODY_VERSION;
 
             // CASE 1: Viewing via Acceptance ID (Snapshot or Linked Proposal)
             if (id) {
@@ -68,6 +85,8 @@ const ContractView: React.FC = () => {
                     console.log('Using Contract Snapshot');
                     proposalData = acceptance.contract_snapshot.proposal;
                     loadedTemplates = acceptance.contract_snapshot.templates || [];
+                    hasContractSnapshot = true;
+                    loadedBodyVersion = normalizeContractBodyVersion(acceptance.contract_snapshot.body_version);
 
                     // Override with accurate acceptance data just in case
                     if (proposalData) {
@@ -83,6 +102,7 @@ const ContractView: React.FC = () => {
                         .single();
 
                     if (!propError) proposalData = liveProposal;
+                    loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
                 }
             }
             // CASE 2: Viewing via Proposal Slug (Live Proposal)
@@ -105,7 +125,18 @@ const ContractView: React.FC = () => {
                     .limit(1)
                     .single();
 
-                if (acceptanceData) acceptanceInfo = acceptanceData;
+                if (acceptanceData) {
+                    acceptanceInfo = acceptanceData;
+
+                    if (acceptanceData.contract_snapshot?.proposal) {
+                        proposalData = acceptanceData.contract_snapshot.proposal;
+                        loadedTemplates = acceptanceData.contract_snapshot.templates || [];
+                        hasContractSnapshot = true;
+                        loadedBodyVersion = normalizeContractBodyVersion(acceptanceData.contract_snapshot.body_version);
+                    } else {
+                        loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
+                    }
+                }
             }
 
             // If we have acceptance info but no proposal data (e.g. restored record), create comprehensive placeholder
@@ -126,6 +157,7 @@ const ContractView: React.FC = () => {
                     services: ["Contrato Restaurado / Legacy"], // Placaholder service
                     is_legacy: true // Flag to render simplified view
                 };
+                loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
             }
 
             if (!proposalData) throw new Error("Contract data not found");
@@ -143,10 +175,11 @@ const ContractView: React.FC = () => {
             }
 
             setProposal(proposalData);
+            setContractBodyVersion(loadedBodyVersion);
 
             // Load templates if not already loaded from snapshot
             // Skip for legacy/placeholder proposals which don't have real service IDs
-            if (loadedTemplates.length === 0 && proposalData.services && !proposalData.is_legacy) {
+            if (loadedTemplates.length === 0 && proposalData.services && !proposalData.is_legacy && !hasContractSnapshot) {
                 const serviceIds = Array.isArray(proposalData.services)
                     ? proposalData.services.map((s: any) => typeof s === 'string' ? s : s.id)
                     : [];
@@ -192,7 +225,6 @@ const ContractView: React.FC = () => {
     if (loading) return <div className="p-8 text-center">Carregando contrato...</div>;
     if (!proposal) return <div className="p-8 text-center">Proposta não encontrada.</div>;
 
-    const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
     const normalizedServices = Array.isArray(proposal.services)
         ? proposal.services.map((service: any) => typeof service === 'string'
             ? { id: service, price: 0 }
@@ -204,11 +236,16 @@ const ContractView: React.FC = () => {
     const hasDynamicOneTimePaymentTerms = oneTimeServicesWithPaymentTerms.length > 0;
     const hasLegacyWebsitePaymentNote = !hasDynamicOneTimePaymentTerms && normalizedServices.some((service) => service.id === 'website');
     const hasAiAgents = normalizedServices.some((service) => service.id === 'ai_agents');
+    const hasWebsite = normalizedServices.some((service) => service.id === 'website');
+    const hasTrafficManagement = normalizedServices.some((service) => service.id === 'traffic_management');
     const paymentClauseText = hasDynamicOneTimePaymentTerms
         ? proposal.monthly_fee > 0
             ? '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1. A primeira mensalidade dos serviços recorrentes deverá ser realizada em até 7 (sete) dias úteis após o aceite digital desta proposta.'
             : '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1.'
         : '4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.';
+    const contractorSignatureCnpj = contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION
+        ? C4_CONTRACT_COMPANY_CNPJ
+        : LEGACY_CONTRACT_SIGNATURE_CNPJ;
 
     return (
         <div className="min-h-screen bg-slate-100 print:bg-white">
@@ -244,7 +281,7 @@ const ContractView: React.FC = () => {
                     <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">1. Das Partes Contratantes</h2>
                     <div className="bg-slate-50 p-6 rounded-lg text-sm border border-slate-100">
                         <p className="mb-4">
-                            <strong>CONTRATADA:</strong> <span className="uppercase">C4 Marketing (HAC ASSESSORIA E CONSULTORIA LTDA)</span>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 24.043.876/0001-83, com sede em Florianópolis/SC.
+                            <strong>CONTRATADA:</strong> <span className="uppercase">{C4_CONTRACT_COMPANY_NAME}</span>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {C4_CONTRACT_COMPANY_CNPJ}, com sede em {C4_CONTRACT_COMPANY_CITY}.
                         </p>
                         <p>
                             <strong>CONTRATANTE:</strong> <span className="uppercase">{proposal.company_name}</span>, neste ato representada por seu responsável legal <strong>{proposal.responsible_name}</strong>{proposal.cnpj ? `, inscrita no CNPJ/MF sob o nº ${proposal.cnpj}` : ''}.
@@ -275,9 +312,20 @@ const ContractView: React.FC = () => {
                     ) : templates.length > 0 ? (
                         <div className="space-y-6">
                             {templates.map((template, index) => {
-                                const serviceDetail = Array.isArray(proposal.services)
-                                    ? (proposal.services as any[]).find(s => s.id === template.service_id)?.details
+                                const serviceData = Array.isArray(proposal.services)
+                                    ? (proposal.services as any[]).find(s => s.id === template.service_id)
                                     : null;
+                                const serviceDetail = serviceData?.details;
+                                const serviceDeliveryTimeline = normalizeWebsiteDeliveryTimeline(serviceData?.deliveryTimeline);
+                                const hasEmbeddedWebsiteTimelineClause = template.content.includes('prazo estimado para desenvolvimento e entrega do website');
+                                const hasEmbeddedWebsiteRevisionClause = template.content.includes('rodadas de ajustes') || template.content.includes('revisões no layout');
+                                const showWebsiteSupplementalClauses = contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION
+                                    && template.service_id === 'website'
+                                    && (
+                                        Boolean(serviceDeliveryTimeline)
+                                        || !hasEmbeddedWebsiteTimelineClause
+                                        || !hasEmbeddedWebsiteRevisionClause
+                                    );
 
                                 return (
                                     <div key={template.id} className="pl-4 border-l-2 border-slate-200">
@@ -288,6 +336,22 @@ const ContractView: React.FC = () => {
                                         {serviceDetail && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm italic text-slate-600">
                                                 <strong>Detalhamento Adicional:</strong> {serviceDetail}
+                                            </div>
+                                        )}
+                                        {showWebsiteSupplementalClauses && (
+                                            <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600 space-y-2">
+                                                {(serviceDeliveryTimeline || !hasEmbeddedWebsiteTimelineClause) && (
+                                                    <p>
+                                                        <strong>Prazo:</strong> {serviceDeliveryTimeline
+                                                            ? `Prazo específico acordado para este projeto: ${serviceDeliveryTimeline}.`
+                                                            : getWebsiteDeliveryTimelineClause()}
+                                                    </p>
+                                                )}
+                                                {!hasEmbeddedWebsiteRevisionClause && (
+                                                    <p>
+                                                        <strong>Revisões:</strong> O projeto inclui até {WEBSITE_MAX_LAYOUT_REVISIONS} rodadas de ajustes e revisões no layout.
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -378,25 +442,81 @@ const ContractView: React.FC = () => {
                     <p className="mb-2 text-sm">
                         5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem e Agentes de IA), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
                     </p>
-                    {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'traffic_management') && (
-                        <p className="mb-2 text-sm">
-                            5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência para o serviço de Gestão de Tráfego, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes deste serviço.
-                        </p>
+                    {contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION ? (
+                        <>
+                            <p className="mb-2 text-sm">
+                                5.3. Caso qualquer das partes opte por rescindir o presente contrato antes do término do prazo de vigência estipulado na cláusula 5.1, ficará sujeita ao pagamento de multa rescisória equivalente a 50% (cinquenta por cento) do valor restante do contrato.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                5.4. A multa prevista nesta cláusula poderá ser dispensada mediante acordo entre as partes, caso a parte prejudicada manifeste expressamente sua concordância com a rescisão sem a aplicação da penalidade.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                5.5. Na hipótese de rescisão contratual, os serviços já executados ou em andamento até a data da notificação de rescisão serão faturados proporcionalmente, devendo a CONTRATANTE efetuar o pagamento correspondente.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                5.6. Permanecerão em vigor, mesmo após a rescisão do contrato, as disposições relativas a propriedade intelectual, confidencialidade, proteção de dados, responsabilidades e eventuais indenizações.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                5.7. Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            {hasTrafficManagement && (
+                                <p className="mb-2 text-sm">
+                                    5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência para o serviço de Gestão de Tráfego, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes deste serviço.
+                                </p>
+                            )}
+                            <p className="mb-2 text-sm">
+                                5.4. Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
+                            </p>
+                        </>
                     )}
-                    <p className="mb-2 text-sm">
-                        5.4. Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
-                    </p>
                 </div>
 
                 {/* 6. Intellectual Property */}
                 <div className="mb-8">
-                    <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">6. Da Propriedade Intelectual</h2>
+                    <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">
+                        {contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION
+                            ? '6. Da Propriedade Intelectual, Acessos e Uso de Marca'
+                            : '6. Da Propriedade Intelectual'}
+                    </h2>
                     <p className="mb-2 text-sm">
                         6.1. Todos os materiais criados (códigos, layouts, artes) especificamente para a CONTRATANTE serão de sua propriedade após a quitação integral do contrato.
                     </p>
                     <p className="mb-2 text-sm">
                         6.2. A metodologia, segredos de negócio, estruturas de campanha e conhecimento técnico (know-how) aplicados pela CONTRATADA permanecem de sua exclusiva propriedade intelectual.
                     </p>
+                    {contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION && hasWebsite && (
+                        <>
+                            <p className="mb-2 text-sm">
+                                6.3. A CONTRATADA deverá fornecer à CONTRATANTE todos os acessos administrativos, arquivos e banco de dados necessários para a gestão e eventual migração do website, inclusive em caso de rescisão contratual, independentemente do motivo.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                6.4. Em caso de rescisão contratual, a CONTRATADA deverá disponibilizar à CONTRATANTE todos os arquivos, banco de dados e backups necessários para migração do website no prazo máximo de 5 (cinco) dias úteis.
+                            </p>
+                        </>
+                    )}
+                    {contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION && (
+                        <>
+                            <p className="mb-2 text-sm">
+                                {hasWebsite ? '6.5.' : '6.3.'} A CONTRATADA somente poderá mencionar a CONTRATANTE ou divulgar os trabalhos realizados no âmbito deste contrato, incluindo website, identidade visual, peças publicitárias ou qualquer outro material desenvolvido, para fins de portfólio, publicidade ou autopromoção mediante autorização prévia e expressa da CONTRATANTE.
+                            </p>
+                            <div className="mb-2 text-sm">
+                                <p className="mb-2">
+                                    {hasWebsite ? '6.6.' : '6.4.'} Fica vedado à CONTRATADA:
+                                </p>
+                                <ul className="list-disc pl-5 text-slate-700 space-y-1">
+                                    <li>utilizar a marca, nome empresarial ou identidade visual da CONTRATANTE em publicações, redes sociais, materiais comerciais ou apresentações sem autorização;</li>
+                                    <li>associar a marca da CONTRATANTE a parceiros comerciais, patrocinadores, eventos ou terceiros;</li>
+                                    <li>sugerir vínculo institucional, parceria estratégica ou prestação de serviços contínua sem autorização formal.</li>
+                                </ul>
+                            </div>
+                            <p className="mb-2 text-sm">
+                                {hasWebsite ? '6.7.' : '6.5.'} A CONTRATANTE poderá solicitar a remoção imediata de qualquer conteúdo divulgado, caso entenda que a utilização de sua marca possa gerar risco jurídico, comercial ou reputacional.
+                            </p>
+                        </>
+                    )}
                 </div>
 
                 {/* 7. LGPD & Confidentiality */}
@@ -423,7 +543,12 @@ const ContractView: React.FC = () => {
                     <div>
                         <div className="border-t border-slate-900 w-3/4 mx-auto mb-2"></div>
                         <p className="font-bold text-sm">C4 Marketing</p>
-                        <p className="text-xs text-slate-500">CNPJ: 48.005.917/0001-57</p>
+                        <p className="text-xs text-slate-500">CNPJ: {contractorSignatureCnpj}</p>
+                        {proposal.accepted_at && (
+                            <p className="text-xs text-slate-400 mt-1">
+                                Aceite Digital em {formatOfficialAcceptanceTimestamp(proposal.accepted_at)}
+                            </p>
+                        )}
                     </div>
                     <div>
                         <div className="border-t border-slate-900 w-3/4 mx-auto mb-2"></div>
@@ -431,7 +556,7 @@ const ContractView: React.FC = () => {
                         <p className="text-xs text-slate-500">{proposal.responsible_name}</p>
                         {proposal.accepted_at && (
                             <p className="text-xs text-slate-400 mt-1">
-                                Aceite Digital em {new Date(proposal.accepted_at).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                Aceite Digital em {formatOfficialAcceptanceTimestamp(proposal.accepted_at)}
                             </p>
                         )}
                     </div>
