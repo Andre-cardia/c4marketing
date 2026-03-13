@@ -19,7 +19,7 @@ interface Proposal {
     media_limit: number;
     created_at: string;
     contract_duration: number;
-    services?: { id: string; price: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
+    services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
 }
 
 const ProposalView: React.FC = () => {

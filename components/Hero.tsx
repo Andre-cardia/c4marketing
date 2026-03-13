@@ -5,7 +5,7 @@ interface HeroProps {
   responsibleName?: string;
   createdAt?: string;
   contractDuration?: number;
-  services?: { id: string; price: number }[] | string[];
+  services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
 }
 
 const Hero: React.FC<HeroProps> = ({

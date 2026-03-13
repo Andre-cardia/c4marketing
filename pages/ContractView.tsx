@@ -6,6 +6,12 @@ import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import logo from '../assets/logo.png';
+import {
+    getProposalServiceLabel,
+    hasServicePaymentTerms,
+    isOneTimeProposalService,
+    normalizeOneTimePaymentTerms,
+} from '../lib/proposalPaymentTerms';
 
 interface Proposal {
     id: number;
@@ -17,7 +23,7 @@ interface Proposal {
     setup_fee: number;
     contract_duration: number;
     created_at: string;
-    services?: { id: string; price: number; details?: string }[] | string[];
+    services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
     accepted_at?: string;
     is_legacy?: boolean;
 }
@@ -187,6 +193,22 @@ const ContractView: React.FC = () => {
     if (!proposal) return <div className="p-8 text-center">Proposta não encontrada.</div>;
 
     const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const normalizedServices = Array.isArray(proposal.services)
+        ? proposal.services.map((service: any) => typeof service === 'string'
+            ? { id: service, price: 0 }
+            : service)
+        : [];
+    const oneTimeServicesWithPaymentTerms = normalizedServices.filter(
+        (service) => isOneTimeProposalService(service.id) && hasServicePaymentTerms(service.paymentTerms)
+    );
+    const hasDynamicOneTimePaymentTerms = oneTimeServicesWithPaymentTerms.length > 0;
+    const hasLegacyWebsitePaymentNote = !hasDynamicOneTimePaymentTerms && normalizedServices.some((service) => service.id === 'website');
+    const hasAiAgents = normalizedServices.some((service) => service.id === 'ai_agents');
+    const paymentClauseText = hasDynamicOneTimePaymentTerms
+        ? proposal.monthly_fee > 0
+            ? '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1. A primeira mensalidade dos serviços recorrentes deverá ser realizada em até 7 (sete) dias úteis após o aceite digital desta proposta.'
+            : '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1.'
+        : '4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.';
 
     return (
         <div className="min-h-screen bg-slate-100 print:bg-white">
@@ -319,12 +341,20 @@ const ContractView: React.FC = () => {
                                 {proposal.setup_fee > 0 && (
                                     <div className="mb-0 text-sm">
                                         <p><strong>{proposal.monthly_fee > 0 ? 'b)' : 'a)'} Setup / Implementação (Único):</strong> {proposal.setup_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, a ser pago conforme negociado na proposta.</p>
-                                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'website') && (
+                                        {hasDynamicOneTimePaymentTerms ? (
+                                            <div className="mt-2 space-y-1">
+                                                {oneTimeServicesWithPaymentTerms.map((service) => (
+                                                    <p key={`${service.id}-payment-terms`} className="mt-1 text-xs text-slate-500 italic">
+                                                        * {getProposalServiceLabel(service.id)}: {normalizeOneTimePaymentTerms(service.paymentTerms)}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        ) : hasLegacyWebsitePaymentNote && (
                                             <p className="mt-1 text-xs text-slate-500 italic">
                                                 * Para o serviço de Web Site Institucional, o pagamento será realizado em duas parcelas: 50% no ato do aceite e os 50% restantes na entrega do projeto.
                                             </p>
                                         )}
-                                        {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'ai_agents') && (
+                                        {hasAiAgents && (
                                             <p className="mt-1 text-xs text-slate-500 italic">
                                                 * Para o serviço de Agentes de IA, o Setup/Implementação é cobrado no ato do aceite (pagamento único). A mensalidade inclui infraestrutura (VPS, API OpenAI – até 2 milhões de tokens/mês – e API WhatsApp). Caso o volume de tokens ultrapasse o limite mensal incluso, o valor poderá ser reajustado proporcionalmente, com comunicação prévia.
                                             </p>
@@ -334,7 +364,7 @@ const ContractView: React.FC = () => {
                             </>
                         )}
                     </div>
-                    <p className="text-sm mb-2">4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.</p>
+                    <p className="text-sm mb-2">{paymentClauseText}</p>
                     <p className="text-sm mb-2">4.3. O atraso no pagamento acarretará multa de 2% (dois por cento) e juros de mora de 1% (um por cento) ao mês.</p>
                     <p className="text-sm">4.4. A inadimplência superior a 10 (dez) dias permitirá a suspensão imediata dos serviços até a regularização.</p>
                 </div>

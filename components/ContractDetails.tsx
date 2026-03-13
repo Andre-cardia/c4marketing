@@ -2,7 +2,7 @@
 import React from 'react';
 
 interface ContractDetailsProps {
-  services?: { id: string; price: number }[] | string[];
+  services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
 }
 
 const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
