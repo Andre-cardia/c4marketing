@@ -27,7 +27,7 @@ const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
   // Calculate specific deadlines
   const deadlines: string[] = [];
   if (serviceIds.includes('landing_page')) deadlines.push("Landing Page: 7 dias úteis");
-  if (serviceIds.includes('website')) deadlines.push(`Web Site: ${websiteDeliveryTimeline || 'prazo definido na proposta e no detalhamento do serviço'}`);
+  if (serviceIds.includes('website')) deadlines.push(`Web Site: ${websiteDeliveryTimeline || '30 dias úteis'}`);
   if (serviceIds.includes('ecommerce')) deadlines.push("E-commerce: 60 dias úteis");
   if (serviceIds.includes('ai_agents')) deadlines.push("Agentes de IA (setup): até 15 dias úteis");
 

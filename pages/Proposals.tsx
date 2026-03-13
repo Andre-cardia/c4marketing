@@ -760,7 +760,7 @@ const Proposals: React.FC = () => {
                         </button>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto px-px">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-neutral-50 dark:bg-neutral-950/50 border-b border-neutral-100 dark:border-neutral-800 text-xs text-neutral-400 uppercase tracking-wider">
@@ -878,7 +878,7 @@ const Proposals: React.FC = () => {
                 ) : acceptances.length === 0 ? (
                     <div className="p-8 text-center text-neutral-400">Nenhum aceite registrado ainda.</div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto px-px">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-neutral-50 dark:bg-neutral-950/50 border-b border-neutral-100 dark:border-neutral-800 text-xs text-neutral-400 uppercase tracking-wider">

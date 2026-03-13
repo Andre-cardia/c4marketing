@@ -9,7 +9,8 @@ export const C4_CONTRACT_COMPANY_CNPJ = '24.043.876/0001-83';
 export const LEGACY_CONTRACT_SIGNATURE_CNPJ = '48.005.917/0001-57';
 
 export const WEBSITE_MAX_LAYOUT_REVISIONS = 3;
-export const WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER = '30 dias úteis ou 2 meses';
+export const WEBSITE_DEFAULT_DELIVERY_TIMELINE = '30 dias úteis';
+export const WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER = WEBSITE_DEFAULT_DELIVERY_TIMELINE;
 export const CONTRACT_TIME_ZONE = 'America/Sao_Paulo';
 export const CONTRACT_TIME_ZONE_LABEL = 'horário de Brasília';
 
@@ -48,7 +49,7 @@ export const getWebsiteDeliveryTimelineClause = (value?: string | null) => {
         return `O prazo estimado para desenvolvimento e entrega do website será de ${normalized} após o envio completo dos materiais pela CONTRATANTE.`;
     }
 
-    return 'O prazo estimado para desenvolvimento e entrega do website será aquele definido na proposta comercial e/ou no detalhamento adicional do serviço, após o envio completo dos materiais pela CONTRATANTE.';
+    return `O prazo estimado para desenvolvimento e entrega do website será de ${WEBSITE_DEFAULT_DELIVERY_TIMELINE} após o envio completo dos materiais pela CONTRATANTE.`;
 };
 
 const isDateOnlyIsoString = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value.trim());

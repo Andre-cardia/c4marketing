@@ -19,9 +19,6 @@ import {
     CURRENT_CONTRACT_BODY_VERSION,
     formatOfficialAcceptanceTimestamp,
     getWebsiteDeliveryTimelineClause,
-    LEGACY_CONTRACT_BODY_VERSION,
-    LEGACY_CONTRACT_SIGNATURE_CNPJ,
-    normalizeContractBodyVersion,
     normalizeWebsiteDeliveryTimeline,
     WEBSITE_MAX_LAYOUT_REVISIONS,
 } from '../lib/contractTerms';
@@ -49,6 +46,11 @@ interface ContractTemplate {
     content: string;
 }
 
+const WEBSITE_GENERIC_TIMELINE_CLAUSES = [
+    '2.1. O prazo estimado para desenvolvimento e entrega do website será aquele definido na proposta comercial e/ou no detalhamento adicional do serviço, contado após o envio completo dos materiais pela CONTRATANTE.',
+    '2.1. O prazo estimado para desenvolvimento e entrega do website será aquele definido na proposta comercial e/ou no detalhamento adicional do serviço, após o envio completo dos materiais pela CONTRATANTE.',
+];
+
 const ContractView: React.FC = () => {
     const { slug, id } = useParams<{ slug?: string; id?: string }>();
     const navigate = useNavigate();
@@ -66,7 +68,6 @@ const ContractView: React.FC = () => {
             let proposalData = null;
             let loadedTemplates: ContractTemplate[] = [];
             let acceptanceInfo = null;
-            let hasContractSnapshot = false;
             let loadedBodyVersion: ContractBodyVersion = CURRENT_CONTRACT_BODY_VERSION;
 
             // CASE 1: Viewing via Acceptance ID (Snapshot or Linked Proposal)
@@ -81,12 +82,9 @@ const ContractView: React.FC = () => {
                 acceptanceInfo = acceptance;
 
                 if (acceptance.contract_snapshot) {
-                    // Use Snapshot Data (Independent)
-                    console.log('Using Contract Snapshot');
+                    // Preserve the accepted business data, but always render the latest contract wording.
                     proposalData = acceptance.contract_snapshot.proposal;
                     loadedTemplates = acceptance.contract_snapshot.templates || [];
-                    hasContractSnapshot = true;
-                    loadedBodyVersion = normalizeContractBodyVersion(acceptance.contract_snapshot.body_version);
 
                     // Override with accurate acceptance data just in case
                     if (proposalData) {
@@ -102,7 +100,6 @@ const ContractView: React.FC = () => {
                         .single();
 
                     if (!propError) proposalData = liveProposal;
-                    loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
                 }
             }
             // CASE 2: Viewing via Proposal Slug (Live Proposal)
@@ -131,10 +128,6 @@ const ContractView: React.FC = () => {
                     if (acceptanceData.contract_snapshot?.proposal) {
                         proposalData = acceptanceData.contract_snapshot.proposal;
                         loadedTemplates = acceptanceData.contract_snapshot.templates || [];
-                        hasContractSnapshot = true;
-                        loadedBodyVersion = normalizeContractBodyVersion(acceptanceData.contract_snapshot.body_version);
-                    } else {
-                        loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
                     }
                 }
             }
@@ -157,7 +150,6 @@ const ContractView: React.FC = () => {
                     services: ["Contrato Restaurado / Legacy"], // Placaholder service
                     is_legacy: true // Flag to render simplified view
                 };
-                loadedBodyVersion = LEGACY_CONTRACT_BODY_VERSION;
             }
 
             if (!proposalData) throw new Error("Contract data not found");
@@ -177,9 +169,8 @@ const ContractView: React.FC = () => {
             setProposal(proposalData);
             setContractBodyVersion(loadedBodyVersion);
 
-            // Load templates if not already loaded from snapshot
-            // Skip for legacy/placeholder proposals which don't have real service IDs
-            if (loadedTemplates.length === 0 && proposalData.services && !proposalData.is_legacy && !hasContractSnapshot) {
+            // Always prefer the current service templates; snapshot templates are only a fallback.
+            if (proposalData.services && !proposalData.is_legacy) {
                 const serviceIds = Array.isArray(proposalData.services)
                     ? proposalData.services.map((s: any) => typeof s === 'string' ? s : s.id)
                     : [];
@@ -190,7 +181,9 @@ const ContractView: React.FC = () => {
                         .select('*')
                         .in('service_id', serviceIds);
 
-                    if (templatesData) loadedTemplates = templatesData;
+                    if (templatesData && templatesData.length > 0) {
+                        loadedTemplates = templatesData;
+                    }
                 }
             }
             setTemplates(loadedTemplates);
@@ -243,9 +236,7 @@ const ContractView: React.FC = () => {
             ? '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1. A primeira mensalidade dos serviços recorrentes deverá ser realizada em até 7 (sete) dias úteis após o aceite digital desta proposta.'
             : '4.2. Para os serviços pontuais, o pagamento seguirá as condições específicas descritas no item 4.1.'
         : '4.2. O pagamento da primeira parcela (ou valor integral, conforme o caso) deverá ser realizado em até 7 (sete) dias úteis após o aceite digital desta proposta.';
-    const contractorSignatureCnpj = contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION
-        ? C4_CONTRACT_COMPANY_CNPJ
-        : LEGACY_CONTRACT_SIGNATURE_CNPJ;
+    const contractorSignatureCnpj = C4_CONTRACT_COMPANY_CNPJ;
 
     return (
         <div className="min-h-screen bg-slate-100 print:bg-white">
@@ -317,13 +308,20 @@ const ContractView: React.FC = () => {
                                     : null;
                                 const serviceDetail = serviceData?.details;
                                 const serviceDeliveryTimeline = normalizeWebsiteDeliveryTimeline(serviceData?.deliveryTimeline);
-                                const hasEmbeddedWebsiteTimelineClause = template.content.includes('prazo estimado para desenvolvimento e entrega do website');
-                                const hasEmbeddedWebsiteRevisionClause = template.content.includes('rodadas de ajustes') || template.content.includes('revisões no layout');
-                                const showWebsiteSupplementalClauses = contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION
-                                    && template.service_id === 'website'
+                                const normalizedTemplateContent = template.content.replace(/^### .*$/gm, '').trim();
+                                const websiteTimelineClause = getWebsiteDeliveryTimelineClause(serviceDeliveryTimeline);
+                                const renderedTemplateContent = template.service_id === 'website'
+                                    ? WEBSITE_GENERIC_TIMELINE_CLAUSES.reduce(
+                                        (content, clause) => content.replace(clause, `2.1. ${websiteTimelineClause}`),
+                                        normalizedTemplateContent
+                                    )
+                                    : normalizedTemplateContent;
+                                const hasConcreteWebsiteTimelineClause = template.service_id === 'website'
+                                    && /prazo estimado para desenvolvimento e entrega do website será de /i.test(renderedTemplateContent);
+                                const hasEmbeddedWebsiteRevisionClause = renderedTemplateContent.includes('rodadas de ajustes') || renderedTemplateContent.includes('revisões no layout');
+                                const showWebsiteSupplementalClauses = template.service_id === 'website'
                                     && (
-                                        Boolean(serviceDeliveryTimeline)
-                                        || !hasEmbeddedWebsiteTimelineClause
+                                        !hasConcreteWebsiteTimelineClause
                                         || !hasEmbeddedWebsiteRevisionClause
                                     );
 
@@ -331,7 +329,7 @@ const ContractView: React.FC = () => {
                                     <div key={template.id} className="pl-4 border-l-2 border-slate-200">
                                         <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
                                         <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
-                                            {template.content.replace(/^### .*$/gm, '').trim()}
+                                            {renderedTemplateContent}
                                         </div>
                                         {serviceDetail && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm italic text-slate-600">
@@ -340,11 +338,9 @@ const ContractView: React.FC = () => {
                                         )}
                                         {showWebsiteSupplementalClauses && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm text-slate-600 space-y-2">
-                                                {(serviceDeliveryTimeline || !hasEmbeddedWebsiteTimelineClause) && (
+                                                {!hasConcreteWebsiteTimelineClause && (
                                                     <p>
-                                                        <strong>Prazo:</strong> {serviceDeliveryTimeline
-                                                            ? `Prazo específico acordado para este projeto: ${serviceDeliveryTimeline}.`
-                                                            : getWebsiteDeliveryTimelineClause()}
+                                                        <strong>Prazo:</strong> {websiteTimelineClause}
                                                     </p>
                                                 )}
                                                 {!hasEmbeddedWebsiteRevisionClause && (
