@@ -39,6 +39,30 @@ interface ClientUserCreationResult {
     error?: string;
 }
 
+const EXISTING_CLIENT_ACCOUNT_PATTERNS = [
+    /already\s+been\s+registered/i,
+    /already\s+registered/i,
+    /already\s+exists/i,
+    /user\s+already\s+exists/i,
+    /conta\s+ativa/i,
+    /ja\s+possui\s+conta/i,
+];
+
+const isExistingClientAccountMessage = (value?: string | null) =>
+    Boolean(
+        value && EXISTING_CLIENT_ACCOUNT_PATTERNS.some((pattern) => pattern.test(value))
+    );
+
+const isExistingClientAccountResult = (
+    result?: ClientUserCreationResult | null,
+    responseStatusText?: string
+) => (
+    result?.status === 'existing'
+    || isExistingClientAccountMessage(result?.message)
+    || isExistingClientAccountMessage(result?.error)
+    || isExistingClientAccountMessage(responseStatusText)
+);
+
 const normalizeAcceptanceSubmissionResult = (value: unknown): AcceptanceSubmissionResult | null => {
     const candidate = Array.isArray(value) ? value[0] : value;
     if (typeof candidate === 'number' || typeof candidate === 'string') {
@@ -253,12 +277,14 @@ const ProposalView: React.FC = () => {
 
                 const result: ClientUserCreationResult = await response.json();
 
-                if (!response.ok) {
+                if (isExistingClientAccountResult(result, response.statusText)) {
+                    setClientAccountStatus('existing');
+                } else if (!response.ok) {
                     throw new Error(`Edge Function failed: ${response.statusText}`);
+                } else {
+                    console.log('Client user creation result:', result);
+                    setClientAccountStatus(result.status === 'existing' ? 'existing' : 'created');
                 }
-
-                console.log('Client user creation result:', result);
-                setClientAccountStatus(result.status === 'existing' ? 'existing' : 'created');
             } catch (clientErr) {
                 // Don't block acceptance if client creation fails, but notify UI
                 console.error('Error creating client user (non-blocking):', clientErr);
