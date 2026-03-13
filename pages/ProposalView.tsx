@@ -122,14 +122,21 @@ const ProposalView: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: maskedValue }));
     };
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const hasStartedForm = Object.values(formData).some((value) => value.trim().length > 0);
+    const hasValidName = formData.name.trim().length >= 3;
+    const hasValidEmail = emailRegex.test(formData.email);
+    const hasValidCPFValue = isValidCPF(formData.cpf);
+    const hasValidCNPJValue = isValidCNPJ(formData.cnpj);
+    const hasValidCompanyName = formData.companyName.trim().length >= 2;
+
     const isFormValid = () => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return (
-            formData.name.trim().length >= 3 &&
-            emailRegex.test(formData.email) &&
-            isValidCPF(formData.cpf) &&
-            isValidCNPJ(formData.cnpj) &&
-            formData.companyName.trim().length >= 2
+            hasValidName &&
+            hasValidEmail &&
+            hasValidCPFValue &&
+            hasValidCNPJValue &&
+            hasValidCompanyName
         );
     };
 
@@ -378,7 +385,10 @@ const ProposalView: React.FC = () => {
 
                             <div>
                                 <label htmlFor="cpf" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">CPF</label>
-                                <input type="text" name="cpf" value={formData.cpf} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cpf && !isValidCPF(formData.cpf) ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="000.000.000-00" required />
+                                <input type="text" name="cpf" value={formData.cpf} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cpf && !hasValidCPFValue ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="000.000.000-00" required />
+                                {formData.cpf && !hasValidCPFValue && (
+                                    <p className="mt-2 text-xs font-medium text-red-500">CPF invalido. Revise os digitos informados.</p>
+                                )}
                             </div>
 
                             <div>
@@ -388,10 +398,18 @@ const ProposalView: React.FC = () => {
 
                             <div className="md:col-span-2">
                                 <label htmlFor="cnpj" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">CNPJ</label>
-                                <input type="text" name="cnpj" value={formData.cnpj} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cnpj && !isValidCNPJ(formData.cnpj) ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="00.000.000/0000-00" required />
+                                <input type="text" name="cnpj" value={formData.cnpj} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cnpj && !hasValidCNPJValue ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="00.000.000/0000-00" required />
+                                {formData.cnpj && !hasValidCNPJValue && (
+                                    <p className="mt-2 text-xs font-medium text-red-500">CNPJ invalido. Revise os digitos informados.</p>
+                                )}
                             </div>
 
                             <div className="md:col-span-2 pt-4">
+                                {hasStartedForm && !isFormValid() && (
+                                    <p className="mb-3 text-sm font-medium text-amber-700">
+                                        Revise os campos destacados para continuar com o aceite.
+                                    </p>
+                                )}
                                 <button type="submit" disabled={!isFormValid()} className={`w-full py-5 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-2 ${isFormValid() ? 'bg-brand-coral text-white hover:bg-red-500 hover:shadow-brand-coral/30 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-200 cursor-not-allowed shadow-none'}`}>
                                     Revisar Dados
                                 </button>
