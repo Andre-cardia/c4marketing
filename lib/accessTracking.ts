@@ -41,6 +41,24 @@ export async function logUserAccess(options?: { force?: boolean }): Promise<bool
         return false;
     }
 
+    const rpcResult = await supabase.rpc('log_user_access');
+    if (!rpcResult.error) {
+        const rpcData = rpcResult.data;
+        if (rpcData && typeof rpcData === 'object' && 'success' in rpcData) {
+            const wasLogged = Boolean((rpcData as { success?: boolean }).success);
+            if (wasLogged) {
+                localStorage.setItem(storageKey, String(nowTs));
+                return true;
+            }
+
+            console.error('log_user_access RPC returned failure:', rpcData);
+        } else {
+            console.warn('log_user_access RPC returned unexpected payload, trying direct insert fallback:', rpcData);
+        }
+    } else {
+        console.error('log_user_access RPC failed, trying direct insert fallback:', rpcResult.error);
+    }
+
     const directInsert = await supabase.from('access_logs').insert({
         user_id: user.id,
         user_email: user.email ?? null,
