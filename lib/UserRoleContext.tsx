@@ -60,7 +60,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
                     // Log access
                     if (activeSession.user.email) {
-                        void logUserAccess();
+                        void logUserAccess({ force: true });
                     }
                 } else {
                     setUserRole(null);

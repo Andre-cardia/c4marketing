@@ -124,8 +124,8 @@ const Dashboard: React.FC = () => {
     const [userAvatars, setUserAvatars] = useState<{ [email: string]: string }>({});
 
     // -- Access Control Logic --
-    const logAccess = async () => {
-        return logUserAccess();
+    const logAccess = async (options?: { force?: boolean }) => {
+        return logUserAccess(options);
     };
 
     const fetchAccessLogs = async () => {
@@ -185,7 +185,7 @@ const Dashboard: React.FC = () => {
         setLoading(true);
         // Sequential fetch to ensure acceptances (projects) are loaded before task enrichment
         const acceptancesData = await fetchAcceptances();
-        await logAccess();
+        await logAccess({ force: true });
         await Promise.all([
             fetchProposals(),
             fetchUsersCount(),
