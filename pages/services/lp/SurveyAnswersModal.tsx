@@ -150,7 +150,7 @@ const SurveyAnswersModal: React.FC<SurveyAnswersModalProps> = ({ isOpen, onClose
                             </span>
                             {onReopen && (
                                 <button
-                                    onClick={onReopen}
+                                    onClick={() => { onReopen(); onClose(); }}
                                     className="text-xs text-slate-400 hover:text-red-500 underline"
                                 >
                                     Reabrir / Desfazer
