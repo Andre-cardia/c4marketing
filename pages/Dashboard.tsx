@@ -11,6 +11,7 @@ import {
     X, ArrowRight, BarChart2, ChevronRight
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import { isUserConsideredOnline, logUserAccess } from '../lib/accessTracking';
 
 interface Acceptance {
     id: number;
@@ -124,26 +125,7 @@ const Dashboard: React.FC = () => {
 
     // -- Access Control Logic --
     const logAccess = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (user) {
-            const lastLogKey = `lastAccessLog_${user.id}`;
-            const lastLog = localStorage.getItem(lastLogKey);
-            const now = new Date();
-
-            // Debounce: Log only if last log was > 30 minutes ago
-            if (lastLog) {
-                const lastDate = new Date(lastLog);
-                const diffInMinutes = (now.getTime() - lastDate.getTime()) / (1000 * 60);
-                if (diffInMinutes < 30) return;
-            }
-
-            await supabase.from('access_logs').insert([{
-                user_id: user.id,
-                user_email: user.email
-            }]);
-            localStorage.setItem(lastLogKey, now.toISOString());
-        }
+        return logUserAccess();
     };
 
     const fetchAccessLogs = async () => {
@@ -155,6 +137,22 @@ const Dashboard: React.FC = () => {
 
     useEffect(() => {
         fetchData();
+    }, []);
+
+    useEffect(() => {
+        const refreshTimer = window.setInterval(() => {
+            void fetchAccessLogs();
+        }, 60 * 1000);
+
+        const heartbeatTimer = window.setInterval(async () => {
+            await logAccess();
+            await fetchAccessLogs();
+        }, 5 * 60 * 1000);
+
+        return () => {
+            window.clearInterval(refreshTimer);
+            window.clearInterval(heartbeatTimer);
+        };
     }, []);
 
     useEffect(() => {
@@ -187,16 +185,15 @@ const Dashboard: React.FC = () => {
         setLoading(true);
         // Sequential fetch to ensure acceptances (projects) are loaded before task enrichment
         const acceptancesData = await fetchAcceptances();
+        await logAccess();
         await Promise.all([
             fetchProposals(),
             fetchUsersCount(),
             fetchNotices(),
             fetchAllTasks(acceptancesData),
-            fetchUpcomingBookings(),
-            fetchUsersCount(),
-            fetchAccessLogs(),
-            logAccess()
+            fetchUpcomingBookings()
         ]);
+        await fetchAccessLogs();
         setLoading(false);
     };
 
@@ -862,9 +859,11 @@ const Dashboard: React.FC = () => {
                                     <p className="text-slate-400 text-center py-4 text-sm">Nenhum acesso registrado.</p>
                                 ) : (
                                     enrichedAccessLogs.map(log => {
+                                        const isOnline = isUserConsideredOnline(log.accessed_at);
                                         const timeAgo = (() => {
                                             const diff = new Date().getTime() - new Date(log.accessed_at).getTime();
                                             const mins = Math.floor(diff / 60000);
+                                            if (mins <= 1) return 'agora';
                                             if (mins < 60) return `${mins}m atrás`;
                                             const hours = Math.floor(mins / 60);
                                             if (hours < 24) return `${hours}h atrás`;
@@ -881,7 +880,7 @@ const Dashboard: React.FC = () => {
                                                             <Users size={14} className="text-slate-400" />
                                                         </div>
                                                     )}
-                                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-neutral-950 rounded-full"></span>
+                                                    <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-neutral-950 rounded-full ${isOnline ? 'bg-green-500' : 'bg-slate-400 dark:bg-neutral-600'}`}></span>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-baseline">
