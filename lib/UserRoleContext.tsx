@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { logUserAccess } from './accessTracking';
 
 type UserRole = 'admin' | 'leitor' | 'comercial' | 'gestor' | 'operacional' | 'cliente' | null;
 
@@ -22,27 +23,6 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [calComLink, setCalComLink] = useState<string | null>(null);
     const [email, setEmail] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const logAccess = async (userId: string, userEmail: string) => {
-        const THROTTLE_MINUTES = 15;
-        const lastLogKey = `lastAccessLog_${userId}`;
-        const lastLogTime = localStorage.getItem(lastLogKey);
-        const now = new Date().getTime();
-
-        if (lastLogTime && (now - parseInt(lastLogTime)) < THROTTLE_MINUTES * 60 * 1000) {
-            return; // Skip if logged recently
-        }
-
-        try {
-            await supabase.from('access_logs').insert({
-                user_id: userId,
-                user_email: userEmail
-            });
-            localStorage.setItem(lastLogKey, now.toString());
-        } catch (error) {
-            console.error('Error logging access:', error);
-        }
-    };
 
     const fetchUserRole = async () => {
         setLoading(true);
@@ -80,7 +60,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
                     // Log access
                     if (activeSession.user.email) {
-                        logAccess(activeSession.user.id, activeSession.user.email);
+                        void logUserAccess();
                     }
                 } else {
                     setUserRole(null);
@@ -125,7 +105,25 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
         });
 
-        return () => subscription.unsubscribe();
+        const heartbeat = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                void logUserAccess();
+            }
+        }, 5 * 60 * 1000);
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                void logUserAccess({ force: true });
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            subscription.unsubscribe();
+            window.clearInterval(heartbeat);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
     }, []);
 
     return (
