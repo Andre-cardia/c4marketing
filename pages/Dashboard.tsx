@@ -11,7 +11,7 @@ import {
     X, ArrowRight, BarChart2, ChevronRight
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
-import { isUserConsideredOnline, logUserAccess } from '../lib/accessTracking';
+import { ACCESS_LOG_UPDATED_EVENT, isUserConsideredOnline, logUserAccess } from '../lib/accessTracking';
 
 interface Acceptance {
     id: number;
@@ -83,6 +83,46 @@ interface AccessLog {
     };
 }
 
+interface AccessLogUpdatedDetail {
+    userId: string;
+    userEmail: string | null;
+    accessedAt: string;
+}
+
+function mergeRecentAccessLogs(currentLogs: AccessLog[], nextLog: AccessLog): AccessLog[] {
+    const filtered = currentLogs.filter((log) => {
+        if (log.user_id === nextLog.user_id) return false;
+        if (log.user_email && nextLog.user_email && log.user_email === nextLog.user_email) return false;
+        return true;
+    });
+
+    return [nextLog, ...filtered]
+        .sort((a, b) => new Date(b.accessed_at).getTime() - new Date(a.accessed_at).getTime())
+        .slice(0, 100);
+}
+
+function mergeFetchedAccessLogs(currentLogs: AccessLog[], fetchedLogs: AccessLog[]): AccessLog[] {
+    const logsById = new Map<string, AccessLog>();
+
+    [...currentLogs, ...fetchedLogs].forEach((log) => {
+        const existing = logsById.get(log.id);
+        if (!existing) {
+            logsById.set(log.id, log);
+            return;
+        }
+
+        const existingTime = new Date(existing.accessed_at).getTime();
+        const nextTime = new Date(log.accessed_at).getTime();
+        if (nextTime >= existingTime) {
+            logsById.set(log.id, log);
+        }
+    });
+
+    return Array.from(logsById.values())
+        .sort((a, b) => new Date(b.accessed_at).getTime() - new Date(a.accessed_at).getTime())
+        .slice(0, 100);
+}
+
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -131,7 +171,7 @@ const Dashboard: React.FC = () => {
     const fetchAccessLogs = async () => {
         const { data } = await supabase.from('access_logs').select('*').order('accessed_at', { ascending: false }).limit(100);
         if (data) {
-            setAccessLogs(data);
+            setAccessLogs((currentLogs) => mergeFetchedAccessLogs(currentLogs, data));
         }
     };
 
@@ -154,6 +194,37 @@ const Dashboard: React.FC = () => {
             window.clearInterval(heartbeatTimer);
         };
     }, []);
+
+    useEffect(() => {
+        const handleAccessLogUpdated = (event: Event) => {
+            const detail = (event as CustomEvent<AccessLogUpdatedDetail>).detail;
+            if (!detail?.userId || !detail.accessedAt) return;
+
+            setAccessLogs((currentLogs) => mergeRecentAccessLogs(currentLogs, {
+                id: `local-${detail.userId}-${detail.accessedAt}`,
+                user_id: detail.userId,
+                user_email: detail.userEmail ?? undefined,
+                accessed_at: detail.accessedAt,
+            }));
+
+            void fetchAccessLogs();
+        };
+
+        window.addEventListener(ACCESS_LOG_UPDATED_EVENT, handleAccessLogUpdated);
+
+        return () => {
+            window.removeEventListener(ACCESS_LOG_UPDATED_EVENT, handleAccessLogUpdated);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (roleLoading || !email) return;
+
+        void (async () => {
+            await logAccess({ force: true });
+            await fetchAccessLogs();
+        })();
+    }, [email, roleLoading]);
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);

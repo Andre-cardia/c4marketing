@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 
 export const ACCESS_LOG_THROTTLE_MS = 5 * 60 * 1000;
 export const ACCESS_LOG_ONLINE_WINDOW_MS = 15 * 60 * 1000;
+export const ACCESS_LOG_UPDATED_EVENT = 'access-log-updated';
 const ACCESS_LOG_FUTURE_DRIFT_TOLERANCE_MS = 60 * 1000;
 
 function getAccessLogStorageKey(userId: string) {
@@ -26,6 +27,18 @@ function readLastAccessLogTimestamp(storageKey: string, nowTs: number): number {
     return lastLogTs;
 }
 
+function emitAccessLogUpdated(userId: string, userEmail: string | null | undefined, accessedAt: string) {
+    if (typeof window === 'undefined') return;
+
+    window.dispatchEvent(new CustomEvent(ACCESS_LOG_UPDATED_EVENT, {
+        detail: {
+            userId,
+            userEmail: userEmail ?? null,
+            accessedAt,
+        },
+    }));
+}
+
 export async function logUserAccess(options?: { force?: boolean }): Promise<boolean> {
     const force = options?.force ?? false;
     const { data: { session } } = await supabase.auth.getSession();
@@ -35,6 +48,7 @@ export async function logUserAccess(options?: { force?: boolean }): Promise<bool
 
     const storageKey = getAccessLogStorageKey(user.id);
     const nowTs = Date.now();
+    const accessedAt = new Date(nowTs).toISOString();
     const lastLogTs = readLastAccessLogTimestamp(storageKey, nowTs);
 
     if (!force && Number.isFinite(lastLogTs) && lastLogTs > 0 && (nowTs - lastLogTs) < ACCESS_LOG_THROTTLE_MS) {
@@ -48,6 +62,7 @@ export async function logUserAccess(options?: { force?: boolean }): Promise<bool
             const wasLogged = Boolean((rpcData as { success?: boolean }).success);
             if (wasLogged) {
                 localStorage.setItem(storageKey, String(nowTs));
+                emitAccessLogUpdated(user.id, user.email, accessedAt);
                 return true;
             }
 
@@ -70,6 +85,7 @@ export async function logUserAccess(options?: { force?: boolean }): Promise<bool
     }
 
     localStorage.setItem(storageKey, String(nowTs));
+    emitAccessLogUpdated(user.id, user.email, accessedAt);
     return true;
 }
 
