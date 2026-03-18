@@ -57,6 +57,13 @@ interface Task {
     assignee?: string;
     attachment_url?: string;
     attachments?: { name: string; url: string }[];
+    assignee_response?: string;
+    assignee_response_attachments?: { name: string; url: string }[];
+    assignee_response_updated_at?: string;
+    assignee_response_updated_by?: string;
+    created_at?: string;
+    completed_at?: string;
+    overdue_flagged_at?: string;
     // Enriched field
     project_name?: string;
 }
@@ -76,12 +83,65 @@ interface AccessLog {
     user_id: string;
     accessed_at: string;
     user_email?: string;
-    user?: {
-        full_name: string;
-        avatar_url?: string;
-        email: string;
-    };
+    user?: AppUser;
 }
+
+interface AppUser {
+    id: string;
+    name?: string | null;
+    full_name?: string | null;
+    avatar_url?: string | null;
+    email?: string | null;
+    role?: string | null;
+}
+
+const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const buildDateRange = (startDate: string, endDate: string) => {
+    const rawStart = new Date(`${startDate}T00:00:00`);
+    const rawEnd = new Date(`${endDate}T23:59:59.999`);
+
+    if (rawStart <= rawEnd) {
+        return { start: rawStart, end: rawEnd };
+    }
+
+    return {
+        start: new Date(`${endDate}T00:00:00`),
+        end: new Date(`${startDate}T23:59:59.999`)
+    };
+};
+
+const isTimestampWithinRange = (value: string | null | undefined, start: Date, end: Date) => {
+    if (!value) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    return date >= start && date <= end;
+};
+
+const normalizeText = (value: string | null | undefined) =>
+    (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+
+const getUserDisplayName = (user?: Partial<AppUser> | null) =>
+    user?.full_name?.trim() || user?.name?.trim() || user?.email?.trim() || 'Usuário';
+
+const getUserAliases = (user?: Partial<AppUser> | null) =>
+    Array.from(
+        new Set(
+            [user?.full_name, user?.name, user?.email]
+                .map(normalizeText)
+                .filter(Boolean)
+        )
+    );
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -115,6 +175,14 @@ const Dashboard: React.FC = () => {
     // Notice Modal
     const [showNoticeModal, setShowNoticeModal] = useState(false);
     const [showAccessReportModal, setShowAccessReportModal] = useState(false);
+    const [accessReportStartDate, setAccessReportStartDate] = useState(() => {
+        const today = new Date();
+        return formatDateForInput(new Date(today.getFullYear(), today.getMonth(), 1));
+    });
+    const [accessReportEndDate, setAccessReportEndDate] = useState(() => formatDateForInput(new Date()));
+    const [accessReportLogs, setAccessReportLogs] = useState<AccessLog[]>([]);
+    const [accessReportLoading, setAccessReportLoading] = useState(false);
+    const [accessReportError, setAccessReportError] = useState<string | null>(null);
     const [noticesCollapsed, setNoticesCollapsed] = useState(() => {
         const saved = localStorage.getItem('notices-collapsed');
         return saved === 'true';
@@ -162,6 +230,62 @@ const Dashboard: React.FC = () => {
     }, [location.search]);
 
     useEffect(() => {
+        if (!showAccessReportModal) return;
+
+        let cancelled = false;
+
+        const loadAccessReportLogs = async () => {
+            setAccessReportLoading(true);
+            setAccessReportError(null);
+
+            try {
+                const { start, end } = buildDateRange(accessReportStartDate, accessReportEndDate);
+                const pageSize = 1000;
+                let from = 0;
+                const allLogs: AccessLog[] = [];
+
+                while (true) {
+                    const { data, error } = await supabase
+                        .from('access_logs')
+                        .select('id, user_id, user_email, accessed_at')
+                        .gte('accessed_at', start.toISOString())
+                        .lte('accessed_at', end.toISOString())
+                        .order('accessed_at', { ascending: false })
+                        .range(from, from + pageSize - 1);
+
+                    if (error) throw error;
+                    if (!data?.length) break;
+
+                    allLogs.push(...data);
+
+                    if (data.length < pageSize) break;
+                    from += pageSize;
+                }
+
+                if (!cancelled) {
+                    setAccessReportLogs(allLogs);
+                }
+            } catch (error) {
+                console.error('Error loading access report logs:', error);
+                if (!cancelled) {
+                    setAccessReportLogs([]);
+                    setAccessReportError('Nao foi possivel carregar os acessos do periodo.');
+                }
+            } finally {
+                if (!cancelled) {
+                    setAccessReportLoading(false);
+                }
+            }
+        };
+
+        void loadAccessReportLogs();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showAccessReportModal, accessReportStartDate, accessReportEndDate]);
+
+    useEffect(() => {
         if (!pendingTaskIdFromQuery || loading) return;
 
         const targetTask = tasks.find((task) => String(task.id) === pendingTaskIdFromQuery);
@@ -203,10 +327,10 @@ const Dashboard: React.FC = () => {
         return accessLogs
             .map(log => {
                 // Try finding user by ID (if app_users.id matches auth.id)
-                let user = usersMap.get(log.user_id);
+                let user = usersMap.get(log.user_id) as AppUser | undefined;
                 // If not found, try by email (if log has email)
                 if (!user && log.user_email) {
-                    user = usersEmailMap.get(log.user_email);
+                    user = usersEmailMap.get(log.user_email) as AppUser | undefined;
                 }
                 return {
                     ...log,
@@ -214,7 +338,7 @@ const Dashboard: React.FC = () => {
                 };
             })
             .filter(log => {
-                const userIdentifier = log.user?.id || log.user_email || log.user_id;
+                const userIdentifier = log.user?.id || log.user?.email || log.user_email || log.user_id;
                 if (uniqueUsers.has(userIdentifier)) {
                     return false;
                 }
@@ -223,6 +347,71 @@ const Dashboard: React.FC = () => {
             })
             .slice(0, 8); // Show top 8 unique recent users
     }, [accessLogs, usersMap, usersEmailMap]);
+
+    const accessReportRange = useMemo(
+        () => buildDateRange(accessReportStartDate, accessReportEndDate),
+        [accessReportStartDate, accessReportEndDate]
+    );
+
+    const collaboratorUsers = useMemo(
+        () =>
+            (Array.from(usersMap.values()) as AppUser[])
+                .filter(user => user.email && user.role !== 'cliente')
+                .sort((a, b) => getUserDisplayName(a).localeCompare(getUserDisplayName(b), 'pt-BR')),
+        [usersMap]
+    );
+
+    const accessReportStats = useMemo(() => {
+        const { start, end } = accessReportRange;
+        const now = new Date();
+
+        return collaboratorUsers
+            .map(user => {
+                const aliases = new Set(getUserAliases(user));
+                const normalizedEmail = normalizeText(user.email);
+
+                const userLogs = accessReportLogs.filter(log => {
+                    const matchesId = log.user_id === user.id;
+                    const matchesEmail = normalizedEmail && normalizeText(log.user_email) === normalizedEmail;
+                    return matchesId || matchesEmail;
+                }).length;
+
+                const userTasks = tasks.filter(task => {
+                    const taskAssignee = normalizeText(task.assignee);
+                    return !!taskAssignee && aliases.has(taskAssignee);
+                });
+
+                const totalTasks = userTasks.filter(task => isTimestampWithinRange(task.created_at, start, end)).length;
+
+                const completed = userTasks.filter(task => {
+                    if (task.completed_at) {
+                        return isTimestampWithinRange(task.completed_at, start, end);
+                    }
+
+                    return task.status === 'done' && isTimestampWithinRange(task.created_at, start, end);
+                }).length;
+
+                const overdue = userTasks.filter(task => {
+                    if (task.overdue_flagged_at) {
+                        return isTimestampWithinRange(task.overdue_flagged_at, start, end);
+                    }
+
+                    if (!task.due_date || task.status === 'done') return false;
+
+                    const dueDate = new Date(task.due_date);
+                    if (Number.isNaN(dueDate.getTime())) return false;
+
+                    return dueDate >= start && dueDate <= end && dueDate < now;
+                }).length;
+
+                return { user, userLogs, totalTasks, completed, overdue };
+            })
+            .sort((a, b) => {
+                if (b.userLogs !== a.userLogs) return b.userLogs - a.userLogs;
+                if (b.totalTasks !== a.totalTasks) return b.totalTasks - a.totalTasks;
+                return getUserDisplayName(a.user).localeCompare(getUserDisplayName(b.user), 'pt-BR');
+            });
+    }, [accessReportLogs, accessReportRange, collaboratorUsers, tasks]);
 
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
@@ -259,7 +448,9 @@ const Dashboard: React.FC = () => {
     };
 
     const fetchUsersCount = async () => {
-        const { count, data } = await supabase.from('app_users').select('*', { count: 'exact' });
+        const { count, data } = await supabase
+            .from('app_users')
+            .select('id, name, full_name, email, avatar_url, role', { count: 'exact' });
         if (count !== null) setTotalUsers(count);
 
         // Build Avatar Map & Users Map
@@ -267,7 +458,7 @@ const Dashboard: React.FC = () => {
             const map: { [email: string]: string } = {};
             const uMap = new Map();
             const eMap = new Map();
-            data.forEach((u: any) => {
+            data.forEach((u: AppUser) => {
                 if (u.email && u.avatar_url) {
                     map[u.email] = u.avatar_url;
                 }
@@ -404,7 +595,9 @@ const Dashboard: React.FC = () => {
         setShowTaskModal(false);
         setSelectedTaskForEdit(undefined);
         setSelectedProjectId(null);
-        // Refresh tasks to update list if changed
+    };
+
+    const handleTaskSaved = () => {
         fetchAllTasks();
     };
 
@@ -874,7 +1067,7 @@ const Dashboard: React.FC = () => {
                                             <div key={log.id} className="flex items-center gap-3">
                                                 <div className="relative">
                                                     {log.user?.avatar_url ? (
-                                                        <img src={log.user.avatar_url} alt={log.user.full_name} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800" />
+                                                        <img src={log.user.avatar_url} alt={getUserDisplayName(log.user)} className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-neutral-800" />
                                                     ) : (
                                                         <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center border border-slate-200 dark:border-neutral-800">
                                                             <Users size={14} className="text-slate-400" />
@@ -885,7 +1078,7 @@ const Dashboard: React.FC = () => {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex justify-between items-baseline">
                                                         <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate pr-2">
-                                                            {log.user?.full_name || log.user_email || 'Usuário'}
+                                                            {getUserDisplayName(log.user || { email: log.user_email })}
                                                         </h4>
                                                         <span className="text-[10px] text-slate-400 whitespace-nowrap">{timeAgo}</span>
                                                     </div>
@@ -961,7 +1154,7 @@ const Dashboard: React.FC = () => {
                         projectId={selectedProjectId}
                         task={selectedTaskForEdit}
                         projectName={selectedTaskForEdit?.project_name}
-                        onSave={handleCloseTaskModal} // Refresh list on save
+                        onSave={handleTaskSaved}
                     />
                 )}
 
@@ -984,7 +1177,7 @@ const Dashboard: React.FC = () => {
                                         <FileText className="text-brand-coral" />
                                         Relatório Mensal de Acesso
                                     </h2>
-                                    <p className="text-sm text-slate-500 mt-1">Desempenho da equipe neste mês</p>
+                                    <p className="text-sm text-slate-500 mt-1">Desempenho da equipe no periodo selecionado</p>
                                 </div>
                                 <button
                                     onClick={() => setShowAccessReportModal(false)}
@@ -994,64 +1187,102 @@ const Dashboard: React.FC = () => {
                                 </button>
                             </div>
                             <div className="p-8 overflow-y-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-slate-200 dark:border-slate-700 text-xs uppercase text-slate-500 tracking-wider">
-                                            <th className="pb-4 pl-2 font-bold">Colaborador</th>
-                                            <th className="pb-4 text-center font-bold">Acessos (Mês)</th>
-                                            <th className="pb-4 text-center font-bold">Tarefas Atribuídas</th>
-                                            <th className="pb-4 text-center font-bold text-emerald-500">Concluídas</th>
-                                            <th className="pb-4 text-center font-bold text-red-500">Atrasadas</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-sm font-medium">
-                                        {(() => {
-                                            // Calculate Stats
-                                            const currentMonth = new Date().toISOString().slice(0, 7);
-                                            const stats = (Array.from(usersMap.values()) as any[]).map(user => {
-                                                const userLogs = accessLogs.filter(l => {
-                                                    const isSameMonth = l.accessed_at.startsWith(currentMonth);
-                                                    const matchesId = l.user_id === user.id;
-                                                    const matchesEmail = l.user_email && user.email && l.user_email === user.email;
-                                                    return isSameMonth && (matchesId || matchesEmail);
-                                                }).length;
-                                                const userTasks = tasks.filter(t => t.assignee && t.assignee.includes(user.full_name || '')); // Fuzzy match
-                                                const totalTasks = userTasks.length;
-                                                const completed = userTasks.filter(t => t.status === 'done').length;
-                                                const overdue = userTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
-                                                return { user, userLogs, totalTasks, completed, overdue };
-                                            }).sort((a, b) => b.userLogs - a.userLogs); // Sort by visibility
+                                <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            Data inicial
+                                            <input
+                                                type="date"
+                                                value={accessReportStartDate}
+                                                onChange={(e) => setAccessReportStartDate(e.target.value)}
+                                                className="mt-2 w-full rounded-c4 border border-neutral-300 bg-neutral-50 px-4 py-2 text-sm font-medium text-neutral-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
+                                            />
+                                        </label>
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            Data final
+                                            <input
+                                                type="date"
+                                                value={accessReportEndDate}
+                                                onChange={(e) => setAccessReportEndDate(e.target.value)}
+                                                className="mt-2 w-full rounded-c4 border border-neutral-300 bg-neutral-50 px-4 py-2 text-sm font-medium text-neutral-900 outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-white"
+                                            />
+                                        </label>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const today = new Date();
+                                            setAccessReportStartDate(formatDateForInput(new Date(today.getFullYear(), today.getMonth(), 1)));
+                                            setAccessReportEndDate(formatDateForInput(today));
+                                        }}
+                                        className="rounded-c4 border border-neutral-200 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 transition-colors hover:border-brand-coral hover:text-brand-coral dark:border-neutral-800"
+                                    >
+                                        Voltar para mes atual
+                                    </button>
+                                </div>
 
-                                            return stats.map(({ user, userLogs, totalTasks, completed, overdue }) => (
-                                                <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                    <td className="py-4 pl-2">
-                                                        <div className="flex items-center gap-3">
-                                                            {user.avatar_url ? (
-                                                                <img src={user.avatar_url} alt={user.full_name} className="w-10 h-10 rounded-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-slate-500 font-bold">
-                                                                    {user.full_name?.charAt(0) || '?'}
+                                <p className="mb-6 text-xs text-slate-500">
+                                    Periodo considerado: {accessReportRange.start.toLocaleDateString('pt-BR')} a {accessReportRange.end.toLocaleDateString('pt-BR')}.
+                                    Tarefas atribuidas = criadas no periodo. Concluidas = finalizadas no periodo. Atrasadas = entraram em atraso no periodo.
+                                </p>
+
+                                {accessReportError && (
+                                    <div className="mb-4 rounded-c4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                                        {accessReportError}
+                                    </div>
+                                )}
+
+                                {accessReportLoading ? (
+                                    <div className="flex flex-col items-center justify-center gap-3 py-12 text-sm text-slate-500">
+                                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-brand-coral"></div>
+                                        <p>Carregando relatorio...</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-700 text-xs uppercase text-slate-500 tracking-wider">
+                                                <th className="pb-4 pl-2 font-bold">Colaborador</th>
+                                                <th className="pb-4 text-center font-bold">Acessos</th>
+                                                <th className="pb-4 text-center font-bold">Tarefas Atribuidas</th>
+                                                <th className="pb-4 text-center font-bold text-emerald-500">Concluidas</th>
+                                                <th className="pb-4 text-center font-bold text-red-500">Atrasadas</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-sm font-medium">
+                                            {accessReportStats.map(({ user, userLogs, totalTasks, completed, overdue }) => {
+                                                const displayName = getUserDisplayName(user);
+
+                                                return (
+                                                    <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <td className="py-4 pl-2">
+                                                            <div className="flex items-center gap-3">
+                                                                {user.avatar_url ? (
+                                                                    <img src={user.avatar_url} alt={displayName} className="w-10 h-10 rounded-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-slate-500 font-bold">
+                                                                        {displayName.charAt(0) || '?'}
+                                                                    </div>
+                                                                )}
+                                                                <div>
+                                                                    <div className="font-bold text-slate-800 dark:text-white">{displayName}</div>
+                                                                    <div className="text-xs text-slate-400">{user.email}</div>
                                                                 </div>
-                                                            )}
-                                                            <div>
-                                                                <div className="font-bold text-slate-800 dark:text-white">{user.full_name}</div>
-                                                                <div className="text-xs text-slate-400">{user.email}</div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 text-center text-slate-600 dark:text-neutral-300">
-                                                        <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full font-bold">
-                                                            {userLogs}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 text-center text-slate-600 dark:text-neutral-300">{totalTasks}</td>
-                                                    <td className="py-4 text-center font-bold text-emerald-500">{completed}</td>
-                                                    <td className="py-4 text-center font-bold text-red-500">{overdue}</td>
-                                                </tr>
-                                            ));
-                                        })()}
-                                    </tbody>
-                                </table>
+                                                        </td>
+                                                        <td className="py-4 text-center text-slate-600 dark:text-neutral-300">
+                                                            <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full font-bold">
+                                                                {userLogs}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 text-center text-slate-600 dark:text-neutral-300">{totalTasks}</td>
+                                                        <td className="py-4 text-center font-bold text-emerald-500">{completed}</td>
+                                                        <td className="py-4 text-center font-bold text-red-500">{overdue}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
                         </div>
                     </div>

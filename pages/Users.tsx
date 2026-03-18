@@ -9,6 +9,7 @@ import { useUserRole } from '../lib/UserRoleContext';
 interface AppUser {
     id: string; // generated uuid
     name: string;
+    full_name?: string | null;
     email: string;
     phone: string;
     role: 'leitor' | 'comercial' | 'gestor' | 'operacional';
@@ -132,6 +133,7 @@ const Users: React.FC = () => {
                 const { error: dbError } = await supabase.from('app_users').insert([{
                     id: authUser.id,
                     name: newUser.name,
+                    full_name: newUser.name,
                     email: newUser.email,
                     phone: newUser.phone,
                     role: newUser.role

@@ -48,13 +48,13 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 setEmail(activeSession.user.email ?? null);
                 const { data } = await supabase
                     .from('app_users')
-                    .select('role, full_name, avatar_url, cal_com_link')
+                    .select('role, full_name, name, avatar_url, cal_com_link')
                     .eq('email', activeSession.user.email)
                     .single();
 
                 if (data) {
                     setUserRole(data.role as UserRole);
-                    setFullName(data.full_name);
+                    setFullName(data.full_name || data.name || null);
                     setAvatarUrl(data.avatar_url);
                     setCalComLink(data.cal_com_link);
 
