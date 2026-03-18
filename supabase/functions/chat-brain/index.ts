@@ -7,19 +7,59 @@ import { routeRequestHybrid } from '../_shared/agents/router.ts'
 import { AGENTS } from '../_shared/agents/specialists.ts'
 import { RouterInput, RouteDecision, RetrievalPolicy } from '../_shared/brain-types.ts'
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const ALLOWED_ORIGINS = [
+    'https://sistema.c4marketing.com.br',
+    'https://c4marketing.vercel.app',
+]
+
+function isAllowedOrigin(origin: string): boolean {
+    if (!origin) return false
+    if (ALLOWED_ORIGINS.includes(origin)) return true
+    // Permite qualquer porta de localhost em desenvolvimento
+    try {
+        const url = new URL(origin)
+        return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+    } catch {
+        return false
+    }
+}
+
+function makeCorsHeaders(req: Request): Record<string, string> {
+    const origin = req.headers.get('Origin') ?? ''
+    const requestedHeaders = req.headers.get('Access-Control-Request-Headers')
+    const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0]
+    return {
+        'Access-Control-Allow-Origin': allowedOrigin,
+        'Access-Control-Allow-Headers': requestedHeaders || 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin, Access-Control-Request-Headers',
+    }
 }
 
 Deno.serve(async (req) => {
+    const corsHeaders = makeCorsHeaders(req)
+
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
         const startTime = performance.now()
-        const requestBody = await req.json()
+        let requestBody: any
+        try {
+            requestBody = await req.json()
+        } catch (bodyError: any) {
+            const errorMessage = bodyError?.message || String(bodyError)
+            return new Response(JSON.stringify({
+                answer: 'Requisicao invalida: corpo JSON ausente ou malformado.',
+                documents: [],
+                meta: { error: 'invalid_json_body', detail: errorMessage }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400,
+            })
+        }
         const query = typeof requestBody?.query === 'string' ? requestBody.query : ''
         const session_id = typeof requestBody?.session_id === 'string' ? requestBody.session_id : null
         const forcedAgentRaw = typeof requestBody?.forced_agent === 'string'
@@ -144,16 +184,16 @@ Deno.serve(async (req) => {
             } else {
                 // Fallback resiliente: JWT pode estar inválido para verificação, mas ainda conter claims úteis.
                 // Usado para evitar bloqueio completo do chat quando a sessão local está inconsistente.
+                // SEGURANÇA: nunca confia no role do JWT — applyProfileByEmail sempre lê do banco.
                 const payload = decodeJwtPayload(authToken)
                 const expectedRef = getProjectRefFromSupabaseUrl()
                 const tokenRef = getProjectRefFromPayload(payload)
                 const tokenSub = typeof payload?.sub === 'string' ? payload.sub : null
-                const tokenRole = typeof payload?.role === 'string' ? payload.role : 'authenticated'
                 const refMatches = !expectedRef || !tokenRef || tokenRef === expectedRef
 
                 if (tokenSub && refMatches) {
                     userId = tokenSub
-                    userRole = tokenRole || 'authenticated'
+                    userRole = 'authenticated' // default seguro; será sobrescrito por applyProfileByEmail
 
                     let fallbackEmail = typeof payload?.email === 'string' ? payload.email : null
                     let fallbackName =
@@ -180,6 +220,19 @@ Deno.serve(async (req) => {
                         role: userRole,
                     }
                     await applyProfileByEmail(fallbackEmail)
+
+                    // Se email lookup não resolveu o role, tenta por userId (mais robusto)
+                    if (userRole === 'authenticated') {
+                        const { data: profileById } = await supabaseAdmin
+                            .from('app_users')
+                            .select('name, email, role, full_name')
+                            .eq('id', userId)
+                            .maybeSingle()
+                        if (profileById) {
+                            userProfile = profileById
+                            userRole = profileById.role || userRole
+                        }
+                    }
                     console.warn(`chat-brain auth fallback engaged for user ${userId}`)
                 } else {
                     console.error('chat-brain auth fallback failed (claims missing or ref mismatch)', {
@@ -2070,16 +2123,23 @@ Retorne apenas function calls (sem texto livre).`
                 modelUsage['gpt-4o-mini'].output_tokens += routerUsage.completion_tokens;
                 modelUsage['gpt-4o-mini'].cost += routerCost;
 
-                supabaseAdmin.rpc('log_agent_execution', {
-                    p_session_id: session_id,
-                    p_agent_name: 'Router_GPT4oMini',
-                    p_action: 'route',
-                    p_status: 'success',
-                    p_cost_est: routerCost,
-                    p_tokens_input: routerUsage.prompt_tokens,
-                    p_tokens_output: routerUsage.completion_tokens,
-                    p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
-                }).catch(() => { })
+                try {
+                    const { error: routerLogError } = await supabaseAdmin.rpc('log_agent_execution', {
+                        p_session_id: session_id,
+                        p_agent_name: 'Router_GPT4oMini',
+                        p_action: 'route',
+                        p_status: 'success',
+                        p_cost_est: routerCost,
+                        p_tokens_input: routerUsage.prompt_tokens,
+                        p_tokens_output: routerUsage.completion_tokens,
+                        p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
+                    })
+                    if (routerLogError) {
+                        console.warn('[Router] log_agent_execution failed:', routerLogError.message)
+                    }
+                } catch (routerLogError: any) {
+                    console.warn('[Router] log_agent_execution exception:', routerLogError?.message || routerLogError)
+                }
             }
 
             if (rawToolCalls.length > 0) {
@@ -2728,7 +2788,7 @@ Retorne apenas function calls (sem texto livre).`
                 // Log de falha para RPCs de escrita
                 if (isExecutorAction) {
                     try {
-                        await supabaseAdmin.rpc('log_agent_execution', {
+                        const { error: executorLogError } = await supabaseAdmin.rpc('log_agent_execution', {
                             p_session_id: session_id || 'unknown',
                             p_agent_name: 'Agent_Executor',
                             p_action: rpc_name,
@@ -2740,7 +2800,10 @@ Retorne apenas function calls (sem texto livre).`
                             p_result: {},
                             p_latency_ms: rpcLatencyMs,
                             p_error_message: rpcError.message,
-                        }).catch(() => { })
+                        })
+                        if (executorLogError) {
+                            console.warn('[Executor] log_agent_execution failed:', executorLogError.message)
+                        }
                     } catch (_e) { /* fail-safe */ }
                 }
 
