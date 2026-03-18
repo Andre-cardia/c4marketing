@@ -174,6 +174,21 @@ try {
     false
   );
 
+  // 6) Direct RPC smoke test: query_all_tasks (detects PGRST203 ambiguity before it reaches users)
+  if (serviceClient) {
+    const { data: taskData, error: taskError } = await serviceClient.rpc('query_all_tasks', {});
+    const isPgrst203 = taskError?.code === 'PGRST203';
+    const t6Pass = !taskError;
+    pushResult(
+      'RPC Direta: query_all_tasks (anti-PGRST203)',
+      t6Pass,
+      taskError
+        ? `ERRO code=${taskError.code} msg=${taskError.message}${isPgrst203 ? ' — OVERLOAD AMBÍGUO DETECTADO' : ''}`
+        : `OK rows=${Array.isArray(taskData) ? taskData.length : typeof taskData}`,
+      true
+    );
+  }
+
   const total = tests.length;
   const passed = tests.filter((t) => t.pass).length;
   const criticalFailed = tests.filter((t) => t.critical && !t.pass).length;
