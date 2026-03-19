@@ -298,7 +298,17 @@ const ProposalView: React.FC = () => {
             setIsConfirming(false);
         } catch (err: any) {
             console.error('Error saving acceptance:', err);
-            alert('Ocorreu um erro ao salvar. Tente novamente.');
+            const msg: string = err?.message || '';
+            if (msg.toLowerCase().includes('nao esta disponivel') || msg.toLowerCase().includes('status: accepted')) {
+                // Proposta já foi aceita por outra pessoa — atualiza UI
+                await fetchProposal();
+                setIsConfirming(false);
+                setShowForm(false);
+            } else if (msg.toLowerCase().includes('ja foi aceita por este email')) {
+                alert('Esta proposta já foi aceita com este e-mail. Verifique sua caixa de entrada para acessar o sistema.');
+            } else {
+                alert('Ocorreu um erro ao salvar. Tente novamente.');
+            }
         } finally {
             setIsSubmitting(false);
         }
