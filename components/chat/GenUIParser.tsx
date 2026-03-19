@@ -40,8 +40,87 @@ const getProjectKanbanRouteFromGenUi = (project: any): string => {
 export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     if (!content || typeof content !== 'string') return null;
 
-    // Parseia apenas blocos markdown explícitos ```json ... ```
-    const parts = [];
+    // Tipos GenUI conhecidos para detecção inline
+    const GEN_UI_TYPES = ['task_list', 'user_list', 'access_list', 'report', 'chart', 'image_grid', 'proposal_list', 'project_list', 'client_list'];
+
+    /**
+     * Tenta extrair um objeto JSON completo a partir de uma posição num texto.
+     * Percorre contando chaves abertas/fechadas para encontrar o fim do objeto.
+     */
+    const extractJsonObject = (text: string, startPos: number): string | null => {
+        if (text[startPos] !== '{') return null;
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        for (let i = startPos; i < text.length; i++) {
+            const ch = text[i];
+            if (escape) { escape = false; continue; }
+            if (ch === '\\' && inString) { escape = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) return text.slice(startPos, i + 1);
+            }
+        }
+        return null;
+    };
+
+    /**
+     * Divide um segmento de texto em partes text/gen_ui detectando JSON inline.
+     */
+    const splitTextForInlineJson = (text: string): Array<{ type: string; content?: string; data?: any }> => {
+        const result: Array<{ type: string; content?: string; data?: any }> = [];
+        let pos = 0;
+        while (pos < text.length) {
+            // Procurar próxima ocorrência de {"type":"<tipo_conhecido>"
+            let found = false;
+            let nearestIdx = -1;
+            let nearestJson: string | null = null;
+            let nearestData: any = null;
+
+            for (const genType of GEN_UI_TYPES) {
+                const marker = `{"type":"${genType}"`;
+                let searchFrom = pos;
+                while (searchFrom < text.length) {
+                    const idx = text.indexOf(marker, searchFrom);
+                    if (idx === -1) break;
+                    const jsonStr = extractJsonObject(text, idx);
+                    if (jsonStr) {
+                        try {
+                            const parsed = JSON.parse(jsonStr);
+                            if (nearestIdx === -1 || idx < nearestIdx) {
+                                nearestIdx = idx;
+                                nearestJson = jsonStr;
+                                nearestData = parsed;
+                            }
+                        } catch { /* JSON inválido, ignorar */ }
+                        break;
+                    }
+                    searchFrom = idx + 1;
+                }
+            }
+
+            if (nearestIdx !== -1 && nearestJson) {
+                found = true;
+                if (nearestIdx > pos) {
+                    result.push({ type: 'text', content: text.slice(pos, nearestIdx) });
+                }
+                result.push({ type: 'gen_ui', data: nearestData });
+                pos = nearestIdx + nearestJson.length;
+            }
+
+            if (!found) {
+                result.push({ type: 'text', content: text.slice(pos) });
+                break;
+            }
+        }
+        return result;
+    };
+
+    // PASSO 1: dividir pelos blocos explícitos ```json ... ```
+    const rawParts: Array<{ type: string; content?: string; data?: any }> = [];
     const startTag = '```json';
     const endTag = '```';
     let cursor = 0;
@@ -49,30 +128,41 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
     while (cursor < content.length) {
         const startIndex = content.indexOf(startTag, cursor);
         if (startIndex === -1) {
-            parts.push({ type: 'text', content: content.slice(cursor) });
+            rawParts.push({ type: 'text', content: content.slice(cursor) });
             break;
         }
 
         if (startIndex > cursor) {
-            parts.push({ type: 'text', content: content.slice(cursor, startIndex) });
+            rawParts.push({ type: 'text', content: content.slice(cursor, startIndex) });
         }
 
         const jsonStart = startIndex + startTag.length;
         const endIndex = content.indexOf(endTag, jsonStart);
         if (endIndex === -1) {
-            parts.push({ type: 'text', content: content.slice(startIndex) });
+            rawParts.push({ type: 'text', content: content.slice(startIndex) });
             break;
         }
 
         const jsonStr = content.slice(jsonStart, endIndex).trim();
         try {
             const parsedData = JSON.parse(jsonStr);
-            parts.push({ type: 'gen_ui', data: parsedData });
+            rawParts.push({ type: 'gen_ui', data: parsedData });
         } catch {
-            parts.push({ type: 'text', content: content.slice(startIndex, endIndex + endTag.length) });
+            rawParts.push({ type: 'text', content: content.slice(startIndex, endIndex + endTag.length) });
         }
 
         cursor = endIndex + endTag.length;
+    }
+
+    // PASSO 2: nos segmentos de texto, detectar JSON GenUI inline
+    const parts: Array<{ type: string; content?: string; data?: any }> = [];
+    for (const rawPart of rawParts) {
+        if (rawPart.type === 'text' && rawPart.content) {
+            const inlineParts = splitTextForInlineJson(rawPart.content);
+            parts.push(...inlineParts);
+        } else {
+            parts.push(rawPart);
+        }
     }
 
     return (
@@ -490,13 +580,7 @@ export const GenUIParser: React.FC<GenUIParserProps> = ({ content }) => {
                         );
                     }
 
-                    return (
-                        <div key={index} className="prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown>
-                                {'Não foi possível renderizar este bloco visual. Exibindo resposta em texto.'}
-                            </ReactMarkdown>
-                        </div>
-                    );
+                    return null;
                 }
 
                 return null;

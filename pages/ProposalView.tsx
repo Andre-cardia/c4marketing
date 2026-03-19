@@ -23,6 +23,7 @@ interface Proposal {
     media_limit: number;
     created_at: string;
     contract_duration: number;
+    status?: string;
     services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
 }
 
@@ -317,6 +318,22 @@ const ProposalView: React.FC = () => {
                 <h1 className="text-4xl font-black text-slate-900 mb-4">404</h1>
                 <p className="text-slate-500 mb-8">Proposta não encontrada ou expirada.</p>
                 <a href="/" className="text-brand-coral font-bold hover:underline">Voltar ao início</a>
+            </div>
+        );
+    }
+
+    if (proposal.status === 'accepted') {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+                <div className="bg-white rounded-3xl p-12 max-w-md w-full text-center shadow-xl">
+                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h1 className="text-2xl font-black text-slate-900 mb-3">Proposta já aceita</h1>
+                    <p className="text-slate-500">Esta proposta já foi aceita e o contrato está em andamento. Em caso de dúvidas, entre em contato com nossa equipe.</p>
+                </div>
             </div>
         );
     }

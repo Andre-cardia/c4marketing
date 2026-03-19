@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OpenAI } from 'https://esm.sh/openai@4'
 
 import { matchBrainDocuments, makeOpenAIEmbedder } from '../_shared/brain-retrieval.ts'
-import { routeRequestHybrid } from '../_shared/agents/router.ts'
+import { routeRequestHybrid, callRouterLLM } from '../_shared/agents/router.ts'
 import { AGENTS } from '../_shared/agents/specialists.ts'
 import { RouterInput, RouteDecision, RetrievalPolicy } from '../_shared/brain-types.ts'
 import { runController, ControllerContext, ControllerDeps } from '../_shared/agents/controller.ts'
@@ -2027,9 +2027,9 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
         };
 
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
-            // Classificação por Function Calling com GPT-4o-mini (rápido e barato)
+            // Classificação por Function Calling com GPT-4o
             const completion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 temperature: 0,
                 tools: availableTools,
                 tool_choice: "auto",
@@ -2101,6 +2101,7 @@ Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use
 Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 QUANDO O USUÁRIO FIZER SAUDAÇÕES (oi, olá, bom dia, boa tarde, tudo bem, e aí, hey, etc.) ou conversa casual sem intenção de consulta, use OBRIGATORIAMENTE a ferramenta no_action. NUNCA dispare consultas de banco para cumprimentos.
+QUANDO O USUÁRIO FIZER PERGUNTAS SOBRE CAPACIDADE/FUNCIONALIDADE DO SISTEMA (ex: "você consegue criar tarefas?", "é possível listar clientes?", "você pode ver propostas?", "consegue criar uma tarefa?", "dá pra criar tarefa?", "posso criar tarefa aqui?", "você faz X?", "tem como fazer X aqui?", "o que você consegue fazer?"), use OBRIGATORIAMENTE a ferramenta no_action. Estas são perguntas sobre o que o sistema consegue fazer, NÃO são pedidos de execução. NUNCA dispare queries de banco para perguntas de capacidade.
 Retorne apenas function calls (sem texto livre).`
                     },
                     { role: 'user', content: input.user_message }
@@ -2109,12 +2110,12 @@ Retorne apenas function calls (sem texto livre).`
 
             const rawToolCalls = completion.choices[0].message.tool_calls ?? []
 
-            // Log tokens do Router (gpt-4o-mini) — fire and forget
-            // Preços (Fev 2026): Input $0.150/1M, Output $0.600/1M
+            // Log tokens do Router (gpt-4o) — fire and forget
+            // Preços: Input $2.50/1M, Output $10.00/1M
             const routerUsage = completion.usage
             if (routerUsage) {
-                const miniPrices = MODEL_PRICES['gpt-4o-mini'];
-                const routerCost = (routerUsage.prompt_tokens * miniPrices.input) + (routerUsage.completion_tokens * miniPrices.output);
+                const routerPrices = MODEL_PRICES['gpt-4o'];
+                const routerCost = (routerUsage.prompt_tokens * routerPrices.input) + (routerUsage.completion_tokens * routerPrices.output);
 
                 // Acumular totais da sessão
                 totalInputTokens += routerUsage.prompt_tokens;
@@ -2122,14 +2123,14 @@ Retorne apenas function calls (sem texto livre).`
                 totalCostEst += routerCost;
 
                 // Breakdown por modelo
-                modelUsage['gpt-4o-mini'].input_tokens += routerUsage.prompt_tokens;
-                modelUsage['gpt-4o-mini'].output_tokens += routerUsage.completion_tokens;
-                modelUsage['gpt-4o-mini'].cost += routerCost;
+                modelUsage['gpt-4o'].input_tokens += routerUsage.prompt_tokens;
+                modelUsage['gpt-4o'].output_tokens += routerUsage.completion_tokens;
+                modelUsage['gpt-4o'].cost += routerCost;
 
                 try {
                     const { error: routerLogError } = await supabaseAdmin.rpc('log_agent_execution', {
                         p_session_id: session_id,
-                        p_agent_name: 'Router_GPT4oMini',
+                        p_agent_name: 'Router_GPT4o',
                         p_action: 'route',
                         p_status: 'success',
                         p_cost_est: routerCost,
@@ -2195,9 +2196,36 @@ Retorne apenas function calls (sem texto livre).`
                 let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
                 dbCalls = enforceCompositeCoverage(input.user_message, dbCalls)
 
+                // Guardrail de capability query: se o usuário está PERGUNTANDO SOBRE O QUE O SISTEMA CONSEGUE FAZER
+                // (ex: "você consegue criar uma tarefa?"), não deve disparar nenhuma query de banco.
+                // Este guardrail DEVE ser avaliado antes de qualquer heurística de intenção que use palavras do domínio.
+                const capabilityQueryPatterns = [
+                    /você\s+consegue\b/i,
+                    /você\s+pode\b/i,
+                    /você\s+faz\b/i,
+                    /é\s+possível\b/i,
+                    /dá\s+pra\b/i,
+                    /dá\s+para\b/i,
+                    /tem\s+como\b/i,
+                    /consegue\s+fazer\b/i,
+                    /consegue\s+criar\b/i,
+                    /consegue\s+listar\b/i,
+                    /consegue\s+ver\b/i,
+                    /é\s+capaz\b/i,
+                    /posso\s+criar\b/i,
+                    /posso\s+fazer\b/i,
+                    /o\s+que\s+você\s+(consegue|sabe|pode)\s+fazer\b/i,
+                ]
+                const isCapabilityQuery = capabilityQueryPatterns.some((re) => re.test(input.user_message))
+                if (isCapabilityQuery) {
+                    // Descarta todas as db_calls — capability queries não consultam banco
+                    dbCalls = []
+                }
+
                 // Guardrail de intenção: consultas de tarefas devem sempre executar query_all_tasks
                 // e priorizá-la como chamada principal para evitar GenUI de projetos indevido.
-                const isTaskQueryIntent = hasAny(input.user_message, [
+                // ATENÇÃO: só aplica quando NÃO é uma capability query.
+                const isTaskQueryIntent = !isCapabilityQuery && hasAny(input.user_message, [
                     'tarefa', 'tarefas',
                     'pendencia', 'pendência', 'pendente', 'pendentes',
                     'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline',
