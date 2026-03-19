@@ -496,7 +496,7 @@ const ContractView: React.FC = () => {
                     {contractBodyVersion === CURRENT_CONTRACT_BODY_VERSION && (
                         <>
                             <p className="mb-2 text-sm">
-                                {hasWebsite ? '6.5.' : '6.3.'} A CONTRATADA somente poderá mencionar a CONTRATANTE ou divulgar os trabalhos realizados no âmbito deste contrato, incluindo website, identidade visual, peças publicitárias ou qualquer outro material desenvolvido, para fins de portfólio, publicidade ou autopromoção mediante autorização prévia e expressa da CONTRATANTE.
+                                {hasWebsite ? '6.5.' : '6.3.'} A CONTRATADA somente poderá mencionar a CONTRATANTE ou divulgar os trabalhos realizados no âmbito deste contrato, incluindo website, identidade visual, peças publicitárias ou qualquer outro material desenvolvido, para fins de portfólio, publicidade ou autopromoção, mediante autorização prévia e expressa da CONTRATANTE. Ainda que autorizada a divulgação, todo e qualquer material que contenha a marca, nome empresarial, identidade visual ou quaisquer outros elementos da CONTRATANTE deverá ser previamente submetido à sua análise e aprovação formal antes da publicação ou qualquer forma de veiculação.
                             </p>
                             <div className="mb-2 text-sm">
                                 <p className="mb-2">

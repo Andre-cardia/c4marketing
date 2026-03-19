@@ -70,7 +70,7 @@ const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
     },
     {
       title: "Uso de Marca",
-      content: "A C4 somente poderá divulgar a marca ou os trabalhos realizados para a CONTRATANTE com autorização prévia e expressa. O cliente pode solicitar a remoção imediata de qualquer conteúdo divulgado.",
+      content: "A C4 somente poderá mencionar a CONTRATANTE ou divulgar trabalhos realizados para fins de portfólio ou autopromoção mediante autorização prévia e expressa. Ainda que autorizada a divulgação, todo material que contenha a marca, nome ou elementos da CONTRATANTE deverá ser submetido à sua análise e aprovação antes da publicação. O cliente pode solicitar a remoção imediata de qualquer conteúdo divulgado.",
       show: hasOneTime
     },
     {
