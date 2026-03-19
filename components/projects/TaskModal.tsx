@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2, MessageSquare, Save } from 'lucide-react';
+import { X, Calendar, User, AlignLeft, Flag, Paperclip, Loader2, Trash2, MessageSquare, Save, Link2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
 
@@ -383,9 +383,27 @@ const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, task, projectId,
                                 </div>
                             )}
                         </div>
-                        <button type="button" onClick={onClose} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-c4 transition-colors text-neutral-400">
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {task?.id && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        const url = `${window.location.origin}/projects?kanban=${projectId}&task=${task.id}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Link da tarefa copiado para a área de transferência!');
+                                    }}
+                                    className="p-2 hover:bg-brand-coral/10 hover:text-brand-coral rounded-c4 transition-colors text-neutral-400 flex items-center gap-1.5 text-xs font-bold"
+                                    title="Copiar link direto"
+                                >
+                                    <Link2 size={18} />
+                                    <span className="hidden sm:inline">Copiar Link</span>
+                                </button>
+                            )}
+                            <button type="button" onClick={onClose} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-c4 transition-colors text-neutral-400">
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="p-6 pr-4 overflow-y-auto space-y-8 flex-1 min-h-0 custom-scrollbar">
