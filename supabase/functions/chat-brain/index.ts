@@ -6,6 +6,7 @@ import { matchBrainDocuments, makeOpenAIEmbedder } from '../_shared/brain-retrie
 import { routeRequestHybrid } from '../_shared/agents/router.ts'
 import { AGENTS } from '../_shared/agents/specialists.ts'
 import { RouterInput, RouteDecision, RetrievalPolicy } from '../_shared/brain-types.ts'
+import { runController, ControllerContext, ControllerDeps } from '../_shared/agents/controller.ts'
 
 const ALLOWED_ORIGINS = [
     'https://sistema.c4marketing.com.br',
@@ -2011,6 +2012,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
         const MODEL_PRICES: Record<string, { input: number, output: number }> = {
             'gpt-4o': { input: 0.0000025, output: 0.00001 },
             'gpt-4o-mini': { input: 0.00000015, output: 0.0000006 },
+            'gpt-5.4-mini-2026-03-17': { input: 0.00000075, output: 0.0000045 },
         };
 
         let totalInputTokens = 0;
@@ -2020,7 +2022,8 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
 
         const modelUsage: Record<string, { input_tokens: number, output_tokens: number, cost: number }> = {
             'gpt-4o': { input_tokens: 0, output_tokens: 0, cost: 0 },
-            'gpt-4o-mini': { input_tokens: 0, output_tokens: 0, cost: 0 }
+            'gpt-4o-mini': { input_tokens: 0, output_tokens: 0, cost: 0 },
+            'gpt-5.4-mini-2026-03-17': { input_tokens: 0, output_tokens: 0, cost: 0 },
         };
 
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
@@ -3144,6 +3147,111 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
+        // =========================================================
+        // Controller Agent (ReAct loop) — ativado para queries
+        // analíticas ou de rascunho que exigem múltiplos passos.
+        // Fast path (abaixo) permanece inalterado para queries simples.
+        // =========================================================
+
+        const isMultiEntityControllerQuery = (msg: string) => {
+            const n = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+            const nm = n(msg)
+            return (
+                nm.includes('compare') || nm.includes('comparar') ||
+                (nm.includes('analis') && !nm.includes('quantos')) ||
+                (nm.includes('todos') && nm.includes('cliente') && nm.includes('projet')) ||
+                (nm.includes('todos') && nm.includes('tarefa') && nm.includes('projet'))
+            )
+        }
+
+        const useController = (
+            (effectiveDecision.task_kind === 'analysis' || effectiveDecision.task_kind === 'drafting') ||
+            isMultiEntityControllerQuery(query)
+        ) && effectiveDecision.agent !== 'Agent_Executor'
+          && !isExplicitMemorySaveIntent(query)
+          && !isExplicitMemoryRecallIntent
+
+        if (useController) {
+            console.log(`[Controller] ativando para task_kind=${effectiveDecision.task_kind} agent=${effectiveDecision.agent}`)
+
+            const controllerContext: ControllerContext = {
+                userId,
+                sessionId: session_id ?? '',
+                userRole,
+                agentName: effectiveDecision.agent,
+                initialDecision: effectiveDecision,
+            }
+
+            const controllerDeps: ControllerDeps = {
+                openai,
+                supabaseAdmin,
+                executeDbRpc: async (rpcName: string, params: Record<string, any>) => {
+                    return executeDbRpc(rpcName, params)
+                },
+                runVectorRetrieval: async (_q: string) => {
+                    return runVectorRetrieval()
+                },
+            }
+
+            const controllerResult = await runController(
+                query,
+                controllerContext,
+                controllerDeps,
+                { maxIterations: 5 },
+            )
+
+            // Telemetria
+            totalLatencyMs = Math.round(performance.now() - startTime)
+            const logId = await logFinalAgentExecution({
+                agentName: effectiveDecision.agent,
+                action: 'controller_loop',
+                status: 'success',
+                answer: controllerResult.answer,
+                result: {
+                    iterations: controllerResult.iterations,
+                    observations: controllerResult.observations.length,
+                    evaluation_score: controllerResult.evaluationResult?.score ?? null,
+                    evaluation_pass: controllerResult.evaluationResult?.pass ?? null,
+                },
+                latencyMs: totalLatencyMs,
+            })
+
+            totalCostEst += controllerResult.totalCostEst
+            totalInputTokens += controllerResult.totalInputTokens
+            totalOutputTokens += controllerResult.totalOutputTokens
+            // Registrar uso do gpt-5.4-mini (controller + evaluator) no breakdown por modelo
+            modelUsage['gpt-5.4-mini-2026-03-17'].input_tokens += controllerResult.totalInputTokens
+            modelUsage['gpt-5.4-mini-2026-03-17'].output_tokens += controllerResult.totalOutputTokens
+            modelUsage['gpt-5.4-mini-2026-03-17'].cost += controllerResult.totalCostEst
+
+            return new Response(JSON.stringify({
+                answer: controllerResult.answer,
+                documents: [],
+                meta: {
+                    decision: effectiveDecision,
+                    raw_router_decision: decision,
+                    agent: effectiveDecision.agent,
+                    executed_db_rpcs: controllerResult.observations.map((o) => o.toolName),
+                    cognitive_memory_docs: 0,
+                    normative_governance_enabled: normativeGovernanceEnabled,
+                    canonical_memory_enabled: canonicalMemoryEnabled,
+                    canonical_docs_loaded: 0,
+                    memory_write_events: memoryWriteEvents,
+                    latency_ms: totalLatencyMs,
+                    cost_est: totalCostEst,
+                    log_id: logId,
+                    controller_mode: true,
+                    controller_iterations: controllerResult.iterations,
+                    controller_observations: controllerResult.observations.length,
+                    evaluation_score: controllerResult.evaluationResult?.score ?? null,
+                    evaluation_pass: controllerResult.evaluationResult?.pass ?? null,
+                    evaluation_issues: controllerResult.evaluationResult?.issues ?? [],
+                },
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
+        }
+
         // Canonical retrieval — executado ANTES de qualquer outra busca.
         const { text: canonicalBlock, count: canonicalDocsCount } = canUseDbCountFastPath
             ? { text: '', count: 0 }
@@ -3529,7 +3637,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             usedDeterministicDbAnswer = true
         } else {
             const chatResponse = await openai.chat.completions.create({
-                model: 'gpt-4o',
+                model: 'gpt-5.4-mini-2026-03-17',
                 messages: messages as any,
                 temperature: 0.1
             })
@@ -3538,7 +3646,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             totalLatencyMs = Math.round(endTime - startTime)
             const usage = chatResponse.usage
             if (usage) {
-                const mainModel = 'gpt-4o'; // Modelo principal dos agentes
+                const mainModel = 'gpt-5.4-mini-2026-03-17'; // Modelo principal dos agentes
                 const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
                     (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
 
@@ -3546,9 +3654,9 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 totalOutputTokens += usage.completion_tokens;
                 totalCostEst += chatCost;
 
-                modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
-                modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
-                modelUsage['gpt-4o'].cost += chatCost;
+                modelUsage['gpt-5.4-mini-2026-03-17'].input_tokens += usage.prompt_tokens;
+                modelUsage['gpt-5.4-mini-2026-03-17'].output_tokens += usage.completion_tokens;
+                modelUsage['gpt-5.4-mini-2026-03-17'].cost += chatCost;
             }
 
             answer = chatResponse.choices[0].message.content || ''

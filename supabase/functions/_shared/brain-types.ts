@@ -114,3 +114,44 @@ export interface RouterInput {
   project_id?: string | null;
   source_id?: string | null;
 }
+
+// --- Controller Agent ---
+
+export interface Observation {
+  iteration: number;
+  toolName: string;
+  input: Record<string, any>;
+  output: string;       // texto retornado pela tool (para compor workingMemory)
+  success: boolean;
+  timestamp: number;
+}
+
+export interface ControllerResult {
+  answer: string;
+  iterations: number;
+  observations: Observation[];
+  evaluationResult: EvaluationResult | null;
+  finalDecision: RouteDecision;
+  totalCostEst: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+// --- Evaluator Agent ---
+
+export interface EvaluationInput {
+  query: string;
+  answer: string;
+  observations: Observation[];
+  agentName: AgentName;
+}
+
+export interface EvaluationResult {
+  score: number;        // 0..1
+  pass: boolean;        // score >= 0.70
+  issues: string[];     // problemas identificados
+  suggestion: string;   // sugestão de melhoria (usado em refineAnswer)
+  model: string;
+  latency_ms: number;
+  cost_est: number;
+}
