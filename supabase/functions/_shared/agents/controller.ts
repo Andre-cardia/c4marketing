@@ -436,7 +436,7 @@ export async function runController(
                 context,
                 deps,
             )
-            finalAnswer = forceResult.decision.answer ?? workingMemory || 'Não foi possível coletar dados suficientes.'
+            finalAnswer = (forceResult.decision.answer ?? workingMemory) || 'Não foi possível coletar dados suficientes.'
             totalInputTokens += forceResult.inputTokens
             totalOutputTokens += forceResult.outputTokens
             break
@@ -478,7 +478,7 @@ export async function runController(
                 context,
                 deps,
             )
-            finalAnswer = forced.decision.answer ?? workingMemory || 'Limite de iterações atingido sem dados suficientes.'
+            finalAnswer = (forced.decision.answer ?? workingMemory) || 'Limite de iterações atingido sem dados suficientes.'
             totalInputTokens += forced.inputTokens
             totalOutputTokens += forced.outputTokens
         } catch {
