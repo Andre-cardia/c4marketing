@@ -33,6 +33,7 @@ import { ThemeProvider } from './lib/ThemeContext';
 import { BrainWidgetWrapper } from './components/BrainWidgetWrapper';
 import BrainManager from './pages/BrainManager';
 import BrainTelemetry from './pages/BrainTelemetry';
+import BrainRelatorios from './pages/BrainRelatorios';
 import ResetPasswordHandler from './components/ResetPasswordHandler';
 import SetPassword from './pages/SetPassword';
 import DashboardLayout from './components/DashboardLayout';
@@ -81,6 +82,7 @@ const App: React.FC = () => {
               <Route path="/account" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}><DashboardLayout><Account /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainManager /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain-telemetry" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainTelemetry /></DashboardLayout></ProtectedRoute>} />
+              <Route path="/brain-relatorios" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainRelatorios /></DashboardLayout></ProtectedRoute>} />
               <Route path="/traffic-agent" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><TrafficAgentChat /></DashboardLayout></ProtectedRoute>} />
               <Route path="/client/preview/:acceptanceId" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><ClientDashboard /></ProtectedRoute>} />
               <Route path="/client" element={<ProtectedRoute allowedRoles={['cliente']}><ClientDashboard /></ProtectedRoute>} />

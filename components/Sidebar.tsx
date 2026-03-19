@@ -74,6 +74,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen }) => {
             isIA: true
         },
         {
+            label: 'Relatórios IA',
+            icon: Sparkles,
+            path: '/brain-relatorios',
+            roles: ['gestor'],
+            isIA: true
+        },
+        {
             label: 'Propostas',
             icon: FileText,
             path: '/proposals',
