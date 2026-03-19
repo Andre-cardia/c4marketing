@@ -137,6 +137,63 @@ export interface ControllerResult {
   totalOutputTokens: number;
 }
 
+// --- CUA (Computer-Use Agent) ---
+
+export type CUAActionType =
+  | "create_proposal"
+  | "update_proposal"
+  | "update_proposal_status"
+  | "add_proposal_service"
+  | "create_task"
+  | "assign_task"
+  | "move_task"
+  | "invite_user"
+  | "update_user_role"
+  | "deactivate_user"
+  | "update_document"
+  | "generate_contract"
+  | "mark_clause_reviewed"
+  | "save_report"
+  | "schedule_report"
+  | "deliver_report";
+
+export type CUASessionType = "one_shot" | "monitoring" | "scheduled";
+export type CUASessionStatus = "active" | "paused" | "stopped" | "completed";
+export type CUASeverity = "info" | "warning" | "critical";
+export type CUAActionStatus = "pending" | "executed" | "failed" | "rolled_back";
+
+export interface CUASession {
+  id: string;
+  session_type: CUASessionType;
+  objective: string;
+  status: CUASessionStatus;
+  created_by: string;        // email do gestor
+  interval_minutes: number;
+  max_hours: number;
+  iteration_count: number;
+  last_run_at: string | null;
+  next_run_at: string | null;
+  result: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CUAAction {
+  id: string;
+  session_id: string | null;
+  action_type: CUAActionType;
+  severity: CUASeverity;
+  params: Record<string, any>;
+  result: Record<string, any>;
+  status: CUAActionStatus;
+  can_rollback: boolean;
+  rollback_deadline: string | null;
+  executed_at: string | null;
+  rolled_back_at: string | null;
+  executed_by: string | null;
+  created_at: string;
+}
+
 // --- Evaluator Agent ---
 
 export interface EvaluationInput {

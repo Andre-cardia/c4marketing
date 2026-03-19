@@ -3164,15 +3164,27 @@ Retorne apenas function calls (sem texto livre).`
             )
         }
 
+        // CUA: intenção de escrita detectada pelo router (task_kind='operation')
+        const isCUAOperation = effectiveDecision.task_kind === 'operation'
+
+        // Política gestor-only: write operations bloqueadas para não-gestores
+        if (isCUAOperation && userRole !== 'gestor') {
+            return new Response(JSON.stringify({
+                error: 'Acesso negado: operações autônomas são exclusivas para gestores.',
+                code: 'CUA_GESTOR_ONLY',
+            }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+        }
+
         const useController = (
             (effectiveDecision.task_kind === 'analysis' || effectiveDecision.task_kind === 'drafting') ||
-            isMultiEntityControllerQuery(query)
-        ) && effectiveDecision.agent !== 'Agent_Executor'
-          && !isExplicitMemorySaveIntent(query)
+            isMultiEntityControllerQuery(query) ||
+            isCUAOperation
+        ) && !isExplicitMemorySaveIntent(query)
           && !isExplicitMemoryRecallIntent
 
         if (useController) {
-            console.log(`[Controller] ativando para task_kind=${effectiveDecision.task_kind} agent=${effectiveDecision.agent}`)
+            const mode = isCUAOperation ? 'CUA_WRITE' : 'ANALYSIS'
+            console.log(`[Controller] ativando modo=${mode} task_kind=${effectiveDecision.task_kind} agent=${effectiveDecision.agent} role=${userRole}`)
 
             const controllerContext: ControllerContext = {
                 userId,

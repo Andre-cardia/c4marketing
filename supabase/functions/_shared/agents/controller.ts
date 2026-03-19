@@ -198,6 +198,206 @@ function buildPlannerTools() {
                 parameters: { type: 'object', properties: {} },
             },
         },
+        // --- GestorAPI: tools de escrita (apenas gestor) ---
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_create_proposal',
+                description: 'Criar nova proposta comercial. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_company_name:      { type: 'string', description: 'Nome da empresa.' },
+                        p_responsible_name:  { type: 'string', description: 'Nome do responsável.' },
+                        p_monthly_fee:       { type: 'number', description: 'Mensalidade em R$.' },
+                        p_setup_fee:         { type: 'number', description: 'Setup em R$.' },
+                        p_media_limit:       { type: 'number', description: 'Limite de mídia em R$.' },
+                        p_contract_duration: { type: 'number', description: 'Duração do contrato em meses.' },
+                        p_services:          { type: 'string', description: 'Serviços em JSON (array).' },
+                        p_notes:             { type: 'string', description: 'Observações.' },
+                    },
+                    required: ['p_company_name', 'p_responsible_name'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_update_proposal',
+                description: 'Atualizar um campo de uma proposta existente. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_proposal_id: { type: 'number', description: 'ID da proposta.' },
+                        p_field:       { type: 'string', enum: ['company_name','responsible_name','monthly_fee','setup_fee','media_limit','contract_duration'], description: 'Campo a atualizar.' },
+                        p_value:       { type: 'string', description: 'Novo valor.' },
+                    },
+                    required: ['p_proposal_id', 'p_field', 'p_value'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_update_proposal_status',
+                description: 'Atualizar o status do contrato ativo vinculado a uma proposta. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_proposal_id: { type: 'number', description: 'ID da proposta.' },
+                        p_status:      { type: 'string', enum: ['Ativo','Inativo','Suspenso','Cancelado','Finalizado'], description: 'Novo status.' },
+                    },
+                    required: ['p_proposal_id', 'p_status'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_add_proposal_service',
+                description: 'Adicionar serviço à lista de serviços de uma proposta. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_proposal_id:  { type: 'number', description: 'ID da proposta.' },
+                        p_service_type: { type: 'string', description: 'Tipo de serviço (ex: tráfego pago, site).' },
+                        p_value:        { type: 'number', description: 'Valor do serviço em R$.' },
+                        p_description:  { type: 'string', description: 'Descrição do serviço.' },
+                    },
+                    required: ['p_proposal_id', 'p_service_type'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_create_task',
+                description: 'Criar nova tarefa em um projeto. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_project_name: { type: 'string', description: 'Nome do cliente/projeto (busca parcial).' },
+                        p_project_id:   { type: 'number', description: 'ID do projeto (alternativa ao nome).' },
+                        p_title:        { type: 'string', description: 'Título da tarefa.' },
+                        p_description:  { type: 'string', description: 'Descrição.' },
+                        p_due_date:     { type: 'string', description: 'Prazo (YYYY-MM-DD).' },
+                        p_priority:     { type: 'string', enum: ['low','medium','high'], description: 'Prioridade.' },
+                        p_status:       { type: 'string', enum: ['backlog','in_progress','approval','done','paused'], description: 'Status inicial.' },
+                        p_assignee:     { type: 'string', description: 'Email do responsável.' },
+                    },
+                    required: ['p_title'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_assign_task',
+                description: 'Atribuir ou reatribuir responsável de uma tarefa. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_task_id:       { type: 'string', description: 'UUID da tarefa.' },
+                        p_task_title:    { type: 'string', description: 'Título da tarefa (busca parcial).' },
+                        p_project_name:  { type: 'string', description: 'Filtro por projeto.' },
+                        p_assignee_email:{ type: 'string', description: 'Email do novo responsável.' },
+                    },
+                    required: ['p_assignee_email'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_invite_user',
+                description: 'Convidar novo usuário para o sistema. SOMENTE para role=gestor. Risco crítico — confirmar antes.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_email: { type: 'string', description: 'E-mail do usuário.' },
+                        p_name:  { type: 'string', description: 'Nome completo.' },
+                        p_role:  { type: 'string', enum: ['gestor','operacional','comercial','leitor','cliente'], description: 'Role do usuário.' },
+                    },
+                    required: ['p_email', 'p_name'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_update_user_role',
+                description: 'Alterar role de um usuário existente. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_user_id:    { type: 'string', description: 'UUID do usuário.' },
+                        p_user_email: { type: 'string', description: 'Email do usuário (alternativa ao ID).' },
+                        p_new_role:   { type: 'string', enum: ['gestor','operacional','comercial','leitor','cliente'], description: 'Novo role.' },
+                    },
+                    required: ['p_new_role'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_deactivate_user',
+                description: 'Desativar usuário (altera role para leitor). SOMENTE para role=gestor. Risco crítico — confirmar antes.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_user_id:    { type: 'string', description: 'UUID do usuário.' },
+                        p_user_email: { type: 'string', description: 'Email do usuário.' },
+                    },
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'execute_generate_contract',
+                description: 'Gerar rascunho de contrato a partir de uma proposta. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_proposal_id: { type: 'number', description: 'ID da proposta.' },
+                        p_notes:       { type: 'string', description: 'Notas adicionais para o contrato.' },
+                    },
+                    required: ['p_proposal_id'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'brain_save_report',
+                description: 'Salvar relatório gerado pelo agente. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_title:       { type: 'string', description: 'Título do relatório.' },
+                        p_content:     { type: 'string', description: 'Conteúdo do relatório em Markdown.' },
+                        p_report_type: { type: 'string', enum: ['ops_daily','contract_pulse','proposal_pipeline','client_health','custom'], description: 'Tipo do relatório.' },
+                    },
+                    required: ['p_title', 'p_content'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'brain_schedule_report',
+                description: 'Agendar entrega de relatório existente. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_report_id:  { type: 'string', description: 'UUID do relatório.' },
+                        p_deliver_at: { type: 'string', description: 'Data/hora de entrega (ISO 8601).' },
+                    },
+                    required: ['p_report_id', 'p_deliver_at'],
+                },
+            },
+        },
     ]
 }
 
