@@ -163,9 +163,13 @@ const Users: React.FC = () => {
     };
 
     const handleUpdateRole = async (userId: string, newRole: string) => {
-        const { error } = await supabase.from('app_users').update({ role: newRole }).eq('id', userId);
+        const { error } = await supabase.rpc('update_user_role', {
+            target_user_id: userId,
+            new_role: newRole
+        });
         if (error) {
-            alert('Erro ao atualizar permissão.');
+            console.error('Erro ao atualizar role:', error);
+            alert(`Erro ao atualizar permissão: ${error.message}`);
         } else {
             fetchUsers();
         }
