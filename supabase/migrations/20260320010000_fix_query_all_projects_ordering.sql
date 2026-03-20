@@ -38,7 +38,7 @@ BEGIN
             (SELECT count(*) FROM traffic_campaigns tc WHERE tc.traffic_project_id = tp.id) AS total_campaigns,
             (SELECT count(*) FROM traffic_campaigns tc WHERE tc.traffic_project_id = tp.id AND tc.status = 'active') AS active_campaigns,
             tp.created_at,
-            a.created_at              AS activated_at
+            a.timestamp               AS activated_at
         FROM traffic_projects tp
         JOIN acceptances a ON a.id = tp.acceptance_id
         LEFT JOIN app_users u ON u.id = tp.responsible_user_id
@@ -61,7 +61,7 @@ BEGIN
             (SELECT count(*) FROM websites w WHERE w.website_project_id = wp.id) AS total_campaigns,
             (SELECT count(*) FROM websites w WHERE w.website_project_id = wp.id AND w.status != 'delivered') AS active_campaigns,
             wp.created_at,
-            a.created_at              AS activated_at
+            a.timestamp               AS activated_at
         FROM website_projects wp
         JOIN acceptances a ON a.id = wp.acceptance_id
         LEFT JOIN app_users u ON u.id = wp.responsible_user_id
@@ -84,7 +84,7 @@ BEGIN
             (SELECT count(*) FROM landing_pages l WHERE l.landing_page_project_id = lp.id) AS total_campaigns,
             (SELECT count(*) FROM landing_pages l WHERE l.landing_page_project_id = lp.id AND l.status != 'delivered') AS active_campaigns,
             lp.created_at,
-            a.created_at              AS activated_at
+            a.timestamp               AS activated_at
         FROM landing_page_projects lp
         JOIN acceptances a ON a.id = lp.acceptance_id
         LEFT JOIN app_users u ON u.id = lp.responsible_user_id

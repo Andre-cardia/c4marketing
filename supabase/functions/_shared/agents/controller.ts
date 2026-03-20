@@ -130,13 +130,14 @@ function buildPlannerTools() {
             type: 'function' as const,
             function: {
                 name: 'query_all_projects',
-                description: 'Consultar projetos de serviço (Gestão de Tráfego, Criação de Site, Landing Page).',
+                description: 'Consultar projetos de serviço (Gestão de Tráfego, Criação de Site, Landing Page). Resultados ordenados por data de ativação DESC — o PRIMEIRO resultado é sempre o mais recente. PARÂMETROS VÁLIDOS: apenas p_service_type e p_status_filter. NÃO use p_limit ou qualquer outro parâmetro.',
                 parameters: {
                     type: 'object',
                     properties: {
-                        p_service_type: { type: 'string', enum: ['traffic', 'website', 'landing_page'], description: 'Filtro por tipo. Omita para todos.' },
-                        p_status_filter: { type: 'string', enum: ['Ativo', 'Inativo'], description: 'Filtro por status do cliente. Omita para todos.' },
+                        p_service_type: { type: 'string', enum: ['traffic', 'website', 'landing_page'], description: 'Filtro por tipo de serviço. Omita para retornar todos os tipos.' },
+                        p_status_filter: { type: 'string', enum: ['Ativo', 'Inativo', 'Suspenso', 'Cancelado', 'Finalizado'], description: 'Filtro por status do cliente. Omita para todos.' },
                     },
+                    additionalProperties: false,
                 },
             },
         },
