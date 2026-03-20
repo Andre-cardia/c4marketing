@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '../lib/UserRoleContext';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
+
+/** Returns the home path for a given role */
+const homePathForRole = (role: string | null): string => {
+  if (role === 'cliente') return '/client';
+  if (role === 'financeiro' || role === 'leitor') return '/account';
+  return '/dashboard';
+};
 
 const Home: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>('login');
@@ -13,37 +21,18 @@ const Home: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { userRole, loading: roleLoading } = useUserRole();
 
+  // Redirect already-authenticated users to their home page
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setError(`ERRO DE CONFIGURAÇÃO: ${supabaseConfigError || 'As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas.'} O sistema não pode se conectar ao banco de dados.`);
-    } else {
-      checkUser();
+      return;
     }
-  }, []);
-
-  const checkUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    // If browser has stale auth state, clear it instead of redirecting in loop.
-    const firstUserCheck = await supabase.auth.getUser();
-    if (firstUserCheck.error || !firstUserCheck.data?.user) {
-      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !refreshed.session) {
-        await supabase.auth.signOut();
-        return;
-      }
-
-      const secondUserCheck = await supabase.auth.getUser();
-      if (secondUserCheck.error || !secondUserCheck.data?.user) {
-        await supabase.auth.signOut();
-        return;
-      }
+    if (!roleLoading && userRole) {
+      navigate(homePathForRole(userRole), { replace: true });
     }
-
-    navigate('/dashboard');
-  };
+  }, [roleLoading, userRole]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +66,8 @@ const Home: React.FC = () => {
           password,
         });
         if (error) throw error;
+        // Navigate based on role — role will be resolved by UserRoleContext after SIGNED_IN event
+        // Use a generic navigate; ProtectedRoute will handle role-based redirects.
         navigate('/dashboard');
       } else {
         // Register Mode (First Access)
