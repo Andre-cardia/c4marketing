@@ -18,24 +18,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   process.exit(1);
 }
 
-const defaultUserId = '321f03b7-4b78-41f5-8133-6967d6aea169';
-const userId = process.env.BRAIN_TEST_USER_ID || defaultUserId;
 const userEmail = process.env.BRAIN_TEST_USER_EMAIL || 'andre@c4marketing.com';
-const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
 const sessionId = process.env.BRAIN_TEST_SESSION_ID || randomUUID();
-
-const projectRef = (() => {
-  try {
-    return new URL(supabaseUrl).hostname.split('.')[0];
-  } catch {
-    return null;
-  }
-})();
-
-if (!projectRef) {
-  console.error('[FATAL] Invalid VITE_SUPABASE_URL');
-  process.exit(1);
-}
 
 const marker = `CANARY_MEMORY_${Date.now()}`;
 const sloTracked = (process.env.BRAIN_CANARY_SLO_TRACKED || 'false').toLowerCase() === 'true';
@@ -44,24 +28,102 @@ const serviceClient =
     ? createClient(supabaseUrl, serviceRoleKey)
     : null;
 
-const b64u = (obj) =>
-  Buffer.from(JSON.stringify(obj), 'utf8')
-    .toString('base64')
-    .replace(/=+$/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+// ─── Token de Acesso ──────────────────────────────────────────────────────────
+// Obtém um access_token REAL via admin.generateLink (magic link OTP) para garantir
+// que o chat-brain valide o JWT corretamente e leia o role de gestor de app_users.
+// Isso substitui o JWT sintético que falhava silenciosamente na validação GoTrue
+// e fazia o fallback retornar role='authenticated', causando 403.
+// ─────────────────────────────────────────────────────────────────────────────
+let accessToken = null;
 
-// JWT sintético (3 segmentos) para acionar fallback de claims no chat-brain
-// quando o token não for validável por assinatura no GoTrue.
-const syntheticJwt = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
-  iss: 'supabase',
-  ref: projectRef,
-  role: userRole,
-  sub: userId,
-  email: userEmail,
-  iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor(Date.now() / 1000) + 60 * 60,
-})}.${b64u({ sig: 'canary' })}`;
+if (serviceClient) {
+  try {
+    console.log(`[AUTH] Gerando token real para ${userEmail} via admin.generateLink...`);
+    const { data: linkData, error: linkError } = await serviceClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userEmail,
+      options: { redirectTo: supabaseUrl },
+    });
+
+    if (linkError) {
+      console.error('[AUTH] generateLink falhou:', linkError.message);
+    } else {
+      const actionLink = linkData?.properties?.action_link || '';
+      let tokenHash = null;
+      try {
+        tokenHash = new URL(actionLink).searchParams.get('token');
+      } catch (urlErr) {
+        console.error('[AUTH] Falha ao parsear action_link:', urlErr?.message || urlErr);
+      }
+
+      if (tokenHash) {
+        const anonClient = createClient(supabaseUrl, supabaseAnonKey);
+        const { data: sessionData, error: sessionError } = await anonClient.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'magiclink',
+        });
+
+        if (sessionError) {
+          console.error('[AUTH] verifyOtp falhou:', sessionError.message);
+        } else if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+          console.log(`[AUTH] Token real obtido com sucesso. user_id=${sessionData.session.user?.id}`);
+        } else {
+          console.error('[AUTH] verifyOtp não retornou access_token.');
+        }
+      } else {
+        console.error('[AUTH] token_hash ausente no action_link:', actionLink);
+      }
+    }
+  } catch (authErr) {
+    console.error('[AUTH] Erro inesperado na geração do token:', authErr?.message || authErr);
+  }
+}
+
+// ─── Fallback local ───────────────────────────────────────────────────────────
+// Usado apenas quando serviceRoleKey não está disponível (ambiente local sem .env completo).
+// ATENÇÃO: Este JWT sintético falha na validação real do Supabase Auth. O fallback do
+// chat-brain tentará resolver por userId/email em app_users. Se o userId não existir,
+// retornará 403. Use apenas para debug local.
+// ─────────────────────────────────────────────────────────────────────────────
+if (!accessToken) {
+  console.warn('[AUTH] AVISO: Não foi possível obter token real. Usando JWT sintético como fallback local.');
+  console.warn('[AUTH] Este modo pode causar 403 se o userId não existir na tabela app_users.');
+
+  const defaultUserId = '321f03b7-4b78-41f5-8133-6967d6aea169';
+  const userId = process.env.BRAIN_TEST_USER_ID || defaultUserId;
+  const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
+
+  const projectRef = (() => {
+    try {
+      return new URL(supabaseUrl).hostname.split('.')[0];
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!projectRef) {
+    console.error('[FATAL] Invalid VITE_SUPABASE_URL');
+    process.exit(1);
+  }
+
+  const b64u = (obj) =>
+    Buffer.from(JSON.stringify(obj), 'utf8')
+      .toString('base64')
+      .replace(/=+$/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+  accessToken = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
+    iss: 'supabase',
+    ref: projectRef,
+    role: userRole,
+    sub: userId,
+    email: userEmail,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 60 * 60,
+  })}.${b64u({ sig: 'canary' })}`;
+}
 
 const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
 
@@ -72,7 +134,7 @@ const callChat = async (query) => {
       method: 'POST',
       headers: {
         apikey: supabaseAnonKey,
-        Authorization: `Bearer ${syntheticJwt}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
