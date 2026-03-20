@@ -67,7 +67,7 @@ const Projects: React.FC = () => {
                 return;
             }
 
-            // Build map: acceptanceId -> { responsible_user_name, responsible_user_email }
+            // Build map: acceptanceId -> { name, email } from query_all_projects
             const responsibleMap: Record<string, { name: string; email: string }> = {};
             if (rpcResult.data) {
                 const rpcRows: any[] = typeof rpcResult.data === 'string'
@@ -79,6 +79,32 @@ const Projects: React.FC = () => {
                             name: row.responsible_user_name,
                             email: row.responsible_user_email ?? '',
                         };
+                    }
+                }
+            }
+
+            // Fallback: projects not in any project table (e.g. hosting-only) →
+            // use acceptances.responsible_user_id directly
+            const missingUserIds = [
+                ...new Set(
+                    acceptances
+                        .filter(acc => !responsibleMap[acc.id] && acc.responsible_user_id)
+                        .map(acc => acc.responsible_user_id as string)
+                ),
+            ];
+            if (missingUserIds.length > 0) {
+                const { data: users } = await supabase
+                    .from('app_users')
+                    .select('id, name, email')
+                    .in('id', missingUserIds);
+                if (users) {
+                    const userById: Record<string, { name: string; email: string }> = {};
+                    users.forEach((u: any) => { userById[u.id] = { name: u.name, email: u.email }; });
+                    for (const acc of acceptances) {
+                        if (!responsibleMap[acc.id] && acc.responsible_user_id) {
+                            const u = userById[acc.responsible_user_id];
+                            if (u) responsibleMap[acc.id] = u;
+                        }
                     }
                 }
             }

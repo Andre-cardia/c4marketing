@@ -46,7 +46,7 @@ COMMENT ON COLUMN public.acceptances.responsible_user_id IS
 
 -- 3. Nova RPC: atualiza responsável em acceptances + todas as tabelas de projeto
 CREATE OR REPLACE FUNCTION public.execute_update_responsible_by_acceptance(
-    p_acceptance_id       UUID    DEFAULT NULL,
+    p_acceptance_id       BIGINT  DEFAULT NULL,   -- acceptances.id é BIGINT
     p_responsible_email   TEXT    DEFAULT NULL,
     p_responsible_user_id UUID    DEFAULT NULL,
     p_session_id          TEXT    DEFAULT NULL
@@ -127,7 +127,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.execute_update_responsible_by_acceptance(uuid, text, uuid, text)
+GRANT EXECUTE ON FUNCTION public.execute_update_responsible_by_acceptance(bigint, text, uuid, text)
     TO authenticated, service_role;
 
 COMMENT ON FUNCTION public.execute_update_responsible_by_acceptance IS
