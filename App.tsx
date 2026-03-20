@@ -79,7 +79,7 @@ const App: React.FC = () => {
               <Route path="/projects/:id/consulting" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><Consulting /></DashboardLayout></ProtectedRoute>} />
               <Route path="/projects/:id/ai-agents" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><AIAgents /></DashboardLayout></ProtectedRoute>} />
               <Route path="/meetings" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional']}><DashboardLayout><Meetings /></DashboardLayout></ProtectedRoute>} />
-              <Route path="/account" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor']}><DashboardLayout><Account /></DashboardLayout></ProtectedRoute>} />
+              <Route path="/account" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial', 'operacional', 'leitor', 'financeiro']}><DashboardLayout><Account /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainManager /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain-telemetry" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainTelemetry /></DashboardLayout></ProtectedRoute>} />
               <Route path="/brain-relatorios" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><BrainRelatorios /></DashboardLayout></ProtectedRoute>} />

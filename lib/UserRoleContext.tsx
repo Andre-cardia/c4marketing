@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { logUserAccess } from './accessTracking';
 
-type UserRole = 'admin' | 'leitor' | 'comercial' | 'gestor' | 'operacional' | 'cliente' | null;
+type UserRole = 'admin' | 'leitor' | 'financeiro' | 'comercial' | 'gestor' | 'operacional' | 'cliente' | null;
 
 interface UserRoleContextType {
     userRole: UserRole;

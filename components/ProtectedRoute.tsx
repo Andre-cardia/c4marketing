@@ -79,8 +79,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
                 if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userRecord.role)) {
                     console.warn(`Access Denied: Role ${userRecord.role} not in allowed list [${allowedRoles}]`);
                     setAuthorized(false);
-                    // Optional: redirect to dashboard or show unauthorized message
-                    // For now, we'll just set authorized to false which redirects to /
                 } else {
                     setAuthorized(true);
                 }
@@ -105,7 +103,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         if (userRole === 'cliente') {
             return <Navigate to="/client" replace />;
         }
-        return <Navigate to="/dashboard" replace />; // Redirect to Dashboard if logged in but unauthorized for specific page
+        if (userRole === 'financeiro' || userRole === 'leitor') {
+            return <Navigate to="/account" replace />;
+        }
+        // Unknown or fully unauthorized role → sign out to avoid redirect loop
+        supabase.auth.signOut();
+        return <Navigate to="/" replace />;
     }
 
     return <>{children}</>;
