@@ -47,7 +47,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
         responsibleUserEmail: '',
     });
 
-    const isGestor = userRole === 'gestor';
+    const isGestor = userRole === 'gestor' || userRole === 'admin';
 
     useEffect(() => {
         if (isOpen && projectToEdit) {
