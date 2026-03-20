@@ -63,6 +63,17 @@ export const SERVICES_CONFIG: ServiceConfig[] = [
         bgClass: 'bg-white border border-slate-200 shadow-sm relative overflow-hidden',
     },
     {
+        id: 'hosting',
+        title: 'Hospedagem',
+        description: 'Infraestrutura de hospedagem gerenciada com alta disponibilidade, SSL incluso, backups automáticos e suporte técnico.',
+        icon: 'Globe',
+        colorTheme: 'blue',
+        priceLabel: 'Mensalidade',
+        priceType: 'currency',
+        detailsLabel: 'Detalhamento:',
+        bgClass: 'bg-white border border-slate-200 shadow-sm relative overflow-hidden',
+    },
+    {
         id: 'ai_agents',
         title: 'Agentes de IA',
         description: 'Implementação de agentes inteligentes para atendimento, qualificação e operações internas, com setup inicial, treinamento e otimizações recorrentes.',

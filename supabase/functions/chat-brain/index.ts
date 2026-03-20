@@ -75,6 +75,9 @@ Deno.serve(async (req) => {
 
         // Idempotency: Se recebido do frontend, evita duplicação de execução pesada em retentativa.
         const idempotencyKey = req.headers.get('x-idempotency-key') || null
+        const screenshotBase64 = typeof requestBody?.screenshot_base64 === 'string' && requestBody.screenshot_base64.length > 0
+            ? requestBody.screenshot_base64
+            : null
         const rawClientToday = typeof requestBody?.client_today === 'string' ? requestBody.client_today.trim() : null
         const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : 'America/Sao_Paulo'
         const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -3242,7 +3245,8 @@ Retorne apenas function calls (sem texto livre).`
                 nm.includes('compare') || nm.includes('comparar') ||
                 (nm.includes('analis') && !nm.includes('quantos')) ||
                 (nm.includes('todos') && nm.includes('cliente') && nm.includes('projet')) ||
-                (nm.includes('todos') && nm.includes('tarefa') && nm.includes('projet')) ||
+                // Qualquer query sobre tarefas de um projeto específico → Controller (precisa de lookup em 2 passos: ID do projeto → tarefas)
+                (nm.includes('tarefa') && nm.includes('projet')) ||
                 // Queries de detalhe/recência sobre projetos ou contratos → Controller
                 // (evita fallback para RAG com dados possivelmente desatualizados)
                 (nm.includes('projet') && (
@@ -3253,7 +3257,11 @@ Retorne apenas function calls (sem texto livre).`
                 )) ||
                 (nm.includes('contrat') && (
                     nm.includes('novo') || nm.includes('ultimo') || nm.includes('recente') || nm.includes('ativad')
-                ))
+                )) ||
+                // Queries de visão/tela → Controller (único path com analyze_screen disponível)
+                nm.includes('print') || nm.includes('screenshot') ||
+                (nm.includes('tela') && (nm.includes('ver') || nm.includes('vejo') || nm.includes('vendo') || nm.includes('consegue') || nm.includes('captur') || nm.includes('mostr'))) ||
+                nm.includes('o que esta na tela') || nm.includes('o que voce ve') || nm.includes('o que voce esta vendo')
             )
         }
 
@@ -3285,6 +3293,7 @@ Retorne apenas function calls (sem texto livre).`
                 userRole,
                 agentName: effectiveDecision.agent,
                 initialDecision: effectiveDecision,
+                screenshotBase64: screenshotBase64 ?? undefined,
             }
 
             const controllerDeps: ControllerDeps = {
@@ -3351,6 +3360,7 @@ Retorne apenas function calls (sem texto livre).`
                     evaluation_score: controllerResult.evaluationResult?.score ?? null,
                     evaluation_pass: controllerResult.evaluationResult?.pass ?? null,
                     evaluation_issues: controllerResult.evaluationResult?.issues ?? [],
+                    screenshot_used: controllerResult.observations.some(o => o.toolName === 'analyze_screen' && o.success),
                 },
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -3540,7 +3550,9 @@ Retorne apenas function calls (sem texto livre).`
             // GUARDRAIL: queries sobre projetos/contratos NÃO devem usar RAG —
             // brain_documents pode estar desatualizado. Forçar SQL direto.
             const _nqRag = (query || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
-            const isProjectOrContractFastQuery = _nqRag.includes('projet') || _nqRag.includes('contrat')
+            // Exclui queries sobre tarefas em projetos — essas precisam do Controller (lookup em 2 passos)
+            const isProjectOrContractFastQuery = (_nqRag.includes('projet') || _nqRag.includes('contrat'))
+                && !(_nqRag.includes('tarefa') || _nqRag.includes('pendencia') || _nqRag.includes('pendente'))
             if (isProjectOrContractFastQuery) {
                 console.log('[FastPath] RAG interceptado → query_all_projects (guardrail proj/contrato)')
                 const { section: _projSection, rawData: _projRaw } = await executeDbRpc('query_all_projects', {})

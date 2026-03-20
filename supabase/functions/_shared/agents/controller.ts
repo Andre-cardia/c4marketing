@@ -43,6 +43,7 @@ export interface ControllerContext {
     userRole: string
     agentName: AgentName
     initialDecision: RouteDecision
+    screenshotBase64?: string   // Vision Perception: captura da tela enviada pelo frontend
 }
 
 export interface ToolResult {
@@ -81,6 +82,21 @@ function buildPlannerTools() {
                         answer: { type: 'string', description: 'Resposta completa e definitiva para o usuário, em português.' },
                     },
                     required: ['answer'],
+                },
+            },
+        },
+        // --- vision perception ---
+        {
+            type: 'function' as const,
+            function: {
+                name: 'analyze_screen',
+                description: 'Analisa a captura de tela atual do sistema (Vision Perception). SEMPRE disponível — a captura é feita automaticamente a cada mensagem. Chame proativamente quando: o usuário menciona o que está vendo, tabelas visíveis, estado da interface, dados em tela, ou quando o contexto visual pode complementar dados do banco.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        focus: { type: 'string', description: 'O que você quer extrair da tela. Ex: "dados da tabela de projetos", "formulário aberto", "alertas ou erros visíveis".' },
+                    },
+                    required: ['focus'],
                 },
             },
         },
@@ -511,6 +527,19 @@ PRIORIDADE DE FERRAMENTAS — CRÍTICO:
 7. DOCUMENTOS INSTITUCIONAIS (missão, visão, valores, políticas, manuais, estratégia, cultura):
    → Use rag_search APENAS para esses conteúdos. NÃO use para dados operacionais.
 
+VISÃO DE TELA (analyze_screen) — USE PROATIVAMENTE:
+- A captura de tela é enviada automaticamente a cada mensagem. analyze_screen está SEMPRE disponível.
+- IMPORTANTE: Você TEM capacidade de ver a tela. NUNCA diga "não consigo tirar print" ou "não tenho acesso à tela" — isso é FALSO. Use analyze_screen e descreva o que viu.
+- Chame analyze_screen IMEDIATAMENTE (primeira iteração) quando o usuário pede:
+  • "tire um print", "tirar print", "screenshot", "captura de tela"
+  • "o que está na tela", "o que você vê", "o que estou vendo"
+  • "veja a tela", "olhe a tela", "você consegue ver a tela?"
+- Chame analyze_screen também quando:
+  • A query menciona "nessa tabela", "esse formulário", "isso aqui", dados visíveis na interface
+  • Após consultar o banco, o contexto visual pode complementar ou confirmar os dados
+- NÃO chame analyze_screen para perguntas puramente factuais/operacionais que o banco já resolve.
+- Após obter o resultado de analyze_screen, responda diretamente com o que você VIU — sem disclaimers.
+
 ${isGestor
     ? `8. OPERAÇÕES DE ESCRITA — você tem role=${context.userRole} com poderes completos:
    As ferramentas execute_* estão DISPONÍVEIS e DEVEM ser usadas quando o usuário pede para criar, atualizar, mover ou executar.
@@ -582,8 +611,26 @@ async function executeTool(
     toolArgs: Record<string, any>,
     query: string,
     deps: ControllerDeps,
+    context: ControllerContext,
 ): Promise<ToolResult> {
     try {
+        if (toolName === 'analyze_screen') {
+            if (!context.screenshotBase64) {
+                return {
+                    text: '[Vision Perception] Nenhuma captura de tela disponível nesta mensagem (possível erro de captura no frontend). Use os dados do banco para responder.',
+                    rawData: null,
+                    success: false,
+                    significant: false,
+                }
+            }
+            return await runVisionPerception(
+                context.screenshotBase64,
+                toolArgs.focus ?? 'estado geral da interface',
+                query,
+                deps.openai,
+            )
+        }
+
         if (toolName === 'rag_search') {
             const text = await deps.runVectorRetrieval(query)
             return {
@@ -608,6 +655,72 @@ async function executeTool(
         const errMsg = `Erro ao executar ${toolName}: ${err?.message ?? String(err)}`
         console.warn(`[Controller] executeTool error: ${errMsg}`)
         return { text: errMsg, rawData: null, success: false, significant: false }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VISION PERCEPTION: analisa screenshot via gpt-4o
+// ---------------------------------------------------------------------------
+
+async function runVisionPerception(
+    screenshotBase64: string,
+    focus: string,
+    query: string,
+    openai: OpenAI,
+): Promise<ToolResult> {
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            max_tokens: 600,
+            messages: [{
+                role: 'user',
+                content: [
+                    {
+                        type: 'image_url',
+                        image_url: { url: `data:image/jpeg;base64,${screenshotBase64}`, detail: 'high' },
+                    },
+                    {
+                        type: 'text',
+                        text: `Você é o Segundo Cérebro da C4 Marketing analisando a interface do sistema.
+Pergunta original do usuário: "${query}"
+Foco solicitado: "${focus}"
+
+REGRA CRÍTICA: Extraia APENAS o que está VISÍVEL e LEGÍVEL na imagem.
+NUNCA invente, adivinhe ou complete dados que não consegue ler claramente.
+Se um texto estiver ilegível, use "ilegível" em vez de inventar um valor plausível.
+
+Extraia do screenshot:
+1. Qual página/tela está visível (leia o título exato)
+2. Dados visíveis e legíveis (nomes, emails, valores, status, datas — EXATAMENTE como aparecem)
+3. Estado da interface (formulários abertos, alertas, erros visíveis)
+4. Se não conseguir ler um dado com clareza, liste como "ilegível"
+
+Responda em JSON estruturado:
+{
+  "page": "nome exato da página conforme título visível",
+  "visible_entities": ["lista das entidades LEGÍVEIS — use valores exatos, não invente"],
+  "relevant_data": "dados relevantes para a pergunta — somente o que é legível",
+  "ui_state": "estado atual da interface",
+  "summary": "resumo em 2 frases do que está visível — baseado apenas no que você leu"
+}`,
+                    },
+                ],
+            }],
+        })
+        const content = response.choices[0]?.message?.content ?? '{}'
+        return {
+            text: `[Vision Perception]\n${content}`,
+            rawData: null,
+            success: true,
+            significant: content.length > 50,
+        }
+    } catch (err: any) {
+        return {
+            text: `[Vision Perception] Erro: ${err?.message ?? String(err)}`,
+            rawData: null,
+            success: false,
+            significant: false,
+        }
     }
 }
 
@@ -832,7 +945,7 @@ export async function runController(
         seenToolKeys.add(key)
 
         // [ACT]
-        const toolResult = await executeTool(toolName, toolArgs, query, deps)
+        const toolResult = await executeTool(toolName, toolArgs, query, deps, context)
 
         // [PERCEPTION] — analisa o output e extrai sinais estruturados
         const perception = runPerception(toolResult, toolName)

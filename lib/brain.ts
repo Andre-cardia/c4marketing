@@ -99,6 +99,24 @@ type ChatBrainPayload = {
     client_today?: string;
     client_tz?: string;
     forced_agent?: string;
+    screenshot_base64?: string;   // Vision Perception: captura da tela atual (opcional)
+}
+
+/** Captura a tela atual via html2canvas e retorna base64 JPEG comprimido. */
+export async function capturePageScreenshot(): Promise<string | null> {
+    try {
+        const html2canvas = (await import('html2canvas')).default
+        const canvas = await html2canvas(document.body, {
+            scale: 0.6,
+            useCORS: true,
+            logging: false,
+            removeContainer: true,
+        })
+        return canvas.toDataURL('image/jpeg', 0.75).split(',')[1] // só o base64
+    } catch (err) {
+        console.warn('[brain] capturePageScreenshot failed (silenced):', err)
+        return null
+    }
 }
 
 async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: string): Promise<AskBrainResponse> {
@@ -248,7 +266,7 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
 export async function askBrain(
     query: string,
     sessionId?: string,
-    options?: { forcedAgent?: string }
+    options?: { forcedAgent?: string; screenshotBase64?: string }
 ): Promise<AskBrainResponse> {
     const now = new Date();
     const clientToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -263,6 +281,16 @@ export async function askBrain(
     if (options?.forcedAgent) {
         payload.forced_agent = options.forcedAgent;
     }
+
+    // Vision Perception: usa screenshot fornecido ou captura automaticamente
+    const screenshot = options?.screenshotBase64 ?? await capturePageScreenshot()
+    if (screenshot) {
+        payload.screenshot_base64 = screenshot
+        console.log('[brain] screenshot capturado:', screenshot.length, 'chars base64')
+    } else {
+        console.warn('[brain] screenshot não disponível (capturePageScreenshot retornou null)')
+    }
+
     const expectedRef = getProjectRefFromSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 
     let token = await getValidAccessToken();
