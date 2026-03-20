@@ -27,12 +27,6 @@ const SERVICES_OPTIONS = [
     { id: 'ai_agents', label: 'Agentes de IA' },
 ];
 
-// Map UI service IDs to execute_update_project_responsible p_service_type values
-const SERVICE_TO_TYPE_MAP: Record<string, string> = {
-    traffic_management: 'traffic',
-    website: 'website',
-    landing_page: 'landing_page',
-};
 
 const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onProjectCreated, projectToEdit, userRole }) => {
     const [loading, setLoading] = useState(false);
@@ -142,49 +136,20 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
 
                 if (error) throw error;
 
-                // Gestor: update internal responsible on all applicable project tables
+                // Gestor: update internal responsible (single RPC handles all service types)
                 if (isGestor && formData.responsibleUserEmail &&
                     formData.responsibleUserEmail !== (projectToEdit.responsible_user_email ?? '')) {
 
-                    const services: string[] = projectToEdit.services
-                        ? projectToEdit.services.map((s: any) => typeof s === 'string' ? s : s.id)
-                        : [];
+                    const { data: rpcResult, error: rpcError } = await supabase.rpc(
+                        'execute_update_responsible_by_acceptance',
+                        {
+                            p_acceptance_id:     projectToEdit.id,
+                            p_responsible_email: formData.responsibleUserEmail,
+                        }
+                    );
 
-                    // Get project table IDs for this acceptance
-                    const serviceTypes = services
-                        .map(s => SERVICE_TO_TYPE_MAP[s])
-                        .filter(Boolean);
-
-                    if (serviceTypes.length > 0) {
-                        const tableMap: Record<string, string> = {
-                            traffic: 'traffic_projects',
-                            website: 'website_projects',
-                            landing_page: 'landing_page_projects',
-                        };
-
-                        const projectIdResults = await Promise.all(
-                            serviceTypes.map(type =>
-                                supabase
-                                    .from(tableMap[type])
-                                    .select('id')
-                                    .eq('acceptance_id', projectToEdit.id)
-                                    .maybeSingle()
-                                    .then(res => ({ type, id: res.data?.id ?? null }))
-                            )
-                        );
-
-                        await Promise.all(
-                            projectIdResults
-                                .filter(r => r.id !== null)
-                                .map(r =>
-                                    supabase.rpc('execute_update_project_responsible', {
-                                        p_project_id: r.id,
-                                        p_service_type: r.type,
-                                        p_responsible_email: formData.responsibleUserEmail,
-                                    })
-                                )
-                        );
-                    }
+                    if (rpcError) throw rpcError;
+                    if (rpcResult?.status === 'error') throw new Error(rpcResult.message);
                 }
 
             } else {
