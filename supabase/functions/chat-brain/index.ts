@@ -3242,7 +3242,18 @@ Retorne apenas function calls (sem texto livre).`
                 nm.includes('compare') || nm.includes('comparar') ||
                 (nm.includes('analis') && !nm.includes('quantos')) ||
                 (nm.includes('todos') && nm.includes('cliente') && nm.includes('projet')) ||
-                (nm.includes('todos') && nm.includes('tarefa') && nm.includes('projet'))
+                (nm.includes('todos') && nm.includes('tarefa') && nm.includes('projet')) ||
+                // Queries de detalhe/recência sobre projetos ou contratos → Controller
+                // (evita fallback para RAG com dados possivelmente desatualizados)
+                (nm.includes('projet') && (
+                    nm.includes('novo') || nm.includes('ultimo') || nm.includes('recente') ||
+                    nm.includes('ativad') || nm.includes('detalh') || nm.includes('conte sobre') ||
+                    nm.includes('fale sobre') || nm.includes('me diga') || nm.includes('semana') ||
+                    nm.includes('hoje') || nm.includes('ontem')
+                )) ||
+                (nm.includes('contrat') && (
+                    nm.includes('novo') || nm.includes('ultimo') || nm.includes('recente') || nm.includes('ativad')
+                ))
             )
         }
 
@@ -3526,7 +3537,23 @@ Retorne apenas function calls (sem texto livre).`
             }
         } else {
             // === RAG (busca semântica) ===
-            contextText = await runVectorRetrieval()
+            // GUARDRAIL: queries sobre projetos/contratos NÃO devem usar RAG —
+            // brain_documents pode estar desatualizado. Forçar SQL direto.
+            const _nqRag = (query || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+            const isProjectOrContractFastQuery = _nqRag.includes('projet') || _nqRag.includes('contrat')
+            if (isProjectOrContractFastQuery) {
+                console.log('[FastPath] RAG interceptado → query_all_projects (guardrail proj/contrato)')
+                const { section: _projSection, rawData: _projRaw } = await executeDbRpc('query_all_projects', {})
+                contextText = _projSection
+                const _projRows = Array.isArray(_projRaw) ? _projRaw : []
+                if (_projRows.length > 0) {
+                    rawDbRecordsForGenUI = _projRows
+                    rpcNameForGenUI = 'query_all_projects'
+                }
+                executedDbRpcs.push('query_all_projects')
+            } else {
+                contextText = await runVectorRetrieval()
+            }
         }
 
         // Fast-path para consultas de contagem puramente estruturadas:

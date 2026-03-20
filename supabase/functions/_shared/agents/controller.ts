@@ -20,6 +20,7 @@ import type {
     ControllerResult,
     EvaluationResult,
     Observation,
+    PerceptionResult,
     RouteDecision,
 } from '../brain-types.ts'
 import { runEvaluator, refineAnswer } from './evaluator.ts'
@@ -441,8 +442,13 @@ function toolKey(name: string, args: Record<string, any>): string {
     return `${name}:${JSON.stringify(Object.entries(args).sort())}`
 }
 
-function buildWorkingMemoryEntry(obs: Observation): string {
+function buildWorkingMemoryEntry(obs: Observation, compact = false): string {
     const status = obs.success ? 'OK' : 'FALHOU'
+    // Iterações posteriores: usa summary compactado para economizar contexto
+    if (compact && obs.perception) {
+        const facts = obs.perception.keyFacts.join(' | ')
+        return `\n[Iter ${obs.iteration} | ${obs.toolName} | ${status} | signal=${obs.perception.signalKind}]\nFATOS: ${facts}\n`
+    }
     const data = obs.output.slice(0, 1000) + (obs.output.length > 1000 ? '\n...(truncado)' : '')
     return `\n[Iteração ${obs.iteration} | ${obs.toolName} | ${status}]\n${data}`
 }
@@ -606,6 +612,127 @@ async function executeTool(
 }
 
 // ---------------------------------------------------------------------------
+// PERCEPTION: analisa o output da tool e extrai sinais estruturados
+// ---------------------------------------------------------------------------
+
+function runPerception(toolResult: ToolResult, toolName: string): PerceptionResult {
+    const { text, rawData, success } = toolResult
+
+    if (!success) {
+        return {
+            signalKind: 'error',
+            rowCount: null,
+            summary: text.slice(0, 300),
+            keyFacts: [`Erro em ${toolName}: ${text.slice(0, 150)}`],
+            needsRetry: true,
+            confidence: 0,
+        }
+    }
+
+    // Contagem de linhas
+    let rowCount: number | null = null
+    if (Array.isArray(rawData)) rowCount = rawData.length
+
+    // Resultado vazio
+    if (rowCount === 0 || /nenhum resultado|0 registros|not found/i.test(text)) {
+        return {
+            signalKind: 'empty',
+            rowCount: 0,
+            summary: `${toolName}: nenhum resultado encontrado`,
+            keyFacts: [`${toolName} retornou 0 registros`],
+            needsRetry: false,
+            confidence: 0.95,
+        }
+    }
+
+    // Extrai fatos-chave do primeiro item
+    const keyFacts: string[] = []
+    if (rowCount !== null) keyFacts.push(`${toolName}: ${rowCount} registro(s)`)
+    if (Array.isArray(rawData) && rawData.length > 0) {
+        const first = rawData[0]
+        if (first && typeof first === 'object') {
+            const keys = ['company_name', 'name', 'title', 'status', 'activated_at', 'id']
+                .filter((k) => first[k] != null)
+            if (keys.length > 0) {
+                keyFacts.push(`Primeiro: ${keys.map((k) => `${k}=${String(first[k]).slice(0, 60)}`).join(', ')}`)
+            }
+        }
+    }
+
+    // Summary compactado — usa os fatos + trunca output longo
+    const summary = text.length > 800
+        ? `${keyFacts.join(' | ')}\n${text.slice(0, 800)}…[+${text.length - 800} chars]`
+        : text
+
+    return {
+        signalKind: rowCount !== null && rowCount > 0 ? 'data' : 'partial',
+        rowCount,
+        summary,
+        keyFacts,
+        needsRetry: false,
+        confidence: 0.85,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DB PERSISTENCE: gravar observation e sessão (fire-and-forget)
+// ---------------------------------------------------------------------------
+
+async function persistObservationToDb(
+    obs: Observation,
+    context: ControllerContext,
+    sessionRunId: string,
+    supabase: SupabaseClient,
+): Promise<void> {
+    try {
+        await supabase.from('controller_observations').insert({
+            session_run_id: sessionRunId,
+            user_id: context.userId || null,
+            agent_name: context.agentName,
+            iteration: obs.iteration,
+            tool_name: obs.toolName,
+            tool_input: obs.input,
+            raw_output: obs.output.slice(0, 5000),
+            summary: obs.perception?.summary ?? obs.output.slice(0, 500),
+            signal_kind: obs.perception?.signalKind ?? 'partial',
+            row_count: obs.perception?.rowCount ?? null,
+            key_facts: obs.perception?.keyFacts ?? [],
+            success: obs.success,
+            needs_retry: obs.perception?.needsRetry ?? false,
+        })
+    } catch (err: any) {
+        console.warn('[Controller] persistObservationToDb error (silenced):', err?.message)
+    }
+}
+
+async function persistSessionToDb(
+    result: ControllerResult,
+    query: string,
+    context: ControllerContext,
+    sessionRunId: string,
+    supabase: SupabaseClient,
+): Promise<void> {
+    try {
+        await supabase.from('controller_sessions').insert({
+            session_run_id: sessionRunId,
+            user_id: context.userId || null,
+            agent_name: context.agentName,
+            query: query.slice(0, 1000),
+            answer: result.answer.slice(0, 2000),
+            iterations: result.iterations,
+            obs_count: result.observations.length,
+            eval_score: result.evaluationResult?.score ?? null,
+            eval_pass: result.evaluationResult?.pass ?? null,
+            total_cost_est: result.totalCostEst,
+            total_input_tokens: result.totalInputTokens,
+            total_output_tokens: result.totalOutputTokens,
+        })
+    } catch (err: any) {
+        console.warn('[Controller] persistSessionToDb error (silenced):', err?.message)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MEMORY UPDATE: persistir observação relevante
 // ---------------------------------------------------------------------------
 
@@ -640,8 +767,10 @@ export async function runController(
     let totalInputTokens = 0
     let totalOutputTokens = 0
     const seenToolKeys = new Set<string>()
+    // ID único para esta execução do Controller (sessão + timestamp)
+    const sessionRunId = `${context.sessionId}_${Date.now()}`
 
-    console.log(`[Controller] start — query="${query.slice(0, 80)}" maxIter=${maxIterations} agent=${context.agentName}`)
+    console.log(`[Controller] start — query="${query.slice(0, 80)}" maxIter=${maxIterations} agent=${context.agentName} runId=${sessionRunId}`)
 
     // -------------------------------------------------------------------------
     // Loop principal: Think → Act → Observe → Memory
@@ -705,6 +834,10 @@ export async function runController(
         // [ACT]
         const toolResult = await executeTool(toolName, toolArgs, query, deps)
 
+        // [PERCEPTION] — analisa o output e extrai sinais estruturados
+        const perception = runPerception(toolResult, toolName)
+        console.log(`[Controller] perception iter=${iteration} tool=${toolName} signal=${perception.signalKind} rows=${perception.rowCount ?? '?'} retry=${perception.needsRetry}`)
+
         // [OBSERVE]
         const obs: Observation = {
             iteration,
@@ -713,13 +846,18 @@ export async function runController(
             output: toolResult.text,
             success: toolResult.success,
             timestamp: Date.now(),
+            perception,
         }
         observations.push(obs)
-        workingMemory += buildWorkingMemoryEntry(obs)
+        // Iterações 1-2: working memory completa; 3+: summary compactado
+        workingMemory += buildWorkingMemoryEntry(obs, iteration > 2)
 
         console.log(`[Controller] obs ${iteration}: tool=${toolName} success=${toolResult.success} significant=${toolResult.significant}`)
 
-        // [MEMORY UPDATE]
+        // [MEMORY UPDATE — DB] persiste observation no banco (fire-and-forget)
+        persistObservationToDb(obs, context, sessionRunId, deps.supabaseAdmin)
+
+        // [MEMORY UPDATE — brain_documents] persiste se dado relevante
         if (toolResult.significant) {
             await tryPersistMemory(obs, context, deps)
         }
@@ -784,7 +922,7 @@ export async function runController(
         ` cost=$${totalCostEst.toFixed(6)}`
     )
 
-    return {
+    const result: ControllerResult = {
         answer: finalAnswer,
         iterations: iteration,
         observations,
@@ -794,4 +932,9 @@ export async function runController(
         totalInputTokens,
         totalOutputTokens,
     }
+
+    // Persiste sessão completa no banco (fire-and-forget)
+    persistSessionToDb(result, query, context, sessionRunId, deps.supabaseAdmin)
+
+    return result
 }

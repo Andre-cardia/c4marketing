@@ -117,6 +117,15 @@ export interface RouterInput {
 
 // --- Controller Agent ---
 
+export interface PerceptionResult {
+  signalKind: 'data' | 'empty' | 'error' | 'partial';
+  rowCount: number | null;
+  summary: string;       // versão compactada do output (usada em working memory)
+  keyFacts: string[];    // fatos extraídos para o planner
+  needsRetry: boolean;
+  confidence: number;    // 0..1
+}
+
 export interface Observation {
   iteration: number;
   toolName: string;
@@ -124,6 +133,7 @@ export interface Observation {
   output: string;       // texto retornado pela tool (para compor workingMemory)
   success: boolean;
   timestamp: number;
+  perception?: PerceptionResult;  // análise estruturada do output (Perception Layer)
 }
 
 export interface ControllerResult {
