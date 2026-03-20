@@ -211,7 +211,137 @@ Deno.serve(async (req) => {
             }
         }
 
-        return new Response(JSON.stringify({ processed: results }), {
+        // 3. Processar fila commercial (proposals + acceptances)
+        const { data: commercialItems } = await supabase
+            .rpc('get_pending_commercial_sync_items', { p_limit: 10 })
+
+        const commercialResults = []
+        for (const item of (commercialItems || [])) {
+            try {
+                let docContent = ''
+                let docMetadata: any = {}
+                const shouldDelete = item.operation === 'DELETE'
+
+                if (!shouldDelete) {
+                    // === PROPOSALS ===
+                    if (item.source_table === 'proposals') {
+                        const { data: prop, error: pErr } = await supabase
+                            .from('proposals')
+                            .select(`*, acceptances ( id, name, company_name, email, status, timestamp, expiration_date )`)
+                            .eq('id', parseInt(item.source_id, 10))
+                            .maybeSingle()
+                        if (pErr) throw pErr
+                        if (!prop) throw new Error(`Proposta ${item.source_id} não encontrada`)
+
+                        const acceptance = Array.isArray(prop.acceptances) ? prop.acceptances[0] : prop.acceptances
+                        const isAccepted = !!acceptance
+                        const clientName = acceptance?.company_name || prop.company_name || 'N/A'
+
+                        docContent = `[PROPOSTA] Empresa: ${clientName}\n`
+                        docContent += `Responsável: ${prop.responsible_name || 'N/A'}\n`
+                        docContent += `Status: ${isAccepted ? 'Aceita' : 'Em aberto'}\n`
+                        docContent += `Mensalidade: R$${prop.monthly_fee || 0}\n`
+                        docContent += `Setup: R$${prop.setup_fee || 0}\n`
+                        if (prop.media_limit) docContent += `Limite Mídia: R$${prop.media_limit}\n`
+                        if (prop.contract_duration) docContent += `Duração: ${prop.contract_duration} meses\n`
+                        if (prop.services) docContent += `Serviços: ${typeof prop.services === 'string' ? prop.services : JSON.stringify(prop.services)}\n`
+                        if (isAccepted && acceptance) {
+                            docContent += `Data do Aceite: ${acceptance.timestamp ? new Date(acceptance.timestamp).toLocaleDateString('pt-BR') : 'N/A'}\n`
+                            if (acceptance.expiration_date) docContent += `Validade: ${acceptance.expiration_date}\n`
+                            docContent += `Status do Contrato: ${acceptance.status || 'N/A'}\n`
+                        }
+
+                        docMetadata = {
+                            type: 'official_doc',
+                            artifact_kind: isAccepted ? 'contract' : 'proposal',
+                            title: isAccepted ? `Contrato: ${clientName}` : `Proposta: ${clientName}`,
+                            source_table: 'proposals',
+                            source_id: item.source_id,
+                            status: prop.status || 'active',
+                            authority_type: 'policy',
+                            authority_rank: isAccepted ? 10 : 50, // contratos têm rank mais alto
+                        }
+
+                    // === ACCEPTANCES (CONTRATOS) ===
+                    } else if (item.source_table === 'acceptances') {
+                        const { data: acc, error: aErr } = await supabase
+                            .from('acceptances')
+                            .select(`
+                                *,
+                                proposals ( id, slug, monthly_fee, setup_fee, media_limit, contract_duration, services ),
+                                traffic_projects ( id, survey_status, account_setup_status ),
+                                website_projects ( id, survey_status, account_setup_status ),
+                                landing_page_projects ( id, survey_status, account_setup_status )
+                            `)
+                            .eq('id', item.source_id)
+                            .maybeSingle()
+                        if (aErr) throw aErr
+                        if (!acc) throw new Error(`Aceite ${item.source_id} não encontrado`)
+
+                        const prop = acc.proposals
+                        const services: string[] = []
+                        if (acc.traffic_projects?.length > 0) services.push('Gestão de Tráfego')
+                        if (acc.website_projects?.length > 0) services.push('Criação de Site')
+                        if (acc.landing_page_projects?.length > 0) services.push('Landing Page')
+
+                        docContent = `[CONTRATO] Empresa: ${acc.company_name || 'N/A'}\n`
+                        docContent += `Cliente: ${acc.name || 'N/A'}\n`
+                        docContent += `Email: ${acc.email || 'N/A'}\n`
+                        docContent += `Status do Contrato: ${acc.status || 'N/A'}\n`
+                        docContent += `Data de Assinatura: ${acc.timestamp ? new Date(acc.timestamp).toLocaleDateString('pt-BR') : 'N/A'}\n`
+                        if (acc.expiration_date) docContent += `Validade: ${acc.expiration_date}\n`
+                        if (services.length > 0) docContent += `Serviços Contratados: ${services.join(', ')}\n`
+                        if (prop) {
+                            docContent += `Mensalidade: R$${prop.monthly_fee || 0}\n`
+                            docContent += `Setup: R$${prop.setup_fee || 0}\n`
+                            if (prop.media_limit) docContent += `Limite Mídia: R$${prop.media_limit}\n`
+                            if (prop.contract_duration) docContent += `Duração: ${prop.contract_duration} meses\n`
+                        }
+
+                        docMetadata = {
+                            type: 'official_doc',
+                            artifact_kind: 'contract',
+                            title: `Contrato: ${acc.company_name || 'N/A'}`,
+                            source_table: 'acceptances',
+                            source_id: item.source_id,
+                            status: acc.status || 'Ativo',
+                            authority_type: 'policy',
+                            authority_rank: 10, // contratos têm máxima autoridade
+                        }
+                    } else {
+                        throw new Error(`Processador commercial para ${item.source_table} não implementado`)
+                    }
+                }
+
+                if (shouldDelete) {
+                    console.log(`DELETE commercial ${item.source_table}/${item.source_id} - ignorado por enquanto`)
+                } else {
+                    const embeddingResponse = await openai.embeddings.create({
+                        model: 'text-embedding-3-small',
+                        input: docContent,
+                    })
+                    const embedding = embeddingResponse.data[0].embedding
+                    await upsertVersionedBrainDocument(docContent, docMetadata, embedding)
+                }
+
+                await supabase.rpc('update_commercial_sync_item_status', {
+                    p_id: item.id,
+                    p_status: 'completed'
+                })
+                commercialResults.push({ id: item.id, status: 'completed', table: item.source_table })
+
+            } catch (err) {
+                console.error(`Erro processando item commercial ${item.id}:`, err)
+                await supabase.rpc('update_commercial_sync_item_status', {
+                    p_id: item.id,
+                    p_status: 'failed',
+                    p_error_message: err.message
+                })
+                commercialResults.push({ id: item.id, status: 'failed', error: err.message })
+            }
+        }
+
+        return new Response(JSON.stringify({ processed: results, commercial: commercialResults }), {
             headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
         })
 

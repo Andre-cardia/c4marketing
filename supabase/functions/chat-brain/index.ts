@@ -763,6 +763,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
 
         const dbRpcNames = new Set([
             'query_all_projects', 'query_all_clients', 'query_all_proposals',
+            'query_all_contracts',
             'query_all_users', 'query_all_tasks', 'query_access_summary',
             'query_financial_summary',
             'query_task_distribution_chart',
@@ -828,6 +829,11 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
             const mentionsClients = hasAny(text, ['cliente', 'clientes'])
             const mentionsProposals = hasAny(text, ['proposta', 'propostas', 'orcamento', 'orçamento'])
+            const mentionsContracts = hasAny(text, [
+                'contrato', 'contratos', 'proposta aceita', 'propostas aceitas',
+                'vigencia', 'vigência', 'validade do contrato', 'servicos contratados', 'serviços contratados',
+                'o que foi contratado', 'aceite de', 'contrato de', 'contrato da', 'contrato do',
+            ])
             const mentionsFinance = hasAny(text, [
                 'mrr', 'arr', 'faturamento', 'receita', 'run rate',
                 'recorrente', 'recorrencia', 'recorrência', 'ticket medio', 'ticket médio'
@@ -898,6 +904,29 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                     params.p_status = 'Inativo'
                 }
                 calls.push({ rpc_name: 'query_all_clients', params })
+            }
+
+            if (mentionsContracts && !mentionsProposals) {
+                // Perguntas sobre contratos/aceites → usar RPC dedicada com dados completos
+                const wantsRecentAcceptance = hasAny(text, [
+                    'aceite hoje', 'aceite de hoje', 'aceitou hoje', 'novo contrato hoje',
+                    'contrato novo', 'aceite recente', 'ultimo aceite', 'último aceite',
+                    'aceites hoje', 'aceite desta semana', 'aceites desta semana',
+                    'quem aceitou', 'quem assinou', 'novo aceite',
+                ])
+                if (wantsRecentAcceptance) {
+                    const acceptanceParams: Record<string, any> = { p_limit: 5 }
+                    if (hasAny(text, ['hoje', 'today'])) {
+                        acceptanceParams.p_date = clientToday || runtimeToday
+                    }
+                    calls.push({ rpc_name: 'query_recent_acceptances', params: acceptanceParams })
+                } else {
+                    const contractParams: Record<string, any> = {}
+                    if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) contractParams.p_status = 'Ativo'
+                    else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) contractParams.p_status = 'Inativo'
+                    else if (hasAny(text, ['suspenso', 'suspensos', 'suspensa', 'suspensas'])) contractParams.p_status = 'Suspenso'
+                    calls.push({ rpc_name: 'query_all_contracts', params: contractParams })
+                }
             }
 
             if (mentionsProposals) {
@@ -1201,7 +1230,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                         .map((row: any) => ({
                             fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
                             created_at: row?.created_at || null,
-                            scope: row?.scope === 'session' ? 'session' : 'user',
+                            scope: (row?.scope === 'session' ? 'session' : 'user') as 'session' | 'user',
                         }))
                         .filter((row) => row.fact.length > 0)
                     explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(fromRpc), limit)
@@ -2181,6 +2210,7 @@ Retorne apenas function calls (sem texto livre).`
                 // Mapear função para agente e configuração
                 const funcToAgent: Record<string, { agent: string; artifact_kind: string }> = {
                     'query_all_proposals': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
+                    'query_all_contracts': { agent: 'Agent_Contracts', artifact_kind: 'contract' },
                     'query_all_clients': { agent: 'Agent_Client360', artifact_kind: 'client' },
                     'query_all_projects': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_financial_summary': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },

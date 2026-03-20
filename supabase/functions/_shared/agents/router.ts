@@ -257,6 +257,7 @@ const ROUTER_TOOL = {
                             type: "string",
                             enum: [
                                 "query_all_proposals",
+                                "query_all_contracts",
                                 "query_all_clients",
                                 "query_all_projects",
                                 "query_financial_summary",
@@ -272,6 +273,15 @@ const ROUTER_TOOL = {
                             type: "string",
                             enum: ["open", "accepted", "all", "Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado"],
                             description: "Filtro de status.",
+                        },
+                        p_status: {
+                            type: "string",
+                            enum: ["Ativo", "Inativo", "Suspenso", "Cancelado", "Finalizado"],
+                            description: "Filtro de status para query_all_contracts e query_all_clients.",
+                        },
+                        p_company_name: {
+                            type: "string",
+                            description: "Busca parcial por nome de empresa (query_all_contracts).",
                         },
                         p_service_type: {
                             type: "string",
@@ -335,48 +345,65 @@ AGENTES DISPONÍVEIS E DOMÍNIOS:
 - Agent_GovernanceSecurity → LGPD, RLS, segurança, conformidade, políticas, auditoria
 - Agent_Executor      → criação/atualização de registros (tarefas, propostas, usuários)
 
+CONTEXTO DO SISTEMA — FLUXO DE PROPOSTA → CONTRATO:
+1. Proposta criada (proposals) → enviada ao cliente via link.
+2. Cliente aceita → registro criado em acceptances (este É o contrato).
+3. Automaticamente: proposta bloqueada (status=inactive) + projeto gerado com os serviços contratados.
+4. "Propostas Aceitas" = aceites em acceptances (com condições de pagamento revisáveis).
+TABELAS: proposals (propostas em aberto), acceptances (contratos/aceites), traffic_projects / website_projects / landing_page_projects (projetos gerados).
+
 REGRAS DE ROTEAMENTO (em ordem de prioridade):
 
-1. DADOS FINANCEIROS (MRR, ARR, faturamento, receita, run rate, mensalidade)
+1. DADOS FINANCEIROS (MRR, ARR, faturamento, receita, run rate, mensalidade global)
    → agent=Agent_Proposals, tool_hint=db_query, rpc_name=query_financial_summary, risk=high
 
-2. CONTRATOS / LEGAIS (contrato, cláusula, vigência, rescisão, aditivo, multa)
+2. CONTRATOS / ACEITES — listagem, detalhes, vigência, status, empresa específica
+   Triggers: "contrato", "contratos", "proposta aceita", "aceite de [empresa]", "condições do contrato",
+   "vigência", "validade", "serviços contratados", "o que foi contratado"
+   → agent=Agent_Contracts, tool_hint=db_query, rpc_name=query_all_contracts, risk=high, top_k=0
+   Se a busca é por empresa específica: adicionar p_company_name no db_query_params.
+   Se filtro de status: adicionar p_status (Ativo/Inativo/etc.) no db_query_params.
+
+3. ACEITES RECENTES — "aceite hoje", "novo contrato hoje", "quem aceitou hoje", "aceite recente", "último aceite", "aceites desta semana"
+   → agent=Agent_Contracts, tool_hint=db_query, rpc_name=query_recent_acceptances, risk=medium, top_k=0
+
+4. CLÁUSULAS LEGAIS / RESCISÃO / ADITIVOS (análise jurídica aprofundada)
    → agent=Agent_Contracts, retrieval_policy=NORMATIVE_FIRST, risk=high, top_k=5
 
-3. DADOS SENSÍVEIS (CPF, CNPJ, senha, API key, LGPD, sigilo)
+5. DADOS SENSÍVEIS (CPF, CNPJ, senha, API key, LGPD, sigilo)
    → agent=Agent_GovernanceSecurity, retrieval_policy=STRICT_DOCS_ONLY, risk=high
 
-4. ACEITES RECENTES — "aceite hoje", "novo contrato hoje", "quem aceitou hoje", "aceite recente", "último aceite", "aceites desta semana"
-   → agent=Agent_Contracts, tool_hint=db_query, rpc_name=query_recent_acceptances, risk=medium
+6. PROPOSTAS ABERTAS — listagem/contagem de propostas em aberto (não aceitas)
+   → agent=Agent_Proposals, tool_hint=db_query, rpc_name=query_all_proposals, p_status_filter=open
 
-5. PROPOSTAS — listagem/contagem
-   → agent=Agent_Proposals, tool_hint=db_query, rpc_name=query_all_proposals
+7. PROPOSTAS — listagem geral (todas)
+   → agent=Agent_Proposals, tool_hint=db_query, rpc_name=query_all_proposals, p_status_filter=all
 
-7. CLIENTES — listagem/contagem
+8. CLIENTES — listagem/contagem
    → agent=Agent_Client360, tool_hint=db_query, rpc_name=query_all_clients
 
-8. PROJETOS — listagem/contagem
+9. PROJETOS — listagem/contagem
    → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_projects
 
-9. TAREFAS — listagem/consulta
-   → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_tasks
+10. TAREFAS — listagem/consulta
+    → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_tasks
 
-10. TAREFAS — criação explícita ("criar tarefa", "nova tarefa")
+11. TAREFAS — criação explícita ("criar tarefa", "nova tarefa")
     → agent=Agent_Executor, task_kind=operation, tool_hint=rag_search
 
-11. USUÁRIOS / EQUIPE / ACESSOS
+12. USUÁRIOS / EQUIPE / ACESSOS
     → agent=Agent_BrainOps, tool_hint=db_query, rpc_name=query_all_users OU query_access_summary
 
-12. TRÁFEGO PAGO / MARKETING / CAMPANHAS
+13. TRÁFEGO PAGO / MARKETING / CAMPANHAS
     → agent=Agent_MarketingTraffic, tool_hint=rag_search OU db_query (survey se survey/briefing)
 
-13. SURVEYS / BRIEFINGS / FORMULÁRIOS
+14. SURVEYS / BRIEFINGS / FORMULÁRIOS
     → tool_hint=db_query, rpc_name=query_survey_responses
 
-14. OPERAÇÕES DO SISTEMA (sincronizar, reindexar, ETL)
+15. OPERAÇÕES DO SISTEMA (sincronizar, reindexar, ETL)
     → agent=Agent_BrainOps, retrieval_policy=OPS_ONLY, task_kind=operation
 
-15. CAPABILITY QUERY — PRIORIDADE MÁXIMA (aplique ESTA regra ANTES das regras 4 a 12)
+16. CAPABILITY QUERY — PRIORIDADE MÁXIMA (aplique ESTA regra ANTES das regras 2 a 15)
     Triggers: frases interrogativas com "você consegue", "você pode", "é possível", "dá pra", "dá para", "tem como", "consegue fazer", "é capaz", "você faz", "posso fazer", "o que você sabe fazer" + qualquer verbo ou objeto.
     Exemplos:
       - "você consegue criar uma tarefa?" → capability query
@@ -392,6 +419,16 @@ REGRAS DE ROTEAMENTO (em ordem de prioridade):
 
 REGRA DE OURO: tool_hint=db_query requer db_query_params.rpc_name. Se não souber qual RPC usar, prefira tool_hint=rag_search.
 top_k=0 APENAS quando a resposta vem 100% de SQL.
+
+ATENÇÃO ESPECIAL — query_all_contracts:
+Use SEMPRE que a pergunta envolver contrato, proposta aceita ou aceite de uma empresa específica:
+  "contrato da Baggio" / "contrato ativo" / "contratos ativos" / "proposta aceita da X" /
+  "o que foi contratado" / "vigência do contrato" / "status do contrato" / "serviços contratados"
+  → db_query_params: { rpc_name: "query_all_contracts" }
+  Para empresa específica: adicionar p_company_name.
+  Para filtro de status: adicionar p_status (Ativo/Inativo/Suspenso/Cancelado/Finalizado).
+NUNCA use query_all_proposals para perguntas sobre contratos ou aceites.
+NUNCA invente dados sobre contratos — sempre use query_all_contracts ou query_recent_acceptances.
 
 ATENÇÃO ESPECIAL — query_recent_acceptances:
 Use SEMPRE que a pergunta envolver temporal recente + aceite/contrato:

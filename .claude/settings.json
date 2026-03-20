@@ -11,7 +11,11 @@
       "Bash(supabase --version)",
       "Bash(npx supabase --version)",
       "Bash(npx supabase migration list --linked)",
-      "Bash(npx supabase functions deploy chat-brain --project-ref xffdrdoaysxfkpebhywl --use-api)"
+      "Bash(npx supabase functions deploy chat-brain --project-ref xffdrdoaysxfkpebhywl --use-api)",
+      "Bash(grep -l \"query_all_proposals\\\\|query_financial_summary\\\\|acceptances\\\\|contracts\" \"d:/GitHub/C4 Marketing/aistudio-repository-template/supabase/migrations/\"*.sql)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\André Cardia\\.claude\\projects\\d--GitHub-C4-Marketing-aistudio-repository-template"
     ]
   }
 }

@@ -87,12 +87,27 @@ function buildPlannerTools() {
         {
             type: 'function' as const,
             function: {
-                name: 'query_all_proposals',
-                description: 'Consultar propostas comerciais. Use para listar, contar ou filtrar propostas.',
+                name: 'query_all_contracts',
+                description: 'Consultar contratos (aceites formalizados). Use para qualquer pergunta sobre contratos, propostas aceitas, vigência, serviços contratados, status de contrato ou dados de um cliente específico. PREFIRA esta tool ao invés de query_all_proposals quando a pergunta envolver contrato.',
                 parameters: {
                     type: 'object',
                     properties: {
-                        p_status_filter: { type: 'string', enum: ['all', 'open', 'accepted'], description: "Filtro de status. 'open'=em aberto, 'accepted'=aceitas, 'all'=todas." },
+                        p_status: { type: 'string', enum: ['Ativo', 'Inativo', 'Suspenso', 'Cancelado', 'Finalizado'], description: 'Filtro por status do contrato. Omita para todos.' },
+                        p_company_name: { type: 'string', description: 'Busca parcial por nome da empresa. Ex: "Baggio" retorna "Baggio Industria Ltda".' },
+                        p_limit: { type: 'number', description: 'Máximo de registros. Padrão: 50.' },
+                    },
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
+                name: 'query_all_proposals',
+                description: 'Consultar propostas comerciais EM ABERTO (não aceitas). Use apenas para listar, contar ou filtrar propostas que ainda não foram aceitas pelo cliente. Para contratos e aceites, use query_all_contracts.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_status_filter: { type: 'string', enum: ['all', 'open', 'accepted'], description: "Filtro de status. 'open'=em aberto (default), 'accepted'=aceitas, 'all'=todas." },
                     },
                     required: ['p_status_filter'],
                 },
