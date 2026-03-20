@@ -35,9 +35,11 @@ jobs:
 
       - name: Create .env from secrets
         run: |
-          printf 'VITE_SUPABASE_URL=%s\n' "$VITE_SUPABASE_URL" > .env
-          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$VITE_SUPABASE_ANON_KEY" >> .env
-          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY" >> .env
+          # Strip BOM (U+FEFF ef bb bf) defensively — secrets stored with BOM fail new URL()
+          clean() { printf '%s' "$1" | sed 's/^\xef\xbb\xbf//'; }
+          printf 'VITE_SUPABASE_URL=%s\n' "$(clean "$VITE_SUPABASE_URL")" > .env
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$(clean "$VITE_SUPABASE_ANON_KEY")" >> .env
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$(clean "$SUPABASE_SERVICE_ROLE_KEY")" >> .env
 
       - name: Validate required secrets
         run: |
