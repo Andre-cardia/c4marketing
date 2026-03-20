@@ -46,14 +46,6 @@ jobs:
             exit 1
           fi
 
-      - name: Debug URL format
-        run: |
-          url_len=${#VITE_SUPABASE_URL}
-          url_prefix="${VITE_SUPABASE_URL:0:8}"
-          echo "URL length: $url_len"
-          echo "URL prefix (first 8 chars): $url_prefix"
-          node -e "const u = process.env.VITE_SUPABASE_URL; try { new URL(u); console.log('URL is valid'); } catch(e) { console.error('URL parse error:', e.message, '| repr:', JSON.stringify(u?.substring(0,20))); process.exit(1); }"
-
       - name: Run memory canary
         id: canary
         continue-on-error: true
