@@ -10,7 +10,8 @@
       "Bash(git add App.tsx components/Sidebar.tsx pages/BrainRelatorios.tsx supabase/functions/brain-reports/)",
       "Bash(supabase --version)",
       "Bash(npx supabase --version)",
-      "Bash(npx supabase migration list --linked)"
+      "Bash(npx supabase migration list --linked)",
+      "Bash(npx supabase functions deploy chat-brain --project-ref xffdrdoaysxfkpebhywl --use-api)"
     ]
   }
 }

@@ -264,6 +264,7 @@ const ROUTER_TOOL = {
                                 "query_all_tasks",
                                 "query_access_summary",
                                 "query_survey_responses",
+                                "query_recent_acceptances",
                             ],
                             description: "Função RPC do banco de dados a chamar.",
                         },
@@ -345,34 +346,37 @@ REGRAS DE ROTEAMENTO (em ordem de prioridade):
 3. DADOS SENSÍVEIS (CPF, CNPJ, senha, API key, LGPD, sigilo)
    → agent=Agent_GovernanceSecurity, retrieval_policy=STRICT_DOCS_ONLY, risk=high
 
-4. PROPOSTAS — listagem/contagem
+4. ACEITES RECENTES — "aceite hoje", "novo contrato hoje", "quem aceitou hoje", "aceite recente", "último aceite", "aceites desta semana"
+   → agent=Agent_Contracts, tool_hint=db_query, rpc_name=query_recent_acceptances, risk=medium
+
+5. PROPOSTAS — listagem/contagem
    → agent=Agent_Proposals, tool_hint=db_query, rpc_name=query_all_proposals
 
-5. CLIENTES — listagem/contagem
+7. CLIENTES — listagem/contagem
    → agent=Agent_Client360, tool_hint=db_query, rpc_name=query_all_clients
 
-6. PROJETOS — listagem/contagem
+8. PROJETOS — listagem/contagem
    → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_projects
 
-7. TAREFAS — listagem/consulta
+9. TAREFAS — listagem/consulta
    → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_tasks
 
-8. TAREFAS — criação explícita ("criar tarefa", "nova tarefa")
-   → agent=Agent_Executor, task_kind=operation, tool_hint=rag_search
+10. TAREFAS — criação explícita ("criar tarefa", "nova tarefa")
+    → agent=Agent_Executor, task_kind=operation, tool_hint=rag_search
 
-9. USUÁRIOS / EQUIPE / ACESSOS
-   → agent=Agent_BrainOps, tool_hint=db_query, rpc_name=query_all_users OU query_access_summary
+11. USUÁRIOS / EQUIPE / ACESSOS
+    → agent=Agent_BrainOps, tool_hint=db_query, rpc_name=query_all_users OU query_access_summary
 
-10. TRÁFEGO PAGO / MARKETING / CAMPANHAS
+12. TRÁFEGO PAGO / MARKETING / CAMPANHAS
     → agent=Agent_MarketingTraffic, tool_hint=rag_search OU db_query (survey se survey/briefing)
 
-11. SURVEYS / BRIEFINGS / FORMULÁRIOS
+13. SURVEYS / BRIEFINGS / FORMULÁRIOS
     → tool_hint=db_query, rpc_name=query_survey_responses
 
-12. OPERAÇÕES DO SISTEMA (sincronizar, reindexar, ETL)
+14. OPERAÇÕES DO SISTEMA (sincronizar, reindexar, ETL)
     → agent=Agent_BrainOps, retrieval_policy=OPS_ONLY, task_kind=operation
 
-13. CAPABILITY QUERY — PRIORIDADE MÁXIMA (aplique ESTA regra ANTES das regras 4 a 12)
+15. CAPABILITY QUERY — PRIORIDADE MÁXIMA (aplique ESTA regra ANTES das regras 4 a 12)
     Triggers: frases interrogativas com "você consegue", "você pode", "é possível", "dá pra", "dá para", "tem como", "consegue fazer", "é capaz", "você faz", "posso fazer", "o que você sabe fazer" + qualquer verbo ou objeto.
     Exemplos:
       - "você consegue criar uma tarefa?" → capability query
@@ -387,7 +391,14 @@ REGRAS DE ROTEAMENTO (em ordem de prioridade):
     → is_capability_query=true, top_k=0, tool_hint=rag_search, agent=Agent_BrainOps, risk=low
 
 REGRA DE OURO: tool_hint=db_query requer db_query_params.rpc_name. Se não souber qual RPC usar, prefira tool_hint=rag_search.
-top_k=0 APENAS quando a resposta vem 100% de SQL.`;
+top_k=0 APENAS quando a resposta vem 100% de SQL.
+
+ATENÇÃO ESPECIAL — query_recent_acceptances:
+Use SEMPRE que a pergunta envolver temporal recente + aceite/contrato:
+  "aceite hoje" / "novo contrato hoje" / "quem aceitou hoje" / "aceite de hoje" /
+  "último aceite" / "aceite recente" / "aceites desta semana" / "contrato novo"
+  → db_query_params: { rpc_name: "query_recent_acceptances" }
+NUNCA use query_all_proposals para responder sobre aceites recentes ou do dia.`;
 }
 
 // ---------------------------------------------------------------------------

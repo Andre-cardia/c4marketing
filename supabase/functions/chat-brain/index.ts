@@ -767,6 +767,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             'query_financial_summary',
             'query_task_distribution_chart',
             'query_survey_responses',
+            'query_recent_acceptances',
             'execute_create_traffic_task',
             'execute_delete_task',
             'execute_move_task',
@@ -900,13 +901,29 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             }
 
             if (mentionsProposals) {
-                let p_status_filter: 'all' | 'open' | 'accepted' = 'all'
-                if (hasAny(text, ['aberta', 'aberto', 'em aberto', 'pendente', 'pendentes', 'nao aceita', 'não aceita', 'sem aceite'])) {
-                    p_status_filter = 'open'
-                } else if (hasAny(text, ['aceita', 'aceitas', 'aprovada', 'aprovadas', 'fechada', 'fechadas', 'aceite'])) {
-                    p_status_filter = 'accepted'
+                // Detectar intenção de aceite recente/hoje — usar RPC específica com timestamp
+                const wantsRecentAcceptance = hasAny(text, [
+                    'aceite hoje', 'aceite de hoje', 'aceitou hoje', 'novo contrato hoje',
+                    'contrato novo', 'aceite recente', 'ultimo aceite', 'último aceite',
+                    'aceites hoje', 'aceite desta semana', 'aceites desta semana',
+                    'quem aceitou', 'quem assinou', 'novo aceite',
+                ])
+
+                if (wantsRecentAcceptance) {
+                    const acceptanceParams: Record<string, any> = { p_limit: 5 }
+                    if (hasAny(text, ['hoje', 'today'])) {
+                        acceptanceParams.p_date = clientToday || runtimeToday
+                    }
+                    calls.push({ rpc_name: 'query_recent_acceptances', params: acceptanceParams })
+                } else {
+                    let p_status_filter: 'all' | 'open' | 'accepted' = 'all'
+                    if (hasAny(text, ['aberta', 'aberto', 'em aberto', 'pendente', 'pendentes', 'nao aceita', 'não aceita', 'sem aceite'])) {
+                        p_status_filter = 'open'
+                    } else if (hasAny(text, ['aceita', 'aceitas', 'aprovada', 'aprovadas', 'fechada', 'fechadas', 'aceite'])) {
+                        p_status_filter = 'accepted'
+                    }
+                    calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
                 }
-                calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
             }
 
             if (mentionsFinance) {
@@ -2172,6 +2189,7 @@ Retorne apenas function calls (sem texto livre).`
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_survey_responses': { agent: 'Agent_MarketingTraffic', artifact_kind: 'project' },
+                    'query_recent_acceptances': { agent: 'Agent_Contracts', artifact_kind: 'contract' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                     'execute_create_traffic_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
