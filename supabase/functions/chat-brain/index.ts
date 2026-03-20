@@ -16,13 +16,19 @@ const ALLOWED_ORIGINS = [
 function isAllowedOrigin(origin: string): boolean {
     if (!origin) return false
     if (ALLOWED_ORIGINS.includes(origin)) return true
-    // Permite qualquer porta de localhost em desenvolvimento
+    // Permite qualquer porta de localhost ou rede local em desenvolvimento
     try {
         const url = new URL(origin)
-        return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+        const h = url.hostname
+        if (h === 'localhost' || h === '127.0.0.1') return true
+        // IPs de rede privada (LAN dev — 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true
+        if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true
+        if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true
     } catch {
         return false
     }
+    return false
 }
 
 function makeCorsHeaders(req: Request): Record<string, string> {
