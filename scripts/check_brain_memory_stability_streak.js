@@ -5,8 +5,10 @@ import path from 'node:path';
 
 dotenv.config();
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const stripBOM = (s) => (typeof s === 'string' ? s.replace(/^\uFEFF/, '') : s);
+
+const supabaseUrl = stripBOM(process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL);
+const serviceRoleKey = stripBOM(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('[FATAL] Missing VITE_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
