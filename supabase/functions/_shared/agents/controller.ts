@@ -469,6 +469,8 @@ async function callPlannerLLM(
 
     const todayBrasilia = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short' })
 
+    const isGestor = context.userRole === 'gestor' || context.userRole === 'admin'
+
     const systemPrompt = `Você é o PLANEJADOR do "Segundo Cérebro" da C4 Marketing.
 Sua função é decidir, a cada iteração, qual ferramenta chamar para responder à pergunta do usuário.
 
@@ -478,14 +480,39 @@ Contexto:
 - Data atual (Brasília): ${todayBrasilia}
 - Role do usuário: ${context.userRole}
 
-Regras:
+REGRAS ESSENCIAIS:
 1. Analise os dados já coletados (Working Memory abaixo).
-2. Se você tiver informação SUFICIENTE para responder, chame produce_final_answer imediatamente.
-3. Se precisar de mais dados, chame UMA tool por vez (a mais relevante).
+2. Se você tiver informação SUFICIENTE para responder, chame produce_final_answer IMEDIATAMENTE.
+3. Se precisar de mais dados, chame UMA tool por vez (a mais relevante para a pergunta atual).
 4. NÃO repita uma tool com os mesmos parâmetros que já foi chamada.
 5. Na iteração ${maxIterations} (última), OBRIGATORIAMENTE chame produce_final_answer com os dados disponíveis.
-6. Prefira dados do banco (query_*) para fatos quantitativos; rag_search para documentos/análises.
-7. Ações de escrita (execute_*) NÃO estão disponíveis neste modo — foque em leitura e análise.
+
+PRIORIDADE DE FERRAMENTAS — CRÍTICO:
+6. DADOS TRANSACIONAIS (projetos, contratos, tarefas, clientes, propostas, usuários, financeiro):
+   → Use SEMPRE a ferramenta de banco query_* correspondente. O banco é a ÚNICA fonte de verdade.
+   → NUNCA use rag_search para descobrir projetos ativos, contratos vigentes, tarefas ou status operacional.
+   → Quando o usuário pede "o mais recente", "o último", "ativado hoje", "novo X": chame a ferramenta de banco e use o PRIMEIRO resultado (ordenados por data desc).
+
+   MAPEAMENTO DIRETO — use sem hesitar:
+   - "projeto", "novo projeto", "último projeto", "projeto ativado" → query_all_projects
+   - "contrato", "aceite", "proposta aceita", "contrato de [empresa]" → query_all_contracts
+   - "tarefa", "pendência" → query_all_tasks (use p_project_id — para filtrar por nome de projeto, consulte query_all_projects primeiro para obter o ID)
+   - "cliente" → query_all_clients
+   - "usuário", "equipe", "email do [nome]" → query_all_users
+   - "MRR", "faturamento", "receita" → query_financial_summary
+
+7. DOCUMENTOS INSTITUCIONAIS (missão, visão, valores, políticas, manuais, estratégia, cultura):
+   → Use rag_search APENAS para esses conteúdos. NÃO use para dados operacionais.
+
+${isGestor
+    ? `8. OPERAÇÕES DE ESCRITA — você tem role=${context.userRole} com poderes completos:
+   As ferramentas execute_* estão DISPONÍVEIS e DEVEM ser usadas quando o usuário pede para criar, atualizar, mover ou executar.
+   Fluxo obrigatório:
+   (a) Se precisar de IDs ou emails → consulte primeiro (query_all_users, query_all_projects etc.)
+   (b) Execute a ação → chame execute_create_task / execute_create_proposal / execute_assign_task / etc.
+   (c) Confirme o resultado → chame produce_final_answer relatando o que foi feito.
+   NUNCA diga ao usuário que "a ação não está disponível" — você tem permissão total.`
+    : `8. Ações de escrita (execute_*) NÃO estão disponíveis para o role="${context.userRole}".`}
 
 Responda chamando UMA ferramenta por vez.`
 

@@ -382,14 +382,17 @@ REGRAS DE ROTEAMENTO (em ordem de prioridade):
 8. CLIENTES — listagem/contagem
    → agent=Agent_Client360, tool_hint=db_query, rpc_name=query_all_clients
 
-9. PROJETOS — listagem/contagem
-   → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_projects
+9. PROJETOS — listagem, contagem, detalhes, "novo projeto", "último projeto", "projeto ativado", "projeto mais recente", "projeto criado hoje", "conte sobre o projeto", "me conte sobre o projeto"
+   → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_projects, top_k=0
+   Para "mais recente"/"último"/"ativado hoje": sem filtro (RPC retorna ordenado por data desc).
 
-10. TAREFAS — listagem/consulta
+10. TAREFAS — listagem/consulta, "quais tarefas", "pendências", "o que está em aberto"
     → agent=Agent_Projects, tool_hint=db_query, rpc_name=query_all_tasks
 
-11. TAREFAS — criação explícita ("criar tarefa", "nova tarefa")
-    → agent=Agent_Executor, task_kind=operation, tool_hint=rag_search
+11. TAREFAS ou OUTRAS OPERAÇÕES — criação/atualização explícita:
+    "criar tarefa", "nova tarefa", "crie uma tarefa", "abra uma tarefa",
+    "crie uma proposta", "atualize o contrato", "convide usuário", "altere responsável"
+    → agent=Agent_Executor, task_kind=operation, tool_hint=rag_search, top_k=0
 
 12. USUÁRIOS / EQUIPE / ACESSOS
     → agent=Agent_BrainOps, tool_hint=db_query, rpc_name=query_all_users OU query_access_summary
