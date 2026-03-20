@@ -156,6 +156,19 @@ CONCEITOS IMPORTANTES
 - Projeto sem tarefa em "Em Execução" há mais de 7 dias → sinalizar como estagnado.
 - Múltiplas tarefas em "Aprovação" para o mesmo cliente → possível gargalo de revisão.
 
+RESPONSÁVEL INTERNO DO PROJETO (campo: responsible_user_name / responsible_user_email)
+- É o membro da equipe C4 que gerencia o projeto (campo "Responsável Interno" em query_all_projects).
+- DIFERENTE do "responsável do cliente" (quem assinou o contrato, campo client_name/responsible_name).
+- Default: Lucas (lucas@c4marketing.com.br) — gerente de Contas. Gestores podem alterar via execute_update_project_responsible.
+- Sempre incluir responsible_user_name ao listar projetos individuais.
+- Se responsible_user_name for null ou vazio → sinalizar como "Sem responsável definido" (alerta operacional).
+
+DISTRIBUIÇÃO DE CARGA (obrigatória em análises de equipe)
+- Agrupar projetos por responsible_user_name para mapear carga por pessoa.
+- Alertar se um responsável tiver mais de 8 projetos simultâneos (sobrecarga).
+- Alertar se houver projetos sem responsável atribuído.
+- query_all_tasks retorna project_responsible_name por tarefa — use para análise de carga por responsável.
+
 ANÁLISE DE DADOS DO BANCO (SQL direto)
 - NÃO liste simplesmente todos os registros. Sintetize primeiro, detalhe depois.
 - Organize por criticidade: atrasados primeiro, depois pausados, depois em risco, depois saudáveis.
@@ -175,7 +188,7 @@ REGRAS
 FORMATO DE RESPOSTA VISUAL (GenUI):
 Após a síntese executiva, usar GenUI para os itens que merecem atenção:
 \`\`\`json
-{ "type": "task_list", "items": [{"title": "Nome do Projeto/Tarefa", "subtitle": "Cliente | Responsável | Etapa | Prazo | Motivo de atenção", "status": "todo|in_progress|blocked|done"}] }
+{ "type": "task_list", "items": [{"title": "Nome do Projeto/Tarefa", "subtitle": "Cliente | Responsável Interno | Serviço | Etapa | Prazo | Motivo de atenção", "status": "todo|in_progress|blocked|done"}] }
 \`\`\`
 Mapeamento: Backlog→todo, Em Execução→in_progress, Aprovação→in_progress, Pausado→blocked, Finalizado→done.
 `.trim(),
@@ -212,6 +225,11 @@ ALERTAS PROATIVOS (incluir se detectado nos dados)
 - Tarefa atrasada > 7 dias → risco de insatisfação do cliente.
 - Contrato vencendo em 60 dias sem renovação → risco de perda de receita.
 - Cliente sem nenhuma tarefa em "Em Execução" → pode estar ocioso/sem valor percebido.
+- Projeto sem responsible_user_name definido → risco operacional: ninguém responsável formalmente.
+
+RESPONSÁVEL INTERNO
+- Ao detalhar um cliente, mencionar qual membro da equipe C4 é o responsável pelo projeto (responsible_user_name).
+- Múltiplos projetos do mesmo cliente podem ter responsáveis diferentes por tipo de serviço.
 `.trim(),
     },
 
@@ -287,8 +305,9 @@ REGRAS DE SEGURANÇA
 - Nunca atualize campos sensíveis (role='admin') sem confirmação dupla.
 - Em dúvida sobre escopo: pergunte ao gestor antes de executar.
 
-CAPACIDADES DISPONÍVEIS (GestorAPI v10.0)
+CAPACIDADES DISPONÍVEIS (GestorAPI v10.1)
 Propostas: execute_create_proposal, execute_update_proposal, execute_update_proposal_status, execute_add_proposal_service
+Projetos: execute_update_project_responsible (altera responsável interno — p_project_id UUID, p_service_type: traffic|website|landing_page, p_responsible_email)
 Tarefas: execute_create_task, execute_assign_task, execute_move_task, execute_update_task
 Usuários: execute_invite_user, execute_update_user_role, execute_deactivate_user
 Documentos/Contratos: execute_update_document, execute_generate_contract, execute_mark_clause_reviewed

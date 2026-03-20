@@ -94,13 +94,16 @@ Deno.serve(async (req) => {
                     if (item.source_table === 'website_projects') {
                         const { data: proj, error: pErr } = await supabase
                             .from('website_projects')
-                            .select(`*, acceptances ( company_name ), websites ( * )`)
+                            .select(`*, acceptances ( company_name ), websites ( * ), app_users ( name, email )`)
                             .eq('id', item.source_id)
                             .single()
                         if (pErr) throw pErr
 
-                        docContent = `[PROJETO WEB] Site: ${proj.acceptances?.company_name || 'N/A'}\n`
+                        const clientName = proj.acceptances?.company_name || 'N/A'
+                        const responsible = proj.app_users as { name?: string; email?: string } | null
+                        docContent = `[PROJETO WEB] Site: ${clientName}\n`
                         docContent += `Status: ${proj.account_setup_status}\n`
+                        docContent += `Responsável Interno: ${responsible?.name || 'Não atribuído'}${responsible?.email ? ` (${responsible.email})` : ''}\n`
                         if (proj.websites && proj.websites.length > 0) {
                             const web = proj.websites[0]
                             docContent += `Etapa Atual: ${web.status}\n`
@@ -109,24 +112,28 @@ Deno.serve(async (req) => {
                         docMetadata = {
                             type: 'official_doc',
                             artifact_kind: 'project',
-                            title: `Projeto Site: ${proj.acceptances?.company_name || 'N/A'}`,
+                            title: `Projeto Site: ${clientName}`,
                             source_table: 'website_projects',
                             source_id: item.source_id,
                             status: 'active',
                             authority_type: 'policy',
+                            responsible_user_email: responsible?.email || null,
                         }
 
                         // === LANDING PAGE PROJECTS ===
                     } else if (item.source_table === 'landing_page_projects') {
                         const { data: proj, error: pErr } = await supabase
                             .from('landing_page_projects')
-                            .select(`*, acceptances ( company_name ), landing_pages ( * )`)
+                            .select(`*, acceptances ( company_name ), landing_pages ( * ), app_users ( name, email )`)
                             .eq('id', item.source_id)
                             .single()
                         if (pErr) throw pErr
 
-                        docContent = `[PROJETO LP] Landing Page: ${proj.acceptances?.company_name || 'N/A'}\n`
+                        const clientName = proj.acceptances?.company_name || 'N/A'
+                        const responsible = proj.app_users as { name?: string; email?: string } | null
+                        docContent = `[PROJETO LP] Landing Page: ${clientName}\n`
                         docContent += `Status Survey: ${proj.survey_status}\n`
+                        docContent += `Responsável Interno: ${responsible?.name || 'Não atribuído'}${responsible?.email ? ` (${responsible.email})` : ''}\n`
                         if (proj.landing_pages && proj.landing_pages.length > 0) {
                             const lp = proj.landing_pages[0]
                             docContent += `Etapa Criativa: ${lp.status}\n`
@@ -135,26 +142,29 @@ Deno.serve(async (req) => {
                         docMetadata = {
                             type: 'official_doc',
                             artifact_kind: 'project',
-                            title: `Projeto LP: ${proj.acceptances?.company_name || 'N/A'}`,
+                            title: `Projeto LP: ${clientName}`,
                             source_table: 'landing_page_projects',
                             source_id: item.source_id,
                             status: 'active',
                             authority_type: 'policy',
+                            responsible_user_email: responsible?.email || null,
                         }
 
                         // === TRAFFIC PROJECTS ===
                     } else if (item.source_table === 'traffic_projects') {
                         const { data: proj, error: pErr } = await supabase
                             .from('traffic_projects')
-                            .select(`*, acceptances ( company_name ), traffic_campaigns ( * )`)
+                            .select(`*, acceptances ( company_name ), traffic_campaigns ( * ), app_users ( name, email )`)
                             .eq('id', item.source_id)
                             .single()
                         if (pErr) throw pErr
 
                         const clientName = proj.acceptances?.company_name || 'N/A'
+                        const responsible = proj.app_users as { name?: string; email?: string } | null
                         docContent = `[PROJETO TRÁFEGO] Gestão de Tráfego: ${clientName}\n`
                         docContent += `Status Survey: ${proj.survey_status}\n`
                         docContent += `Status Setup: ${proj.account_setup_status}\n`
+                        docContent += `Responsável Interno: ${responsible?.name || 'Não atribuído'}${responsible?.email ? ` (${responsible.email})` : ''}\n`
                         if (proj.traffic_campaigns && proj.traffic_campaigns.length > 0) {
                             docContent += `Campanhas Ativas:\n`
                             for (const camp of proj.traffic_campaigns) {
@@ -169,6 +179,7 @@ Deno.serve(async (req) => {
                             source_id: item.source_id,
                             status: 'active',
                             authority_type: 'policy',
+                            responsible_user_email: responsible?.email || null,
                         }
 
                     } else {
@@ -269,9 +280,9 @@ Deno.serve(async (req) => {
                             .select(`
                                 *,
                                 proposals ( id, slug, monthly_fee, setup_fee, media_limit, contract_duration, services ),
-                                traffic_projects ( id, survey_status, account_setup_status ),
-                                website_projects ( id, survey_status, account_setup_status ),
-                                landing_page_projects ( id, survey_status, account_setup_status )
+                                traffic_projects ( id, survey_status, account_setup_status, responsible_user_id, app_users ( name, email ) ),
+                                website_projects ( id, survey_status, account_setup_status, responsible_user_id, app_users ( name, email ) ),
+                                landing_page_projects ( id, survey_status, account_setup_status, responsible_user_id, app_users ( name, email ) )
                             `)
                             .eq('id', item.source_id)
                             .maybeSingle()
@@ -284,6 +295,12 @@ Deno.serve(async (req) => {
                         if (acc.website_projects?.length > 0) services.push('Criação de Site')
                         if (acc.landing_page_projects?.length > 0) services.push('Landing Page')
 
+                        // Responsável interno (primeiro encontrado entre os 3 tipos)
+                        const responsibleFromProject =
+                            (acc.traffic_projects?.[0] as any)?.app_users ||
+                            (acc.website_projects?.[0] as any)?.app_users ||
+                            (acc.landing_page_projects?.[0] as any)?.app_users || null
+
                         docContent = `[CONTRATO] Empresa: ${acc.company_name || 'N/A'}\n`
                         docContent += `Cliente: ${acc.name || 'N/A'}\n`
                         docContent += `Email: ${acc.email || 'N/A'}\n`
@@ -291,6 +308,9 @@ Deno.serve(async (req) => {
                         docContent += `Data de Assinatura: ${acc.timestamp ? new Date(acc.timestamp).toLocaleDateString('pt-BR') : 'N/A'}\n`
                         if (acc.expiration_date) docContent += `Validade: ${acc.expiration_date}\n`
                         if (services.length > 0) docContent += `Serviços Contratados: ${services.join(', ')}\n`
+                        if (responsibleFromProject) {
+                            docContent += `Responsável Interno: ${responsibleFromProject.name || 'N/A'}${responsibleFromProject.email ? ` (${responsibleFromProject.email})` : ''}\n`
+                        }
                         if (prop) {
                             docContent += `Mensalidade: R$${prop.monthly_fee || 0}\n`
                             docContent += `Setup: R$${prop.setup_fee || 0}\n`

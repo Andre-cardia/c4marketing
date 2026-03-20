@@ -370,6 +370,22 @@ function buildPlannerTools() {
         {
             type: 'function' as const,
             function: {
+                name: 'execute_update_project_responsible',
+                description: 'Alterar o responsável interno de um projeto. SOMENTE para role=gestor.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        p_project_id:        { type: 'string', description: 'UUID do projeto.' },
+                        p_service_type:      { type: 'string', enum: ['traffic', 'website', 'landing_page'], description: 'Tipo de serviço do projeto.' },
+                        p_responsible_email: { type: 'string', description: 'Email do novo responsável interno (app_users).' },
+                    },
+                    required: ['p_project_id', 'p_service_type', 'p_responsible_email'],
+                },
+            },
+        },
+        {
+            type: 'function' as const,
+            function: {
                 name: 'execute_generate_contract',
                 description: 'Gerar rascunho de contrato a partir de uma proposta. SOMENTE para role=gestor.',
                 parameters: {

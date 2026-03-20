@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2, Bot, KeyRound } from 'lucide-react';
+import { Plus, Folder, ExternalLink, Activity, Globe, ShoppingCart, BarChart, Server, Layout, ArrowUpDown, ArrowUp, ArrowDown, Calendar, User, Search, LayoutDashboard, Edit, Trash2, Bot, KeyRound, UserCog } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 import CreateProjectModal from '../components/projects/CreateProjectModal';
@@ -12,13 +12,15 @@ interface Project {
     proposal_id: number;
     company_name: string;
     responsible_name: string;
+    responsible_user_name?: string;
+    responsible_user_email?: string;
     status: string;
     services: any[];
     created_at: string;
     slug: string;
 }
 
-type SortKey = 'company_name' | 'created_at' | 'responsible_name';
+type SortKey = 'company_name' | 'created_at' | 'responsible_name' | 'responsible_user_name';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -46,17 +48,39 @@ const Projects: React.FC = () => {
     const fetchProjects = async () => {
         try {
             setLoading(true);
-            const { data: acceptances, error } = await supabase
-                .from('acceptances')
-                .select('*')
-                .eq('status', 'Ativo')
-                .order('timestamp', { ascending: false });
 
-            if (error) throw error;
+            // Fetch acceptances and query_all_projects in parallel
+            const [accResult, rpcResult] = await Promise.all([
+                supabase
+                    .from('acceptances')
+                    .select('*')
+                    .eq('status', 'Ativo')
+                    .order('timestamp', { ascending: false }),
+                supabase.rpc('query_all_projects'),
+            ]);
+
+            if (accResult.error) throw accResult.error;
+            const acceptances = accResult.data;
 
             if (!acceptances) {
                 setProjects([]);
                 return;
+            }
+
+            // Build map: acceptanceId -> { responsible_user_name, responsible_user_email }
+            const responsibleMap: Record<string, { name: string; email: string }> = {};
+            if (rpcResult.data) {
+                const rpcRows: any[] = typeof rpcResult.data === 'string'
+                    ? JSON.parse(rpcResult.data)
+                    : rpcResult.data;
+                for (const row of rpcRows) {
+                    if (row.acceptance_id && row.responsible_user_name && !responsibleMap[row.acceptance_id]) {
+                        responsibleMap[row.acceptance_id] = {
+                            name: row.responsible_user_name,
+                            email: row.responsible_user_email ?? '',
+                        };
+                    }
+                }
             }
 
             const projectsData: Project[] = [];
@@ -81,11 +105,14 @@ const Projects: React.FC = () => {
                     }
                 }
 
+                const resp = responsibleMap[acc.id];
                 projectsData.push({
                     id: acc.id,
                     proposal_id: acc.proposal_id,
                     company_name: acc.company_name,
                     responsible_name: acc.name,
+                    responsible_user_name: resp?.name,
+                    responsible_user_email: resp?.email,
                     status: acc.status,
                     services: services,
                     created_at: acc.timestamp,
@@ -136,7 +163,8 @@ const Projects: React.FC = () => {
             const lowerTerm = searchTerm.toLowerCase();
             sorted = sorted.filter(p =>
                 p.company_name.toLowerCase().includes(lowerTerm) ||
-                p.responsible_name.toLowerCase().includes(lowerTerm)
+                p.responsible_name.toLowerCase().includes(lowerTerm) ||
+                (p.responsible_user_name ?? '').toLowerCase().includes(lowerTerm)
             );
         }
 
@@ -149,6 +177,12 @@ const Projects: React.FC = () => {
                 return sortConfig.direction === 'asc'
                     ? a.responsible_name.localeCompare(b.responsible_name)
                     : b.responsible_name.localeCompare(a.responsible_name);
+            } else if (sortConfig.key === 'responsible_user_name') {
+                const nameA = a.responsible_user_name ?? '';
+                const nameB = b.responsible_user_name ?? '';
+                return sortConfig.direction === 'asc'
+                    ? nameA.localeCompare(nameB)
+                    : nameB.localeCompare(nameA);
             } else {
                 return sortConfig.direction === 'asc'
                     ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -290,6 +324,15 @@ const Projects: React.FC = () => {
                                         </div>
                                     </th>
                                     <th
+                                        className="p-5 font-bold hidden lg:table-cell cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                        onClick={() => handleSort('responsible_user_name')}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            Equipe C4
+                                            {getSortIcon('responsible_user_name')}
+                                        </div>
+                                    </th>
+                                    <th
                                         className="p-5 font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors group"
                                         onClick={() => handleSort('created_at')}
                                     >
@@ -319,6 +362,15 @@ const Projects: React.FC = () => {
                                             <div className="flex items-center gap-2">
                                                 <User className="w-4 h-4 text-slate-300" />
                                                 {project.responsible_name}
+                                            </div>
+                                        </td>
+                                        <td className="p-5 hidden lg:table-cell">
+                                            <div className="flex items-center gap-2">
+                                                <UserCog className="w-4 h-4 text-slate-300" />
+                                                {project.responsible_user_name
+                                                    ? <span className="font-medium text-slate-700 dark:text-slate-200">{project.responsible_user_name}</span>
+                                                    : <span className="text-slate-400 italic text-xs">—</span>
+                                                }
                                             </div>
                                         </td>
                                         <td className="p-5">
@@ -404,6 +456,7 @@ const Projects: React.FC = () => {
                     setProjectToEdit(undefined);
                 }}
                 projectToEdit={projectToEdit}
+                userRole={userRole}
                 onProjectCreated={() => {
                     fetchProjects();
                     setShowCreateModal(false);
