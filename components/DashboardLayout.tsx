@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
@@ -8,9 +9,11 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const location = useLocation();
+    const isWideLayout = location.pathname.startsWith('/crm');
 
     return (
-        <div className="flex min-h-screen bg-neutral-50 dark:bg-black text-neutral-900 dark:text-neutral-100">
+        <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100">
             {/* Sidebar - Desktop and Mobile Drawer */}
             <Sidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
 
@@ -21,7 +24,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
                 {/* Scrollable Content */}
                 <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-8 custom-scrollbar">
-                    <div className="max-w-7xl mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <div className={`${isWideLayout ? 'max-w-[1760px]' : 'max-w-7xl'} mx-auto w-full animate-in fade-in slide-in-from-bottom-2 duration-500`}>
                         {children}
                     </div>
                 </main>

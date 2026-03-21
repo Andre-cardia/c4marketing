@@ -32,7 +32,6 @@ const LandingPageManagement: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [showSurveyModal, setShowSurveyModal] = useState(false);
     const [showAccessGuideModal, setShowAccessGuideModal] = useState(false);
-    const [updatingStatus, setUpdatingStatus] = useState(false);
 
     // Shared Fetch Function
     const loadProjectData = async () => {
@@ -100,23 +99,15 @@ const LandingPageManagement: React.FC = () => {
     };
 
     const handleUpdateStatus = async (field: 'survey_status' | 'account_setup_status' | 'briefing_status', value: 'completed' | 'pending') => {
-        if (!lpProject || updatingStatus) return;
-        setUpdatingStatus(true);
-        try {
-            const { error } = await supabase
-                .from('landing_page_projects')
-                .update({ [field]: value })
-                .eq('id', lpProject.id)
-                .select();
+        if (!lpProject) return;
 
-            if (error) {
-                console.error('Erro ao atualizar status:', error);
-                alert('Erro ao atualizar status. Tente novamente.');
-            } else {
-                setLpProject({ ...lpProject, [field]: value });
-            }
-        } finally {
-            setUpdatingStatus(false);
+        const { error } = await supabase
+            .from('landing_page_projects')
+            .update({ [field]: value })
+            .eq('id', lpProject.id);
+
+        if (!error) {
+            setLpProject({ ...lpProject, [field]: value });
         }
     };
 

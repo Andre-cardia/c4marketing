@@ -1,8 +1,8 @@
-## Relatório Técnico v9.6: Ajuste Financeiro Determinístico + Reforço Cognitivo Estratégico
+## Relatório Técnico v9.7: Expansão Comercial Operacional + CRM Vivo + Canal WhatsApp Integrado
 
-**Sistema "Segundo Cérebro" da C4 Marketing — 4 de Março de 2026**
+**Sistema "Segundo Cérebro" da C4 Marketing — 08 e 09 de março de 2026**
 
-> Esta versão **inclui integralmente** todo o conteúdo da v9.5 (sem cortes) e acrescenta, ao final, o **Bloco 10 — Novo Ciclo v9.6** com os ajustes cognitivos estratégicos e o fechamento financeiro determinístico (chat-brain + dashboard).
+> Esta versão **inclui integralmente** todo o conteúdo da v9.6 (sem cortes) e acrescenta, ao final, o **Bloco 11 — Novo Ciclo v9.7** com a expansão comercial operacional do sistema: CRM próprio separado do kanban de tarefas, integração do CRM com a memória viva do Segundo Cérebro, camada de chat comercial via Evolution API e reforços de autenticação/governança para esse novo domínio.
 
 ---
 
@@ -2798,3 +2798,444 @@ Atualização complementar em 4 de março de 2026 (item 6 executado):
 A v9.6 fecha o gap entre cognição estratégica e consistência financeira operacional: o Segundo Cérebro passou a recuperar melhor os documentos corporativos críticos, executar ajuste financeiro de início de faturamento de forma determinística e refletir o resultado corretamente no dashboard.
 
 Com isso, o risco principal remanescente para “memória viva total” fica concentrado no cumprimento das janelas temporais de estabilidade (T+7/T+30 + streak), e não mais em falhas estruturais de cálculo ou recuperação de contexto.
+
+---
+
+## Bloco 11 — Novo Ciclo v9.7: Expansão Comercial Operacional + CRM Vivo + Canal WhatsApp Integrado (08 e 09 de março de 2026)
+
+> Data de fechamento deste ciclo: **09 de março de 2026**.
+
+### 11.1 Objetivo do ciclo v9.7
+
+O ciclo v9.7 foi executado para transformar o Segundo Cérebro em uma camada operacional real do comercial, fechando quatro frentes:
+
+1. criar um **CRM comercial próprio**, separado do kanban operacional de tarefas;
+2. fazer o CRM alimentar o **contexto vivo** e a **memória documental** do Segundo Cérebro;
+3. ativar um **canal de conversas estilo WhatsApp Web** integrado à Evolution API self-hosted;
+4. endurecer autenticação, ingestão de webhook e controle de acesso para esse novo domínio comercial.
+
+### 11.2 Linha do tempo técnica executada
+
+| Artefato | Entrega | Resultado |
+|---|---|---|
+| `docs/CRM_IMPLEMENTATION_PLAN.md` | Planejamento em 3 fases do CRM comercial | Escopo formalizado com CRM separado do kanban de tarefas |
+| `ab8285c` | Fase 1 do CRM + integração com memória viva | Pipeline comercial, histórico, follow-ups e sync com o Segundo Cérebro entregues |
+| `docs/runbook_chat_brain_invalid_jwt_2026-03-06.md` | Runbook do incidente `Invalid JWT` do Segundo Cérebro | Padrão operacional de correção por `--no-verify-jwt` documentado |
+| `scripts/check_brain_canary.js` (atualizado) | Canário com autenticação real | Validação de chat-brain passou a suportar sessão real/bootstrap de usuário de teste |
+| `8d924ac` | Fase 2 do CRM Chat + Evolution API | Inbox comercial, schema de conversas e Edge Functions publicados |
+| `workspace local (08/03/2026)` | Estabilização de sessão/JWT no CRM Chat | Loop de reauth interrompido, diagnóstico explícito e fetch direto para Edge Functions |
+| `workspace local (08/03/2026)` | Renderização de QR visual no CRM Chat | Payload textual da Evolution passou a ser convertido em QR para a UI |
+| `workspace local + deploy seletivo remoto (08/03/2026)` | Normalização de eventos do webhook da Evolution | Suporte a eventos `messages.upsert`, `connection.update` e equivalentes |
+| `workspace local (09/03/2026)` | Restrição de acesso a CRM e Chat CRM | Apenas `gestor` e `comercial` mantidos nas rotas e menu |
+
+### 11.3 Implementações detalhadas
+
+#### 11.3.1 Planejamento e separação arquitetural do domínio comercial
+
+O plano formal do CRM foi consolidado em:
+
+- `docs/CRM_IMPLEMENTATION_PLAN.md`
+
+Diretriz arquitetural fixada neste ciclo:
+
+- o **kanban operacional de tarefas** permanece separado do **CRM comercial**;
+- o CRM passa a ter rotas, tabelas, histórico, follow-ups, governança e painel próprios;
+- o chat comercial passa a orbitar o CRM, e não o board operacional.
+
+Essa separação evita colapsar pipeline de vendas e execução operacional em um único modelo de dados, preservando rastreabilidade e governança por domínio.
+
+#### 11.3.2 Fase 1 do CRM comercial
+
+Implementado no banco e frontend:
+
+- pipeline com 6 estágios:
+  - `new_lead`
+  - `contacted`
+  - `meeting_scheduled`
+  - `proposal_sent`
+  - `proposal_won`
+  - `proposal_lost`
+- entidades principais:
+  - `crm_pipeline_stages`
+  - `crm_leads`
+  - `crm_lead_stage_history`
+  - `crm_lead_activities`
+  - `crm_followups`
+- telas:
+  - `pages/CRM.tsx`
+  - `lib/crm.ts`
+
+Regras de negócio entregues:
+
+- abertura automática do lead em `opened_at`;
+- motivo de perda obrigatório em `proposal_lost`;
+- histórico automático de mudança de estágio;
+- follow-ups com status e vencimento;
+- vínculo opcional com proposta (`proposal_id`) e contrato/aceite (`acceptance_id`);
+- board comercial independente do kanban operacional.
+
+Migration principal:
+
+- `supabase/migrations/20260307110000_create_crm_phase1.sql`
+
+#### 11.3.3 Integração do CRM com a memória viva do Segundo Cérebro
+
+O CRM passou a alimentar o cérebro em duas camadas distintas:
+
+**Camada 1 — contexto vivo agregado em tempo real**
+
+Migration:
+
+- `supabase/migrations/20260307133000_add_crm_brain_integration.sql`
+
+Entregas centrais:
+
+- novo domínio `crm` no `live_state`;
+- função `build_crm_live_state_markdown()`;
+- distribuição do domínio `crm` em `live_state_domains_for_source(...)`;
+- refresh automático do documento vivo do CRM por eventos de:
+  - `crm_leads`
+  - `crm_followups`
+  - `crm_lead_activities`
+  - `crm_lead_stage_history`
+  - `crm_pipeline_stages`
+
+Resultado:
+
+- o Segundo Cérebro passou a enxergar KPIs, distribuição por estágio, leads recentes, follow-ups pendentes e carteira por responsável em tempo quase real.
+
+**Camada 2 — memória documental rica por lead**
+
+Implementado em:
+
+- `supabase/functions/brain-sync/index.ts`
+
+Nova rotina:
+
+- `buildCrmLeadBrainDocument(...)`
+
+Conteúdo sintetizado por lead:
+
+- dados cadastrais;
+- estágio atual;
+- responsável;
+- origem, temperatura e valor estimado;
+- observações;
+- próximas ações;
+- histórico de estágio;
+- atividades registradas;
+- follow-ups pendentes/vencidos;
+- vínculos com proposta e aceite.
+
+Metadados novos de documento:
+
+- `artifact_kind = 'crm_lead'`
+- `source_table = 'crm_leads'`
+- `source = 'crm_live_record'`
+- `crm_entity = 'lead'`
+- `crm_stage_key`
+- `crm_stage_name`
+- `crm_owner_name`
+- `crm_followups_pending`
+- `crm_followups_overdue`
+
+Observação operacional importante:
+
+- o **live state do CRM** ficou em tempo real por trigger;
+- o **documento vetorial detalhado por lead** continua dependente do `brain-sync`, mantendo a cadência operacional do worker.
+
+#### 11.3.4 Ampliação do chat-brain para o domínio CRM
+
+Implementado em:
+
+- `supabase/functions/chat-brain/index.ts`
+
+O roteamento do cérebro passou a inferir e solicitar contexto `crm` quando a pergunta contém termos como:
+
+- `crm`
+- `lead`, `leads`
+- `oportunidade`
+- `follow-up`
+- `kanban`
+- `pipeline`
+- `funil`
+- `novo lead`
+- `contato realizado`
+- `reuniao agendada`
+- `proposta aceita`
+- `proposta perdida`
+
+Telemetria associada:
+
+- `live_state_domains_requested`
+- `live_state_docs_loaded`
+- `live_state_docs_stale`
+- `live_state_doc_ids`
+- `live_state_lookup_error`
+
+Resultado:
+
+- o Segundo Cérebro passou a responder perguntas macro de pipeline comercial usando o domínio `crm`, sem depender apenas de busca vetorial genérica.
+
+#### 11.3.5 Hardening operacional do cérebro: incidente `Invalid JWT`
+
+O incidente foi formalizado em:
+
+- `docs/runbook_chat_brain_invalid_jwt_2026-03-06.md`
+
+Correção documentada:
+
+- `chat-brain` com `verify_jwt = false` no gateway;
+- autenticação feita dentro do handler;
+- frontend normalizando token e evitando logout forçado em cascata.
+
+O mesmo padrão operacional foi reutilizado depois para destravar a camada comercial:
+
+- `evolution-manager`
+- `evolution-webhook`
+
+Ambas precisaram seguir o modelo `--no-verify-jwt` para evitar `401 Invalid JWT` no gateway, mantendo a autenticação efetiva dentro da própria function.
+
+#### 11.3.6 Canário com autenticação real
+
+Implementado em:
+
+- `scripts/check_brain_canary.js`
+- `.env.example`
+
+Mudança estrutural:
+
+- o canário deixou de depender de JWT sintético;
+- passou a aceitar:
+  - `BRAIN_TEST_ACCESS_TOKEN`
+  - `BRAIN_TEST_USER_EMAIL` + `BRAIN_TEST_USER_PASSWORD`
+  - bootstrap do usuário gerenciado `brain-canary@c4marketing.com` via `service_role`
+
+Resultado:
+
+- o teste operacional do cérebro passou a refletir autenticação real do Supabase Auth, reduzindo falso positivo em cenários de JWT.
+
+#### 11.3.7 Fase 2: CRM Chat + Evolution API
+
+Implementado no banco:
+
+- `supabase/migrations/20260307170000_create_crm_chat_phase2_evolution.sql`
+
+Entidades novas:
+
+- `crm_chat_instances`
+- `crm_chat_contacts`
+- `crm_chat_conversations`
+- `crm_chat_messages`
+- `crm_chat_webhook_events`
+
+Funções e triggers principais:
+
+- preparação/normalização de instância, contato e conversa;
+- toque automático da conversa ao inserir mensagem;
+- atualização de `last_message_at`, `last_message_preview` e `unread_count`;
+- vinculação de conversa/contato com lead;
+- logging automático de atividade do lead a partir de mensagem inserida.
+
+Frontend:
+
+- `pages/CRMChat.tsx`
+- `lib/crmChat.ts`
+
+Capacidades entregues:
+
+- painel estilo WhatsApp Web;
+- provisionamento e sincronização da instância Evolution;
+- QR/pairing code;
+- lista de conversas;
+- histórico de mensagens;
+- composer de envio;
+- vínculo manual de conversa com lead/responsável;
+- painel lateral com status da instância e contexto do lead.
+
+Backend:
+
+- `supabase/functions/evolution-manager/index.ts`
+- `supabase/functions/evolution-webhook/index.ts`
+- `supabase/functions/_shared/evolution.ts`
+
+#### 11.3.8 Ativação da Evolution self-hosted em ambiente novo
+
+Problema operacional encontrado:
+
+- a instalação anterior baseada em `atendai/evolution-api:latest` estava respondendo como `v2.2.3` e falhando em QR/pairing.
+
+Desfecho do ciclo:
+
+- nova instalação operacional em:
+  - `https://evolution2.c4brasil.com.br`
+- versão validada:
+  - `2.3.7`
+
+Estado validado:
+
+- root da API respondendo `200`;
+- webhook da instância configurado para o Supabase;
+- instância comercial `c4-comercial` provisionada;
+- conexão do número concluída a partir do próprio CRM Chat.
+
+Observação:
+
+- a UI `/manager` da Evolution ficou instável atrás do proxy em parte do ciclo, mas isso não bloqueou a integração porque o CRM conversa diretamente com a API HTTP.
+
+#### 11.3.9 Hardening de sessão e UX no CRM Chat
+
+Implementado localmente em:
+
+- `pages/CRMChat.tsx`
+- `lib/crmChat.ts`
+
+Ajustes do ciclo:
+
+- diagnóstico explícito de sessão/Edge Function;
+- refresh/control plane de sessão antes de chamar `evolution-manager`;
+- troca de `supabase.functions.invoke` por `fetch` direto com `apikey + Authorization`;
+- remoção do loop de `signOut` automático;
+- banner persistente de sessão inválida em vez de mensagem piscando;
+- renderização visual de QR via `qrcode` quando o provider devolve payload textual;
+- diferenciação entre `Gerar QR` e `Gerar pairing`.
+
+Resultado:
+
+- a conexão da instância pôde ser concluída no próprio `/crm-chat` sem depender do Manager da Evolution.
+
+#### 11.3.10 Hardening da ingestão de webhook da Evolution
+
+Problema identificado:
+
+- o webhook da Evolution estava configurado corretamente, mas a function processava apenas nomes de evento em `UPPER_SNAKE_CASE`;
+- a Evolution `v2.3.x` pode emitir eventos no formato:
+  - `messages.upsert`
+  - `messages.update`
+  - `connection.update`
+  - `qrcode.updated`
+
+Correção implementada em:
+
+- `supabase/functions/_shared/evolution.ts`
+
+Nova rotina:
+
+- `normalizeEvolutionEventType(...)`
+
+Comportamento:
+
+- converte `messages.upsert` → `MESSAGES_UPSERT`
+- converte `connection.update` → `CONNECTION_UPDATE`
+- converte variantes com `.`, `-`, espaço ou camelCase para o formato canônico usado pelo handler
+
+Deploy seletivo remoto realizado:
+
+- `evolution-webhook`
+
+Estado após correção:
+
+- o pipeline de ingestão ficou compatível com a nomenclatura moderna da Evolution;
+- a validação operacional final de mensagens inbound deve ser reexecutada após esse patch, porque eventos antigos não fazem replay automático.
+
+#### 11.3.11 Governança de acesso para CRM e Chat CRM
+
+A regra de acesso foi endurecida para refletir o domínio comercial real:
+
+- acesso permitido:
+  - `gestor`
+  - `comercial`
+- acesso removido:
+  - `admin`
+  - `leitor`
+
+Arquivos ajustados:
+
+- `App.tsx`
+- `components/Sidebar.tsx`
+- `pages/CRM.tsx`
+- `pages/CRMChat.tsx`
+
+Resultado:
+
+- o bloqueio agora vale no menu e no acesso direto por rota;
+- o CRM e o Chat CRM deixam de ser áreas “genéricas do sistema” e passam a ser áreas explicitamente comerciais.
+
+### 11.4 Arquivos impactados no ciclo v9.7
+
+#### Documentação
+
+- `docs/CRM_IMPLEMENTATION_PLAN.md`
+- `docs/runbook_chat_brain_invalid_jwt_2026-03-06.md`
+- `docs/brain_tech_report_v9.7.md`
+
+#### Banco / migrations
+
+- `supabase/migrations/20260307110000_create_crm_phase1.sql`
+- `supabase/migrations/20260307133000_add_crm_brain_integration.sql`
+- `supabase/migrations/20260307170000_create_crm_chat_phase2_evolution.sql`
+
+#### Frontend
+
+- `pages/CRM.tsx`
+- `lib/crm.ts`
+- `pages/CRMChat.tsx`
+- `lib/crmChat.ts`
+- `App.tsx`
+- `components/Sidebar.tsx`
+
+#### Edge Functions / shared runtime
+
+- `supabase/functions/brain-sync/index.ts`
+- `supabase/functions/chat-brain/index.ts`
+- `supabase/functions/evolution-manager/index.ts`
+- `supabase/functions/evolution-webhook/index.ts`
+- `supabase/functions/_shared/evolution.ts`
+- `supabase/functions/_shared/brain-retrieval.ts`
+- `supabase/functions/_shared/brain-types.ts`
+
+#### Scripts e operação
+
+- `scripts/check_brain_canary.js`
+- `.env.example`
+
+### 11.5 Estado consolidado pós-v9.7
+
+| Frente | Status em 09/03/2026 | Evidência |
+|---|---|---|
+| CRM comercial separado do kanban operacional | Pronto | schema `crm_*` + tela `/crm` |
+| Sync do CRM com live state do cérebro | Pronto | domínio `crm` no `live_state` |
+| Documento vetorial por lead no cérebro | Pronto | `brain-sync` com `artifact_kind=crm_lead` |
+| Perguntas do cérebro sobre pipeline/lead/follow-up | Pronto | `chat-brain` inferindo domínio `crm` |
+| Canário com autenticação real | Pronto | `scripts/check_brain_canary.js` atualizado |
+| Runbook formal para `Invalid JWT` | Pronto | documento operacional criado em 06/03/2026 |
+| CRM Chat + provisionamento Evolution | Pronto | `/crm-chat` conectando e provisionando instância |
+| Evolution self-hosted v2.3.7 em ambiente novo | Pronto | `https://evolution2.c4brasil.com.br` respondendo `200` |
+| Webhook da Evolution com parsing de eventos modernos | Pronto | normalização de `messages.upsert` e equivalentes |
+| Ingestão inbound fim a fim no inbox após patch de normalização | Em revalidação | necessário reenviar mensagem nova pós-patch |
+| Restrição de acesso a CRM e Chat CRM para `gestor` e `comercial` | Implementado no codebase | rotas + sidebar + guardas locais |
+| Fase 3: dashboard de performance comercial | Pendente | escopo segue como próxima etapa do plano |
+
+### 11.6 Próximos passos objetivos (v9.7 → v9.8)
+
+1. reexecutar o teste operacional de mensagem inbound no `CRM Chat` após a normalização do webhook e validar a persistência em:
+   - `crm_chat_webhook_events`
+   - `crm_chat_conversations`
+   - `crm_chat_messages`;
+2. consolidar a promoção operacional da Evolution nova (`evolution2`) para o domínio definitivo, com IP estático e DNS final estáveis;
+3. fechar o deploy/commit dos hardenings locais restantes:
+   - RBAC final de CRM/Chat CRM
+   - normalização de eventos do webhook
+   - refinamentos de sessão/QR no CRM Chat;
+4. implementar a **fase 3** do plano comercial:
+   - dashboard de desempenho por data/usuário
+   - métricas de conversão por etapa
+   - follow-ups vencidos
+   - perdas por motivo e tempo de ciclo;
+5. manter a trilha de evidência temporal do Segundo Cérebro (T+7/T+30/streak), agora com o domínio comercial integrado.
+
+### 11.7 Encerramento da v9.7
+
+A v9.7 marca a expansão do Segundo Cérebro de uma camada predominantemente cognitiva para uma camada **cognitivo-operacional comercial**. O sistema passou a ter CRM próprio, memória viva conectada ao funil, chat comercial integrado ao WhatsApp via Evolution API e governança mais rígida de autenticação e acesso.
+
+O avanço estrutural mais importante deste ciclo é que o cérebro deixa de apenas interpretar o contexto comercial e passa a operar sobre um domínio comercial vivo, com dados próprios, atualização em tempo real e canal conversacional integrado. O risco principal remanescente já não está na modelagem do domínio, e sim na validação final da ingestão inbound do webhook e no fechamento da fase 3 analítica.

@@ -3,70 +3,23 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { OpenAI } from 'https://esm.sh/openai@4'
 
 import { matchBrainDocuments, makeOpenAIEmbedder } from '../_shared/brain-retrieval.ts'
-import { routeRequestHybrid, callRouterLLM } from '../_shared/agents/router.ts'
+import { routeRequestHybrid } from '../_shared/agents/router.ts'
 import { AGENTS } from '../_shared/agents/specialists.ts'
 import { RouterInput, RouteDecision, RetrievalPolicy } from '../_shared/brain-types.ts'
-import { runController, ControllerContext, ControllerDeps } from '../_shared/agents/controller.ts'
 
-const ALLOWED_ORIGINS = [
-    'https://sistema.c4marketing.com.br',
-    'https://c4marketing.vercel.app',
-]
-
-function isAllowedOrigin(origin: string): boolean {
-    if (!origin) return false
-    if (ALLOWED_ORIGINS.includes(origin)) return true
-    // Permite qualquer porta de localhost ou rede local em desenvolvimento
-    try {
-        const url = new URL(origin)
-        const h = url.hostname
-        if (h === 'localhost' || h === '127.0.0.1') return true
-        // IPs de rede privada (LAN dev — 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-        if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true
-        if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true
-        if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true
-    } catch {
-        return false
-    }
-    return false
-}
-
-function makeCorsHeaders(req: Request): Record<string, string> {
-    const origin = req.headers.get('Origin') ?? ''
-    const requestedHeaders = req.headers.get('Access-Control-Request-Headers')
-    const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0]
-    return {
-        'Access-Control-Allow-Origin': allowedOrigin,
-        'Access-Control-Allow-Headers': requestedHeaders || 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Max-Age': '86400',
-        'Vary': 'Origin, Access-Control-Request-Headers',
-    }
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 Deno.serve(async (req) => {
-    const corsHeaders = makeCorsHeaders(req)
-
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
         const startTime = performance.now()
-        let requestBody: any
-        try {
-            requestBody = await req.json()
-        } catch (bodyError: any) {
-            const errorMessage = bodyError?.message || String(bodyError)
-            return new Response(JSON.stringify({
-                answer: 'Requisicao invalida: corpo JSON ausente ou malformado.',
-                documents: [],
-                meta: { error: 'invalid_json_body', detail: errorMessage }
-            }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
-            })
-        }
+        const requestBody = await req.json()
         const query = typeof requestBody?.query === 'string' ? requestBody.query : ''
         const session_id = typeof requestBody?.session_id === 'string' ? requestBody.session_id : null
         const forcedAgentRaw = typeof requestBody?.forced_agent === 'string'
@@ -75,9 +28,6 @@ Deno.serve(async (req) => {
 
         // Idempotency: Se recebido do frontend, evita duplicação de execução pesada em retentativa.
         const idempotencyKey = req.headers.get('x-idempotency-key') || null
-        const screenshotBase64 = typeof requestBody?.screenshot_base64 === 'string' && requestBody.screenshot_base64.length > 0
-            ? requestBody.screenshot_base64
-            : null
         const rawClientToday = typeof requestBody?.client_today === 'string' ? requestBody.client_today.trim() : null
         const clientTimezone = typeof requestBody?.client_tz === 'string' ? requestBody.client_tz.trim() : 'America/Sao_Paulo'
         const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -116,37 +66,6 @@ Deno.serve(async (req) => {
             : null
         const forcedAgentAllowedRoles: Record<string, string[]> = {
             Agent_MarketingTraffic: ['gestor'],
-        }
-
-        const getProjectRefFromSupabaseUrl = () => {
-            try {
-                const url = Deno.env.get('SUPABASE_URL') ?? ''
-                const host = new URL(url).hostname
-                return host.split('.')[0] || null
-            } catch {
-                return null
-            }
-        }
-
-        const decodeJwtPayload = (token: string): Record<string, any> | null => {
-            try {
-                const parts = token.split('.')
-                if (parts.length !== 3) return null
-                const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-                const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
-                const json = atob(padded)
-                return JSON.parse(json)
-            } catch {
-                return null
-            }
-        }
-
-        const getProjectRefFromPayload = (payload: Record<string, any> | null): string | null => {
-            if (!payload) return null
-            if (typeof payload.ref === 'string' && payload.ref) return payload.ref
-            const iss = typeof payload.iss === 'string' ? payload.iss : ''
-            const match = iss.match(/https:\/\/([a-z0-9]+)\.supabase\.co\/auth\/v1/i)
-            return match?.[1] ?? null
         }
 
         const applyProfileByEmail = async (email: string | null) => {
@@ -192,65 +111,7 @@ Deno.serve(async (req) => {
                 }
                 await applyProfileByEmail(user.email || null)
             } else {
-                // Fallback resiliente: JWT pode estar inválido para verificação, mas ainda conter claims úteis.
-                // Usado para evitar bloqueio completo do chat quando a sessão local está inconsistente.
-                // SEGURANÇA: nunca confia no role do JWT — applyProfileByEmail sempre lê do banco.
-                const payload = decodeJwtPayload(authToken)
-                const expectedRef = getProjectRefFromSupabaseUrl()
-                const tokenRef = getProjectRefFromPayload(payload)
-                const tokenSub = typeof payload?.sub === 'string' ? payload.sub : null
-                const refMatches = !expectedRef || !tokenRef || tokenRef === expectedRef
-
-                if (tokenSub && refMatches) {
-                    userId = tokenSub
-                    userRole = 'authenticated' // default seguro; será sobrescrito por applyProfileByEmail
-
-                    let fallbackEmail = typeof payload?.email === 'string' ? payload.email : null
-                    let fallbackName =
-                        payload?.user_metadata?.full_name
-                        || payload?.user_metadata?.name
-                        || (fallbackEmail ? fallbackEmail.split('@')[0] : 'Usuário')
-
-                    const { data: adminUserData, error: adminUserError } = await supabaseAdmin.auth.admin.getUserById(tokenSub)
-                    if (!adminUserError && adminUserData?.user) {
-                        const adminUser = adminUserData.user
-                        fallbackEmail = fallbackEmail || adminUser.email || null
-                        fallbackName =
-                            adminUser.user_metadata?.full_name
-                            || adminUser.user_metadata?.name
-                            || fallbackName
-                    } else if (adminUserError) {
-                        console.error('chat-brain auth.admin.getUserById fallback error:', adminUserError.message)
-                    }
-
-                    userProfile = {
-                        name: fallbackName,
-                        full_name: fallbackName,
-                        email: fallbackEmail,
-                        role: userRole,
-                    }
-                    await applyProfileByEmail(fallbackEmail)
-
-                    // Se email lookup não resolveu o role, tenta por userId (mais robusto)
-                    if (userRole === 'authenticated') {
-                        const { data: profileById } = await supabaseAdmin
-                            .from('app_users')
-                            .select('name, email, role, full_name')
-                            .eq('id', userId)
-                            .maybeSingle()
-                        if (profileById) {
-                            userProfile = profileById
-                            userRole = profileById.role || userRole
-                        }
-                    }
-                    console.warn(`chat-brain auth fallback engaged for user ${userId}`)
-                } else {
-                    console.error('chat-brain auth fallback failed (claims missing or ref mismatch)', {
-                        expectedRef,
-                        tokenRef,
-                        hasSub: !!tokenSub,
-                    })
-                }
+                console.error('chat-brain auth rejected: no user resolved from token')
             }
         }
 
@@ -772,12 +633,10 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
 
         const dbRpcNames = new Set([
             'query_all_projects', 'query_all_clients', 'query_all_proposals',
-            'query_all_contracts',
             'query_all_users', 'query_all_tasks', 'query_access_summary',
             'query_financial_summary',
             'query_task_distribution_chart',
             'query_survey_responses',
-            'query_recent_acceptances',
             'execute_create_traffic_task',
             'execute_delete_task',
             'execute_move_task',
@@ -817,6 +676,123 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             return unique
         }
 
+        type LiveStateDocRow = {
+            domain: string
+            content: string
+            updated_at: string
+            is_stale: boolean
+            document_id: string | null
+        }
+
+        const liveStateDomainPriority = [
+            'overview',
+            'comercial',
+            'crm',
+            'clientes',
+            'propostas',
+            'contratos',
+            'financeiro',
+            'projetos',
+            'tarefas',
+            'prazos',
+            'usuarios',
+            'acoes',
+        ]
+        const liveStateDomainRank = new Map(liveStateDomainPriority.map((domain, idx) => [domain, idx]))
+        const liveStateTrafficAllowed = new Set(['overview', 'clientes', 'projetos', 'tarefas', 'prazos'])
+
+        const toUniqueLiveStateDomains = (domains: string[]) => {
+            const normalized = domains
+                .map((domain) => String(domain || '').trim().toLowerCase())
+                .filter((domain) => liveStateDomainRank.has(domain))
+
+            if (!normalized.includes('overview')) normalized.unshift('overview')
+
+            const unique = Array.from(new Set(normalized))
+            unique.sort((a, b) => (liveStateDomainRank.get(a) ?? 99) - (liveStateDomainRank.get(b) ?? 99))
+            return unique
+        }
+
+        const inferLiveStateDomainsFromText = (text: string): string[] => {
+            const inferred: string[] = ['overview']
+            const normalized = normalizeText(text)
+
+            if (hasAny(normalized, ['crm', 'lead', 'leads', 'oportunidade', 'oportunidades', 'followup', 'follow up', 'follow-up', 'kanban', 'pipeline', 'funil', 'novo lead', 'contato realizado', 'reuniao agendada', 'proposta aceita', 'proposta perdida'])) inferred.push('crm', 'comercial')
+            if (hasAny(normalized, ['comercial', 'pipeline', 'vendas', 'funil'])) inferred.push('comercial')
+            if (hasAny(normalized, ['cliente', 'clientes'])) inferred.push('clientes', 'comercial')
+            if (hasAny(normalized, ['proposta', 'propostas', 'orcamento', 'orçamento'])) inferred.push('propostas', 'comercial')
+            if (hasAny(normalized, ['contrato', 'contratos', 'aceite', 'aditivo', 'vigencia', 'vigência', 'mensalidade'])) inferred.push('contratos', 'clientes', 'financeiro')
+            if (hasAny(normalized, ['mrr', 'arr', 'faturamento', 'receita', 'recorrente', 'financeir'])) inferred.push('financeiro', 'contratos')
+            if (hasAny(normalized, ['projeto', 'projetos'])) inferred.push('projetos')
+            if (hasAny(normalized, ['tarefa', 'tarefas', 'pendencia', 'pendência', 'prazo', 'deadline', 'atrasad', 'vencid'])) inferred.push('tarefas', 'prazos')
+            if (hasAny(normalized, ['usuario', 'usuário', 'usuarios', 'usuários', 'acesso', 'acessos', 'equipe', 'time'])) inferred.push('usuarios')
+            if (hasAny(normalized, ['acao', 'ação', 'acoes', 'ações', 'evento', 'eventos', 'log', 'logs', 'execucao', 'execução'])) inferred.push('acoes')
+
+            return toUniqueLiveStateDomains(inferred)
+        }
+
+        const inferLiveStateDomainsFromDbCalls = (calls: DbQueryCall[]): string[] => {
+            const inferred: string[] = ['overview']
+            for (const call of calls || []) {
+                switch (call.rpc_name) {
+                    case 'query_all_clients':
+                        inferred.push('clientes', 'contratos', 'comercial')
+                        break
+                    case 'query_all_proposals':
+                        inferred.push('propostas', 'comercial')
+                        break
+                    case 'query_financial_summary':
+                    case 'execute_adjust_financial_start_date':
+                        inferred.push('financeiro', 'contratos', 'clientes')
+                        break
+                    case 'query_all_projects':
+                    case 'query_survey_responses':
+                    case 'execute_update_project_status':
+                        inferred.push('projetos')
+                        break
+                    case 'query_all_tasks':
+                    case 'execute_create_traffic_task':
+                    case 'execute_delete_task':
+                    case 'execute_move_task':
+                    case 'execute_update_task':
+                    case 'execute_batch_move_tasks':
+                    case 'execute_batch_delete_tasks':
+                    case 'execute_schedule_task':
+                    case 'query_task_distribution_chart':
+                        inferred.push('tarefas', 'prazos', 'projetos')
+                        break
+                    case 'query_all_users':
+                    case 'query_access_summary':
+                        inferred.push('usuarios')
+                        break
+                    default:
+                        break
+                }
+            }
+            return toUniqueLiveStateDomains(inferred)
+        }
+
+        const parseDbCallsFromDecisionParams = (rawDbParams: any): DbQueryCall[] => {
+            if (!rawDbParams || typeof rawDbParams !== 'object') return []
+            const parsed: DbQueryCall[] = []
+
+            if (rawDbParams.rpc_name === '__batch__' && Array.isArray(rawDbParams.calls)) {
+                for (const rawCall of rawDbParams.calls) {
+                    if (!rawCall || typeof rawCall !== 'object') continue
+                    const { rpc_name, ...rpcParams } = rawCall
+                    if (typeof rpc_name !== 'string' || !dbRpcNames.has(rpc_name)) continue
+                    parsed.push({ rpc_name, params: rpcParams })
+                }
+                return parsed
+            }
+
+            if (typeof rawDbParams.rpc_name === 'string' && dbRpcNames.has(rawDbParams.rpc_name)) {
+                const { rpc_name, ...rpcParams } = rawDbParams
+                parsed.push({ rpc_name, params: rpcParams })
+            }
+            return parsed
+        }
+
         const inferSupplementalDbCalls = (text: string): DbQueryCall[] => {
             const calls: DbQueryCall[] = []
 
@@ -838,11 +814,6 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             const mentionsProjects = hasAny(text, ['projeto', 'projetos'])
             const mentionsClients = hasAny(text, ['cliente', 'clientes'])
             const mentionsProposals = hasAny(text, ['proposta', 'propostas', 'orcamento', 'orçamento'])
-            const mentionsContracts = hasAny(text, [
-                'contrato', 'contratos', 'proposta aceita', 'propostas aceitas',
-                'vigencia', 'vigência', 'validade do contrato', 'servicos contratados', 'serviços contratados',
-                'o que foi contratado', 'aceite de', 'contrato de', 'contrato da', 'contrato do',
-            ])
             const mentionsFinance = hasAny(text, [
                 'mrr', 'arr', 'faturamento', 'receita', 'run rate',
                 'recorrente', 'recorrencia', 'recorrência', 'ticket medio', 'ticket médio'
@@ -915,53 +886,14 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                 calls.push({ rpc_name: 'query_all_clients', params })
             }
 
-            if (mentionsContracts && !mentionsProposals) {
-                // Perguntas sobre contratos/aceites → usar RPC dedicada com dados completos
-                const wantsRecentAcceptance = hasAny(text, [
-                    'aceite hoje', 'aceite de hoje', 'aceitou hoje', 'novo contrato hoje',
-                    'contrato novo', 'aceite recente', 'ultimo aceite', 'último aceite',
-                    'aceites hoje', 'aceite desta semana', 'aceites desta semana',
-                    'quem aceitou', 'quem assinou', 'novo aceite',
-                ])
-                if (wantsRecentAcceptance) {
-                    const acceptanceParams: Record<string, any> = { p_limit: 5 }
-                    if (hasAny(text, ['hoje', 'today'])) {
-                        acceptanceParams.p_date = clientToday || runtimeToday
-                    }
-                    calls.push({ rpc_name: 'query_recent_acceptances', params: acceptanceParams })
-                } else {
-                    const contractParams: Record<string, any> = {}
-                    if (hasAny(text, ['ativo', 'ativos', 'ativa', 'ativas'])) contractParams.p_status = 'Ativo'
-                    else if (hasAny(text, ['inativo', 'inativos', 'inativa', 'inativas'])) contractParams.p_status = 'Inativo'
-                    else if (hasAny(text, ['suspenso', 'suspensos', 'suspensa', 'suspensas'])) contractParams.p_status = 'Suspenso'
-                    calls.push({ rpc_name: 'query_all_contracts', params: contractParams })
-                }
-            }
-
             if (mentionsProposals) {
-                // Detectar intenção de aceite recente/hoje — usar RPC específica com timestamp
-                const wantsRecentAcceptance = hasAny(text, [
-                    'aceite hoje', 'aceite de hoje', 'aceitou hoje', 'novo contrato hoje',
-                    'contrato novo', 'aceite recente', 'ultimo aceite', 'último aceite',
-                    'aceites hoje', 'aceite desta semana', 'aceites desta semana',
-                    'quem aceitou', 'quem assinou', 'novo aceite',
-                ])
-
-                if (wantsRecentAcceptance) {
-                    const acceptanceParams: Record<string, any> = { p_limit: 5 }
-                    if (hasAny(text, ['hoje', 'today'])) {
-                        acceptanceParams.p_date = clientToday || runtimeToday
-                    }
-                    calls.push({ rpc_name: 'query_recent_acceptances', params: acceptanceParams })
-                } else {
-                    let p_status_filter: 'all' | 'open' | 'accepted' = 'all'
-                    if (hasAny(text, ['aberta', 'aberto', 'em aberto', 'pendente', 'pendentes', 'nao aceita', 'não aceita', 'sem aceite'])) {
-                        p_status_filter = 'open'
-                    } else if (hasAny(text, ['aceita', 'aceitas', 'aprovada', 'aprovadas', 'fechada', 'fechadas', 'aceite'])) {
-                        p_status_filter = 'accepted'
-                    }
-                    calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
+                let p_status_filter: 'all' | 'open' | 'accepted' = 'all'
+                if (hasAny(text, ['aberta', 'aberto', 'em aberto', 'pendente', 'pendentes', 'nao aceita', 'não aceita', 'sem aceite'])) {
+                    p_status_filter = 'open'
+                } else if (hasAny(text, ['aceita', 'aceitas', 'aprovada', 'aprovadas', 'fechada', 'fechadas', 'aceite'])) {
+                    p_status_filter = 'accepted'
                 }
+                calls.push({ rpc_name: 'query_all_proposals', params: { p_status_filter } })
             }
 
             if (mentionsFinance) {
@@ -1235,11 +1167,11 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
                     }
                 )
                 if (!rpcFactsError && Array.isArray(rpcFacts) && rpcFacts.length > 0) {
-                    const fromRpc = rpcFacts
-                        .map((row: any) => ({
+                    const fromRpc: ExplicitFactRecord[] = rpcFacts
+                        .map((row: any): ExplicitFactRecord => ({
                             fact: String(row?.fact_text || '').replace(/\s+/g, ' ').trim(),
                             created_at: row?.created_at || null,
-                            scope: (row?.scope === 'session' ? 'session' : 'user') as 'session' | 'user',
+                            scope: row?.scope === 'session' ? 'session' : 'user',
                         }))
                         .filter((row) => row.fact.length > 0)
                     explicitFactsCache = dedupeExplicitFacts(sortExplicitFacts(fromRpc), limit)
@@ -2067,7 +1999,6 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
         const MODEL_PRICES: Record<string, { input: number, output: number }> = {
             'gpt-4o': { input: 0.0000025, output: 0.00001 },
             'gpt-4o-mini': { input: 0.00000015, output: 0.0000006 },
-            'gpt-5.4-mini-2026-03-17': { input: 0.00000075, output: 0.0000045 },
         };
 
         let totalInputTokens = 0;
@@ -2077,14 +2008,13 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
 
         const modelUsage: Record<string, { input_tokens: number, output_tokens: number, cost: number }> = {
             'gpt-4o': { input_tokens: 0, output_tokens: 0, cost: 0 },
-            'gpt-4o-mini': { input_tokens: 0, output_tokens: 0, cost: 0 },
-            'gpt-5.4-mini-2026-03-17': { input_tokens: 0, output_tokens: 0, cost: 0 },
+            'gpt-4o-mini': { input_tokens: 0, output_tokens: 0, cost: 0 }
         };
 
         const callRouterLLM = async (input: RouterInput): Promise<RouteDecision> => {
-            // Classificação por Function Calling com GPT-4o
+            // Classificação por Function Calling com GPT-4o-mini (rápido e barato)
             const completion = await openai.chat.completions.create({
-                model: 'gpt-4o',
+                model: 'gpt-4o-mini',
                 temperature: 0,
                 tools: availableTools,
                 tool_choice: "auto",
@@ -2156,7 +2086,6 @@ Quando o usuário pedir para ALTERAR STATUS de PROJETO (não tarefa), SEMPRE use
 Prefira usar p_project_name ao invés de p_project_id quando o usuário mencionar o nome do cliente/projeto.
 Se a pergunta tiver múltiplas solicitações independentes (ex: tarefas + usuários + projetos), faça uma function call para CADA solicitação.
 QUANDO O USUÁRIO FIZER SAUDAÇÕES (oi, olá, bom dia, boa tarde, tudo bem, e aí, hey, etc.) ou conversa casual sem intenção de consulta, use OBRIGATORIAMENTE a ferramenta no_action. NUNCA dispare consultas de banco para cumprimentos.
-QUANDO O USUÁRIO FIZER PERGUNTAS SOBRE CAPACIDADE/FUNCIONALIDADE DO SISTEMA (ex: "você consegue criar tarefas?", "é possível listar clientes?", "você pode ver propostas?", "consegue criar uma tarefa?", "dá pra criar tarefa?", "posso criar tarefa aqui?", "você faz X?", "tem como fazer X aqui?", "o que você consegue fazer?"), use OBRIGATORIAMENTE a ferramenta no_action. Estas são perguntas sobre o que o sistema consegue fazer, NÃO são pedidos de execução. NUNCA dispare queries de banco para perguntas de capacidade.
 Retorne apenas function calls (sem texto livre).`
                     },
                     { role: 'user', content: input.user_message }
@@ -2165,12 +2094,12 @@ Retorne apenas function calls (sem texto livre).`
 
             const rawToolCalls = completion.choices[0].message.tool_calls ?? []
 
-            // Log tokens do Router (gpt-4o) — fire and forget
-            // Preços: Input $2.50/1M, Output $10.00/1M
+            // Log tokens do Router (gpt-4o-mini) — fire and forget
+            // Preços (Fev 2026): Input $0.150/1M, Output $0.600/1M
             const routerUsage = completion.usage
             if (routerUsage) {
-                const routerPrices = MODEL_PRICES['gpt-4o'];
-                const routerCost = (routerUsage.prompt_tokens * routerPrices.input) + (routerUsage.completion_tokens * routerPrices.output);
+                const miniPrices = MODEL_PRICES['gpt-4o-mini'];
+                const routerCost = (routerUsage.prompt_tokens * miniPrices.input) + (routerUsage.completion_tokens * miniPrices.output);
 
                 // Acumular totais da sessão
                 totalInputTokens += routerUsage.prompt_tokens;
@@ -2178,27 +2107,26 @@ Retorne apenas function calls (sem texto livre).`
                 totalCostEst += routerCost;
 
                 // Breakdown por modelo
-                modelUsage['gpt-4o'].input_tokens += routerUsage.prompt_tokens;
-                modelUsage['gpt-4o'].output_tokens += routerUsage.completion_tokens;
-                modelUsage['gpt-4o'].cost += routerCost;
+                modelUsage['gpt-4o-mini'].input_tokens += routerUsage.prompt_tokens;
+                modelUsage['gpt-4o-mini'].output_tokens += routerUsage.completion_tokens;
+                modelUsage['gpt-4o-mini'].cost += routerCost;
 
-                try {
-                    const { error: routerLogError } = await supabaseAdmin.rpc('log_agent_execution', {
-                        p_session_id: session_id,
-                        p_agent_name: 'Router_GPT4o',
-                        p_action: 'route',
-                        p_status: 'success',
-                        p_cost_est: routerCost,
-                        p_tokens_input: routerUsage.prompt_tokens,
-                        p_tokens_output: routerUsage.completion_tokens,
-                        p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
-                    })
-                    if (routerLogError) {
-                        console.warn('[Router] log_agent_execution failed:', routerLogError.message)
+                void (async () => {
+                    try {
+                        await supabaseAdmin.rpc('log_agent_execution', {
+                            p_session_id: session_id,
+                            p_agent_name: 'Router_GPT4oMini',
+                            p_action: 'route',
+                            p_status: 'success',
+                            p_cost_est: routerCost,
+                            p_tokens_input: routerUsage.prompt_tokens,
+                            p_tokens_output: routerUsage.completion_tokens,
+                            p_tokens_total: (routerUsage.prompt_tokens + routerUsage.completion_tokens),
+                        })
+                    } catch {
+                        // best effort telemetry
                     }
-                } catch (routerLogError: any) {
-                    console.warn('[Router] log_agent_execution exception:', routerLogError?.message || routerLogError)
-                }
+                })()
             }
 
             if (rawToolCalls.length > 0) {
@@ -2219,7 +2147,6 @@ Retorne apenas function calls (sem texto livre).`
                 // Mapear função para agente e configuração
                 const funcToAgent: Record<string, { agent: string; artifact_kind: string }> = {
                     'query_all_proposals': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
-                    'query_all_contracts': { agent: 'Agent_Contracts', artifact_kind: 'contract' },
                     'query_all_clients': { agent: 'Agent_Client360', artifact_kind: 'client' },
                     'query_all_projects': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_financial_summary': { agent: 'Agent_Proposals', artifact_kind: 'proposal' },
@@ -2228,7 +2155,6 @@ Retorne apenas function calls (sem texto livre).`
                     'query_all_tasks': { agent: 'Agent_Projects', artifact_kind: 'project' },
                     'query_access_summary': { agent: 'Agent_BrainOps', artifact_kind: 'ops' },
                     'query_survey_responses': { agent: 'Agent_MarketingTraffic', artifact_kind: 'project' },
-                    'query_recent_acceptances': { agent: 'Agent_Contracts', artifact_kind: 'contract' },
                     'rag_search': { agent: 'Agent_Projects', artifact_kind: 'unknown' },
                     'execute_create_traffic_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
                     'execute_delete_task': { agent: 'Agent_Executor', artifact_kind: 'ops' },
@@ -2253,36 +2179,9 @@ Retorne apenas function calls (sem texto livre).`
                 let dbCalls = dedupeDbCalls(enrichDbCalls(mergeDbCalls(llmDbCalls, supplementalDbCalls)))
                 dbCalls = enforceCompositeCoverage(input.user_message, dbCalls)
 
-                // Guardrail de capability query: se o usuário está PERGUNTANDO SOBRE O QUE O SISTEMA CONSEGUE FAZER
-                // (ex: "você consegue criar uma tarefa?"), não deve disparar nenhuma query de banco.
-                // Este guardrail DEVE ser avaliado antes de qualquer heurística de intenção que use palavras do domínio.
-                const capabilityQueryPatterns = [
-                    /você\s+consegue\b/i,
-                    /você\s+pode\b/i,
-                    /você\s+faz\b/i,
-                    /é\s+possível\b/i,
-                    /dá\s+pra\b/i,
-                    /dá\s+para\b/i,
-                    /tem\s+como\b/i,
-                    /consegue\s+fazer\b/i,
-                    /consegue\s+criar\b/i,
-                    /consegue\s+listar\b/i,
-                    /consegue\s+ver\b/i,
-                    /é\s+capaz\b/i,
-                    /posso\s+criar\b/i,
-                    /posso\s+fazer\b/i,
-                    /o\s+que\s+você\s+(consegue|sabe|pode)\s+fazer\b/i,
-                ]
-                const isCapabilityQuery = capabilityQueryPatterns.some((re) => re.test(input.user_message))
-                if (isCapabilityQuery) {
-                    // Descarta todas as db_calls — capability queries não consultam banco
-                    dbCalls = []
-                }
-
                 // Guardrail de intenção: consultas de tarefas devem sempre executar query_all_tasks
                 // e priorizá-la como chamada principal para evitar GenUI de projetos indevido.
-                // ATENÇÃO: só aplica quando NÃO é uma capability query.
-                const isTaskQueryIntent = !isCapabilityQuery && hasAny(input.user_message, [
+                const isTaskQueryIntent = hasAny(input.user_message, [
                     'tarefa', 'tarefas',
                     'pendencia', 'pendência', 'pendente', 'pendentes',
                     'atrasad', 'vencid', 'fora do prazo', 'prazo estourado', 'deadline',
@@ -2753,6 +2652,10 @@ Retorne apenas function calls (sem texto livre).`
         let strategicLexicalFallbackAttempted = false
         let strategicLexicalFallbackDocsCount = 0
         let strategicLexicalFallbackError: string | null = null
+        let liveStateDocs: LiveStateDocRow[] = []
+        let liveStateContext = ''
+        let liveStateRequestedDomains: string[] = []
+        let liveStateLookupError: string | null = null
         const isTaskFocusedQueryForGenUi = hasAny(query, [
             'tarefa', 'tarefas',
             'pendencia', 'pendência', 'pendente', 'pendentes',
@@ -2876,7 +2779,7 @@ Retorne apenas function calls (sem texto livre).`
                 // Log de falha para RPCs de escrita
                 if (isExecutorAction) {
                     try {
-                        const { error: executorLogError } = await supabaseAdmin.rpc('log_agent_execution', {
+                        await supabaseAdmin.rpc('log_agent_execution', {
                             p_session_id: session_id || 'unknown',
                             p_agent_name: 'Agent_Executor',
                             p_action: rpc_name,
@@ -2889,9 +2792,6 @@ Retorne apenas function calls (sem texto livre).`
                             p_latency_ms: rpcLatencyMs,
                             p_error_message: rpcError.message,
                         })
-                        if (executorLogError) {
-                            console.warn('[Executor] log_agent_execution failed:', executorLogError.message)
-                        }
                     } catch (_e) { /* fail-safe */ }
                 }
 
@@ -2912,7 +2812,7 @@ Retorne apenas function calls (sem texto livre).`
             // mas as rotas do app usam acceptance_id. Aqui anexamos acceptance_id por empresa.
             if (rpc_name === 'query_all_projects' && Array.isArray(normalizedData) && normalizedData.length > 0) {
                 try {
-                    const companyNames = Array.from(
+                    const requestedCompanyNames = Array.from(
                         new Set(
                             normalizedData
                                 .map((row: any) => String(row?.company_name || '').trim())
@@ -2920,27 +2820,37 @@ Retorne apenas function calls (sem texto livre).`
                         )
                     )
 
-                    if (companyNames.length > 0) {
+                    if (requestedCompanyNames.length > 0) {
                         const { data: acceptanceRows, error: acceptanceError } = await supabaseAdmin
                             .from('acceptances')
-                            .select('id, company_name, timestamp')
-                            .in('company_name', companyNames)
+                            .select('id, company_name, company_alias, timestamp')
                             .order('timestamp', { ascending: false })
 
                         if (!acceptanceError && Array.isArray(acceptanceRows)) {
+                            const normalizeCompanyKey = (value: any) =>
+                                String(value || '').trim().toLowerCase()
+
                             const acceptanceByCompany = new Map<string, number>()
+                            const acceptanceTimestampByCompany = new Map<string, string | null>()
                             for (const acc of acceptanceRows as any[]) {
-                                const company = String(acc?.company_name || '').trim()
-                                if (!company || acceptanceByCompany.has(company)) continue
-                                acceptanceByCompany.set(company, Number(acc.id))
+                                const legalName = String(acc?.company_name || '').trim()
+                                const aliasName = String(acc?.company_alias || '').trim()
+                                const displayName = aliasName || legalName
+                                const keys = [displayName, legalName, aliasName]
+                                    .map(normalizeCompanyKey)
+                                    .filter((key) => key.length > 0)
+
+                                for (const key of keys) {
+                                    if (acceptanceByCompany.has(key)) continue
+                                    acceptanceByCompany.set(key, Number(acc.id))
+                                    acceptanceTimestampByCompany.set(key, acc?.timestamp ?? null)
+                                }
                             }
 
                             normalizedData = normalizedData.map((row: any) => ({
                                 ...row,
-                                acceptance_id: acceptanceByCompany.get(String(row?.company_name || '').trim()) ?? null,
-                                acceptance_timestamp:
-                                    acceptanceRows.find((acc: any) => String(acc?.company_name || '').trim() === String(row?.company_name || '').trim())?.timestamp
-                                    ?? null,
+                                acceptance_id: acceptanceByCompany.get(normalizeCompanyKey(row?.company_name)) ?? null,
+                                acceptance_timestamp: acceptanceTimestampByCompany.get(normalizeCompanyKey(row?.company_name)) ?? null,
                             }))
                         }
                     }
@@ -3070,7 +2980,7 @@ Retorne apenas function calls (sem texto livre).`
                     : baseFilters
 
                 let docs = await matchBrainDocuments({
-                    supabase: supabaseAdmin,
+                    supabase: supabaseAdmin as any,
                     queryText: query,
                     filters: primaryFilters as any,
                     options: {
@@ -3084,7 +2994,7 @@ Retorne apenas function calls (sem texto livre).`
                 if (!hasForcedPolicy && canUseNormative && docs.length === 0) {
                     console.warn('[RAG] NORMATIVE_FIRST returned empty, falling back to STRICT_DOCS_ONLY')
                     docs = await matchBrainDocuments({
-                        supabase: supabaseAdmin,
+                        supabase: supabaseAdmin as any,
                         queryText: query,
                         filters: baseFilters as any,
                         options: {
@@ -3178,7 +3088,7 @@ Retorne apenas function calls (sem texto livre).`
             try {
                 const embedder = makeOpenAIEmbedder({ apiKey: Deno.env.get('OPENAI_API_KEY')! })
                 cognitiveMemoryDocs = await matchBrainDocuments({
-                    supabase: supabaseAdmin,
+                    supabase: supabaseAdmin as any,
                     queryText: query,
                     filters: {
                         tenant_id: userId,
@@ -3232,140 +3142,82 @@ Retorne apenas function calls (sem texto livre).`
             }
         }
 
-        // =========================================================
-        // Controller Agent (ReAct loop) — ativado para queries
-        // analíticas ou de rascunho que exigem múltiplos passos.
-        // Fast path (abaixo) permanece inalterado para queries simples.
-        // =========================================================
+        const runLiveStateRetrieval = async (): Promise<string> => {
+            try {
+                const plannedCalls = effectiveDecision.tool_hint === 'db_query'
+                    ? parseDbCallsFromDecisionParams(effectiveDecision.db_query_params)
+                    : []
 
-        const isMultiEntityControllerQuery = (msg: string) => {
-            const n = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
-            const nm = n(msg)
-            return (
-                nm.includes('compare') || nm.includes('comparar') ||
-                (nm.includes('analis') && !nm.includes('quantos')) ||
-                (nm.includes('todos') && nm.includes('cliente') && nm.includes('projet')) ||
-                // Qualquer query sobre tarefas de um projeto específico → Controller (precisa de lookup em 2 passos: ID do projeto → tarefas)
-                (nm.includes('tarefa') && nm.includes('projet')) ||
-                // Queries de detalhe/recência sobre projetos ou contratos → Controller
-                // (evita fallback para RAG com dados possivelmente desatualizados)
-                (nm.includes('projet') && (
-                    nm.includes('novo') || nm.includes('ultimo') || nm.includes('recente') ||
-                    nm.includes('ativad') || nm.includes('detalh') || nm.includes('conte sobre') ||
-                    nm.includes('fale sobre') || nm.includes('me diga') || nm.includes('semana') ||
-                    nm.includes('hoje') || nm.includes('ontem')
-                )) ||
-                (nm.includes('contrat') && (
-                    nm.includes('novo') || nm.includes('ultimo') || nm.includes('recente') || nm.includes('ativad')
-                )) ||
-                // Queries de visão/tela → Controller (único path com analyze_screen disponível)
-                nm.includes('print') || nm.includes('screenshot') ||
-                (nm.includes('tela') && (nm.includes('ver') || nm.includes('vejo') || nm.includes('vendo') || nm.includes('consegue') || nm.includes('captur') || nm.includes('mostr'))) ||
-                nm.includes('o que esta na tela') || nm.includes('o que voce ve') || nm.includes('o que voce esta vendo')
-            )
-        }
+                const inferredDomains = toUniqueLiveStateDomains([
+                    ...inferLiveStateDomainsFromText(query),
+                    ...inferLiveStateDomainsFromDbCalls(plannedCalls),
+                ])
 
-        // CUA: intenção de escrita detectada pelo router (task_kind='operation')
-        const isCUAOperation = effectiveDecision.task_kind === 'operation'
+                let targetDomains = inferredDomains.slice(0, 6)
+                if (isTrafficAgentContext) {
+                    targetDomains = targetDomains.filter((domain) => liveStateTrafficAllowed.has(domain))
+                }
+                if (!targetDomains.includes('overview')) targetDomains.unshift('overview')
+                liveStateRequestedDomains = toUniqueLiveStateDomains(targetDomains).slice(0, 6)
 
-        // Política gestor-only: write operations bloqueadas para não-gestores
-        if (isCUAOperation && userRole !== 'gestor') {
-            return new Response(JSON.stringify({
-                error: 'Acesso negado: operações autônomas são exclusivas para gestores.',
-                code: 'CUA_GESTOR_ONLY',
-            }), { status: 403, headers: { 'Content-Type': 'application/json' } })
-        }
+                console.log(`[Tool] live_state_docs → domains: ${liveStateRequestedDomains.join(',') || 'overview'}`)
 
-        const useController = (
-            (effectiveDecision.task_kind === 'analysis' || effectiveDecision.task_kind === 'drafting') ||
-            isMultiEntityControllerQuery(query) ||
-            isCUAOperation
-        ) && !isExplicitMemorySaveIntent(query)
-          && !isExplicitMemoryRecallIntent
+                const { data, error } = await supabaseAdmin.rpc('get_live_state_documents', {
+                    p_domains: liveStateRequestedDomains,
+                    p_max_age_minutes: 360,
+                })
 
-        if (useController) {
-            const mode = isCUAOperation ? 'CUA_WRITE' : 'ANALYSIS'
-            console.log(`[Controller] ativando modo=${mode} task_kind=${effectiveDecision.task_kind} agent=${effectiveDecision.agent} role=${userRole}`)
+                if (error) {
+                    liveStateLookupError = error.message
+                    console.error('[LiveState] get_live_state_documents error:', error.message)
+                    return ''
+                }
 
-            const controllerContext: ControllerContext = {
-                userId,
-                sessionId: session_id ?? '',
-                userRole,
-                agentName: effectiveDecision.agent,
-                initialDecision: effectiveDecision,
-                screenshotBase64: screenshotBase64 ?? undefined,
+                if (!Array.isArray(data) || data.length === 0) {
+                    liveStateDocs = []
+                    return 'CONSULTA DOC-FIRST (LIVE STATE): nenhum documento vivo disponível para os domínios solicitados.'
+                }
+
+                const toIsoOrRaw = (value: any) => {
+                    if (!value) return 'n/a'
+                    const parsed = new Date(value)
+                    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString()
+                }
+
+                const sanitizedRows: LiveStateDocRow[] = data
+                    .map((row: any) => ({
+                        domain: String(row?.domain || '').toLowerCase().trim(),
+                        content: String(row?.content || '').trim(),
+                        updated_at: String(row?.updated_at || ''),
+                        is_stale: row?.is_stale === true,
+                        document_id: row?.document_id ? String(row.document_id) : null,
+                    }))
+                    .filter((row) => row.domain.length > 0 && row.content.length > 0)
+                    .sort((a, b) => (liveStateDomainRank.get(a.domain) ?? 99) - (liveStateDomainRank.get(b.domain) ?? 99))
+
+                liveStateDocs = sanitizedRows
+
+                const staleCount = liveStateDocs.filter((row) => row.is_stale).length
+                const docsText = liveStateDocs
+                    .map((row) => [
+                        `### LIVE STATE: ${row.domain.toUpperCase()} | atualizado_em=${toIsoOrRaw(row.updated_at)} | stale=${row.is_stale ? 'sim' : 'nao'}`,
+                        row.content,
+                    ].join('\n'))
+                    .join('\n\n')
+
+                const staleHint = staleCount > 0
+                    ? `\nATENÇÃO: ${staleCount} documento(s) vivo(s) podem estar defasados e exigem validação complementar no banco.`
+                    : ''
+
+                return `CONSULTA DOC-FIRST (LIVE STATE): domínios priorizados = ${liveStateRequestedDomains.join(', ')}.${staleHint}\n\n${docsText}`
+            } catch (liveStateError: any) {
+                liveStateLookupError = liveStateError?.message || String(liveStateError)
+                console.error('[LiveState] retrieval failed:', liveStateLookupError)
+                return ''
             }
-
-            const controllerDeps: ControllerDeps = {
-                openai,
-                supabaseAdmin,
-                executeDbRpc: async (rpcName: string, params: Record<string, any>) => {
-                    return executeDbRpc(rpcName, params)
-                },
-                runVectorRetrieval: async (_q: string) => {
-                    return runVectorRetrieval()
-                },
-            }
-
-            const controllerResult = await runController(
-                query,
-                controllerContext,
-                controllerDeps,
-                { maxIterations: 5 },
-            )
-
-            // Telemetria
-            totalLatencyMs = Math.round(performance.now() - startTime)
-            const logId = await logFinalAgentExecution({
-                agentName: effectiveDecision.agent,
-                action: 'controller_loop',
-                status: 'success',
-                answer: controllerResult.answer,
-                result: {
-                    iterations: controllerResult.iterations,
-                    observations: controllerResult.observations.length,
-                    evaluation_score: controllerResult.evaluationResult?.score ?? null,
-                    evaluation_pass: controllerResult.evaluationResult?.pass ?? null,
-                },
-                latencyMs: totalLatencyMs,
-            })
-
-            totalCostEst += controllerResult.totalCostEst
-            totalInputTokens += controllerResult.totalInputTokens
-            totalOutputTokens += controllerResult.totalOutputTokens
-            // Registrar uso do gpt-5.4-mini (controller + evaluator) no breakdown por modelo
-            modelUsage['gpt-5.4-mini-2026-03-17'].input_tokens += controllerResult.totalInputTokens
-            modelUsage['gpt-5.4-mini-2026-03-17'].output_tokens += controllerResult.totalOutputTokens
-            modelUsage['gpt-5.4-mini-2026-03-17'].cost += controllerResult.totalCostEst
-
-            return new Response(JSON.stringify({
-                answer: controllerResult.answer,
-                documents: [],
-                meta: {
-                    decision: effectiveDecision,
-                    raw_router_decision: decision,
-                    agent: effectiveDecision.agent,
-                    executed_db_rpcs: controllerResult.observations.map((o) => o.toolName),
-                    cognitive_memory_docs: 0,
-                    normative_governance_enabled: normativeGovernanceEnabled,
-                    canonical_memory_enabled: canonicalMemoryEnabled,
-                    canonical_docs_loaded: 0,
-                    memory_write_events: memoryWriteEvents,
-                    latency_ms: totalLatencyMs,
-                    cost_est: totalCostEst,
-                    log_id: logId,
-                    controller_mode: true,
-                    controller_iterations: controllerResult.iterations,
-                    controller_observations: controllerResult.observations.length,
-                    evaluation_score: controllerResult.evaluationResult?.score ?? null,
-                    evaluation_pass: controllerResult.evaluationResult?.pass ?? null,
-                    evaluation_issues: controllerResult.evaluationResult?.issues ?? [],
-                    screenshot_used: controllerResult.observations.some(o => o.toolName === 'analyze_screen' && o.success),
-                },
-            }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            })
         }
+
+        liveStateContext = await runLiveStateRetrieval()
 
         // Canonical retrieval — executado ANTES de qualquer outra busca.
         const { text: canonicalBlock, count: canonicalDocsCount } = canUseDbCountFastPath
@@ -3396,7 +3248,8 @@ Retorne apenas function calls (sem texto livre).`
             }
             if (finalCalls.length === 0) {
                 // Guardrail: sempre consultar alguma base antes de responder
-                contextText = await runVectorRetrieval()
+                const vectorContext = await runVectorRetrieval()
+                contextText = [liveStateContext, vectorContext].filter((block) => String(block || '').trim().length > 0).join('\n\n')
             } else {
                 if (effectiveDecision.agent === 'Agent_MarketingTraffic' && finalCalls.some((call) => call.rpc_name.startsWith('execute_'))) {
                     const writeBlockedAnswer = 'Este chat do Agente Especialista em Gestão de Tráfego é consultivo e estratégico. Não executo ações operacionais de escrita (criar, mover, editar ou excluir tarefas) aqui.'
@@ -3462,7 +3315,7 @@ Retorne apenas function calls (sem texto livre).`
                             }
                         } else if (call.rpc_name === 'query_all_tasks') {
                             const taskRows = normalizedRows
-                            const currentTaskRows = Array.isArray(rawDbRecordsForGenUI)
+                            const currentTaskRows: any[] = Array.isArray(rawDbRecordsForGenUI)
                                 ? rawDbRecordsForGenUI
                                 : []
                             rawDbRecordsForGenUI = [...currentTaskRows, ...taskRows]
@@ -3543,29 +3396,12 @@ Retorne apenas function calls (sem texto livre).`
                     }
                 }
 
-                contextText = sections.join('\n\n')
+                contextText = [liveStateContext, ...sections].filter((block) => String(block || '').trim().length > 0).join('\n\n')
             }
         } else {
             // === RAG (busca semântica) ===
-            // GUARDRAIL: queries sobre projetos/contratos NÃO devem usar RAG —
-            // brain_documents pode estar desatualizado. Forçar SQL direto.
-            const _nqRag = (query || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
-            // Exclui queries sobre tarefas em projetos — essas precisam do Controller (lookup em 2 passos)
-            const isProjectOrContractFastQuery = (_nqRag.includes('projet') || _nqRag.includes('contrat'))
-                && !(_nqRag.includes('tarefa') || _nqRag.includes('pendencia') || _nqRag.includes('pendente'))
-            if (isProjectOrContractFastQuery) {
-                console.log('[FastPath] RAG interceptado → query_all_projects (guardrail proj/contrato)')
-                const { section: _projSection, rawData: _projRaw } = await executeDbRpc('query_all_projects', {})
-                contextText = _projSection
-                const _projRows = Array.isArray(_projRaw) ? _projRaw : []
-                if (_projRows.length > 0) {
-                    rawDbRecordsForGenUI = _projRows
-                    rpcNameForGenUI = 'query_all_projects'
-                }
-                executedDbRpcs.push('query_all_projects')
-            } else {
-                contextText = await runVectorRetrieval()
-            }
+            const ragContext = await runVectorRetrieval()
+            contextText = [liveStateContext, ragContext].filter((block) => String(block || '').trim().length > 0).join('\n\n')
         }
 
         // Fast-path para consultas de contagem puramente estruturadas:
@@ -3770,7 +3606,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             usedDeterministicDbAnswer = true
         } else {
             const chatResponse = await openai.chat.completions.create({
-                model: 'gpt-5.4-mini-2026-03-17',
+                model: 'gpt-4o',
                 messages: messages as any,
                 temperature: 0.1
             })
@@ -3779,7 +3615,7 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
             totalLatencyMs = Math.round(endTime - startTime)
             const usage = chatResponse.usage
             if (usage) {
-                const mainModel = 'gpt-5.4-mini-2026-03-17'; // Modelo principal dos agentes
+                const mainModel = 'gpt-4o'; // Modelo principal dos agentes
                 const chatCost = (usage.prompt_tokens * (MODEL_PRICES[mainModel]?.input || 0)) +
                     (usage.completion_tokens * (MODEL_PRICES[mainModel]?.output || 0));
 
@@ -3787,9 +3623,9 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 totalOutputTokens += usage.completion_tokens;
                 totalCostEst += chatCost;
 
-                modelUsage['gpt-5.4-mini-2026-03-17'].input_tokens += usage.prompt_tokens;
-                modelUsage['gpt-5.4-mini-2026-03-17'].output_tokens += usage.completion_tokens;
-                modelUsage['gpt-5.4-mini-2026-03-17'].cost += chatCost;
+                modelUsage['gpt-4o'].input_tokens += usage.prompt_tokens;
+                modelUsage['gpt-4o'].output_tokens += usage.completion_tokens;
+                modelUsage['gpt-4o'].cost += chatCost;
             }
 
             answer = chatResponse.choices[0].message.content || ''
@@ -4157,6 +3993,11 @@ O histórico abaixo é o contexto imediato da nossa conversa atual.
                 normative_governance_enabled: normativeGovernanceEnabled,
                 canonical_memory_enabled: canonicalMemoryEnabled,
                 canonical_docs_loaded: canonicalDocsCount,
+                live_state_domains_requested: liveStateRequestedDomains,
+                live_state_docs_loaded: liveStateDocs.length,
+                live_state_docs_stale: liveStateDocs.filter((d) => d.is_stale).length,
+                live_state_doc_ids: liveStateDocs.map((d) => d.document_id).filter((id): id is string => !!id),
+                ...(liveStateLookupError ? { live_state_lookup_error: liveStateLookupError } : {}),
                 financial_start_adjustment_intent: isFinancialStartAdjustmentIntent,
                 financial_adjustment_billing_start_date: financialAdjustmentBillingStartDate,
                 financial_adjustment_origin_reference_date: financialAdjustmentOriginReferenceDate,

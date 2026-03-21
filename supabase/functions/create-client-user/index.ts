@@ -5,47 +5,6 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const buildJsonResponse = (payload: Record<string, unknown>, status = 200) =>
-    new Response(JSON.stringify(payload), {
-        status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
-const isAlreadyRegisteredMessage = (value?: string | null) =>
-    Boolean(
-        value && [
-            /already\s+been\s+registered/i,
-            /already\s+registered/i,
-            /already\s+exists/i,
-            /user\s+already\s+exists/i,
-        ].some((pattern) => pattern.test(value))
-    )
-
-const findAuthUserByEmail = async (supabaseAdmin: ReturnType<typeof createClient>, email: string) => {
-    const normalizedEmail = email.toLowerCase()
-
-    for (let page = 1; page <= 10; page += 1) {
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 })
-
-        if (error) {
-            console.error('Error listing auth users:', error)
-            return null
-        }
-
-        const users = data?.users ?? []
-        const existingAuthUser = users.find((user) => user.email?.toLowerCase() === normalizedEmail)
-        if (existingAuthUser) {
-            return existingAuthUser
-        }
-
-        if (users.length < 200) {
-            break
-        }
-    }
-
-    return null
-}
-
 Deno.serve(async (req) => {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
@@ -116,10 +75,13 @@ Deno.serve(async (req) => {
         if (existingUser) {
             // User already exists - just ensure role is 'cliente'
             if (existingUser.role !== 'cliente') {
-                return buildJsonResponse({
-                    status: 'existing',
-                    message: 'User already exists with a different role. No changes made.',
-                })
+                return new Response(
+                    JSON.stringify({
+                        status: 'existing',
+                        message: 'User already exists with a different role. No changes made.',
+                    }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
             }
             // Send password reset email (acts as welcome/invite email) - even if existing, maybe they forgot password?
             // Optional: Uncomment to resend invite for existing users
@@ -129,10 +91,13 @@ Deno.serve(async (req) => {
                 redirectTo: finalRedirectUrl,
             })
 
-            return buildJsonResponse({
-                status: 'existing',
-                message: 'Client user already exists. Project check complete. Welcome email resent.',
-            })
+            return new Response(
+                JSON.stringify({
+                    status: 'existing',
+                    message: 'Client user already exists. Project check complete. Welcome email resent.',
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
         // 2. Create user in Supabase Auth (with random password — they'll set it via reset email)
@@ -145,40 +110,36 @@ Deno.serve(async (req) => {
 
         if (authError) {
             // If user already exists in Auth but not in app_users, handle gracefully
-            if (isAlreadyRegisteredMessage(authError.message)) {
-                const existingAuthUser = await findAuthUserByEmail(supabaseAdmin, email)
+            if (authError.message?.includes('already been registered')) {
+                // Get the existing auth user
+                const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+                const existingAuthUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
 
                 if (existingAuthUser) {
-                    const { error: upsertProfileError } = await supabaseAdmin
-                        .from('app_users')
-                        .upsert({
-                            id: existingAuthUser.id,
-                            email: email.toLowerCase(),
-                            name: name || email.split('@')[0],
-                            role: 'cliente',
-                        })
+                    // Insert into app_users with the auth user's ID
+                    await supabaseAdmin.from('app_users').insert({
+                        id: existingAuthUser.id,
+                        email: email.toLowerCase(),
+                        name: name || email.split('@')[0],
+                        role: 'cliente',
+                    })
 
-                    if (upsertProfileError) {
-                        console.error('Error upserting app_user for existing auth user:', upsertProfileError)
-                    }
+                    // Send password reset (welcome email)
+                    const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
+                    const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
+
+                    await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
+                        redirectTo: finalRedirectUrl,
+                    })
+
+                    return new Response(
+                        JSON.stringify({
+                            status: 'created',
+                            message: 'Client profile created. Welcome email sent.',
+                        }),
+                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    )
                 }
-
-                const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
-                const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
-                const { error: resetExistingUserError } = await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
-                    redirectTo: finalRedirectUrl,
-                })
-
-                if (resetExistingUserError) {
-                    console.error('Error sending reset email for existing auth user:', resetExistingUserError)
-                }
-
-                return buildJsonResponse({
-                    status: 'existing',
-                    message: existingAuthUser
-                        ? 'Client user already exists. Existing profile verified and access email sent.'
-                        : 'Client user already exists in authentication. Access email sent.',
-                })
             }
             throw authError
         }
@@ -212,19 +173,22 @@ Deno.serve(async (req) => {
             console.error('Error sending reset email:', resetError)
         }
 
-        return buildJsonResponse({
-            status: 'created',
-            message: 'Client user created/verified. Project check complete. Welcome email sent.',
-        })
+        return new Response(
+            JSON.stringify({
+                status: 'created',
+                message: 'Client user created/verified. Project check complete. Welcome email sent.',
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
 
     } catch (error) {
         console.error('Error in create-client-user:', error)
-        if (isAlreadyRegisteredMessage(error.message)) {
-            return buildJsonResponse({
-                status: 'existing',
-                message: 'Client user already exists in the system.',
-            })
-        }
-        return buildJsonResponse({ error: error.message }, 400)
+        return new Response(
+            JSON.stringify({ error: error.message }),
+            {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+        )
     }
 })

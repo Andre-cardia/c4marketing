@@ -21,7 +21,6 @@ export default defineConfig(({ mode }) => {
     envDir: projectRoot,
     server: {
       port: 3000,
-      strictPort: true,
       host: '0.0.0.0',
       proxy: {
         '/api/openai': {

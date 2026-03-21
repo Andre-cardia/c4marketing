@@ -3,22 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Header from '../components/Header';
 import { ArrowLeft, Check, DollarSign, Calendar, Target } from 'lucide-react';
-import {
-    DEFAULT_ONE_TIME_PAYMENT_TERMS,
-    isOneTimeProposalService,
-    normalizeOneTimePaymentTerms,
-} from '../lib/proposalPaymentTerms';
-import {
-    WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER,
-    WEBSITE_MAX_LAYOUT_REVISIONS,
-} from '../lib/contractTerms';
 
 type ProposalService = {
     id: string;
     price: number;
     details?: string;
-    deliveryTimeline?: string;
-    paymentTerms?: string;
     recurringPrice?: number;
     setupPrice?: number;
 };
@@ -74,28 +63,9 @@ const CreateProposal: React.FC = () => {
 
     const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    const createSelectedService = (serviceId: string): ProposalService => ({
-        id: serviceId,
-        price: 0,
-        recurringPrice: isHybridService(serviceId) ? 0 : undefined,
-        setupPrice: isHybridService(serviceId) ? 0 : undefined,
-        details: '',
-        deliveryTimeline: serviceId === 'website' ? '' : undefined,
-        paymentTerms: isOneTimeProposalService(serviceId) ? DEFAULT_ONE_TIME_PAYMENT_TERMS : undefined,
-    });
-
     const handleCreateProposal = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-
-        const normalizedServices = newProposal.services.map((service) => (
-            isOneTimeProposalService(service.id)
-                ? {
-                    ...service,
-                    paymentTerms: normalizeOneTimePaymentTerms(service.paymentTerms),
-                }
-                : service
-        ));
 
         const slug = newProposal.companyName
             .toLowerCase()
@@ -114,7 +84,7 @@ const CreateProposal: React.FC = () => {
                 setup_fee: oneTimeTotal,
                 media_limit: newProposal.mediaLimit,
                 contract_duration: newProposal.contractDuration,
-                services: normalizedServices,
+                services: newProposal.services,
                 slug: fullSlug
             }]);
 
@@ -203,15 +173,21 @@ const CreateProposal: React.FC = () => {
                                                         checked={isSelected}
                                                         onChange={e => {
                                                             const currentServices = newProposal.services;
-                                                             if (e.target.checked) {
-                                                                 setNewProposal({
-                                                                     ...newProposal,
-                                                                     services: [
-                                                                         ...currentServices,
-                                                                        createSelectedService(service.id)
-                                                                     ]
-                                                                 });
-                                                             } else {
+                                                            if (e.target.checked) {
+                                                                setNewProposal({
+                                                                    ...newProposal,
+                                                                    services: [
+                                                                        ...currentServices,
+                                                                        {
+                                                                            id: service.id,
+                                                                            price: 0,
+                                                                            recurringPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                            setupPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                            details: ''
+                                                                        }
+                                                                    ]
+                                                                });
+                                                            } else {
                                                                 setNewProposal({ ...newProposal, services: currentServices.filter(s => s.id !== service.id) });
                                                             }
                                                         }}
@@ -219,15 +195,21 @@ const CreateProposal: React.FC = () => {
                                                     />
                                                     <div className="flex-1 cursor-pointer" onClick={() => {
                                                         const currentServices = newProposal.services;
-                                                         if (!isSelected) {
-                                                             setNewProposal({
-                                                                 ...newProposal,
-                                                                 services: [
-                                                                     ...currentServices,
-                                                                    createSelectedService(service.id)
-                                                                 ]
-                                                             });
-                                                         }
+                                                        if (!isSelected) {
+                                                            setNewProposal({
+                                                                ...newProposal,
+                                                                services: [
+                                                                    ...currentServices,
+                                                                    {
+                                                                        id: service.id,
+                                                                        price: 0,
+                                                                        recurringPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                        setupPrice: isHybridService(service.id) ? 0 : undefined,
+                                                                        details: ''
+                                                                    }
+                                                                ]
+                                                            });
+                                                        }
                                                     }}>
                                                         <span className="font-bold text-slate-900 block">{service.label}</span>
                                                         <span className="text-xs text-slate-500 uppercase tracking-wider">
@@ -300,9 +282,9 @@ const CreateProposal: React.FC = () => {
 
                                                 {isSelected && (
                                                     <div className="mt-4 pl-10 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                         <div>
-                                                              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Detalhamento do Serviço (Opcional)</label>
-                                                              <textarea
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Detalhamento do Serviço (Opcional)</label>
+                                                            <textarea
                                                                 placeholder="Descreva aqui os detalhes específicos deste serviço para o contrato..."
                                                                 value={serviceData?.details || ''}
                                                                 onChange={e => {
@@ -313,54 +295,11 @@ const CreateProposal: React.FC = () => {
                                                                     }));
                                                                 }}
                                                                 className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none text-slate-900 bg-white"
-                                                                 rows={2}
-                                                              />
-                                                          </div>
-                                                        {service.id === 'website' && (
-                                                            <div>
-                                                                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                                                                    Prazo Estimado do Website (Opcional)
-                                                                </label>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder={WEBSITE_DELIVERY_TIMELINE_PLACEHOLDER}
-                                                                    value={serviceData?.deliveryTimeline || ''}
-                                                                    onChange={e => {
-                                                                        const deliveryTimeline = e.target.value;
-                                                                        setNewProposal(prev => ({
-                                                                            ...prev,
-                                                                            services: prev.services.map(s => s.id === service.id ? { ...s, deliveryTimeline } : s)
-                                                                        }));
-                                                                    }}
-                                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm text-slate-900 bg-white"
-                                                                />
-                                                                <p className="text-[10px] text-slate-400 mt-2">
-                                                                    Esse prazo aparece na cláusula do website. O contrato também incluirá até {WEBSITE_MAX_LAYOUT_REVISIONS} rodadas de ajustes e revisões no layout.
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                        {isOneTimeProposalService(service.id) && (
-                                                            <div>
-                                                                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                                                                    Condições de Pagamento
-                                                                </label>
-                                                                <textarea
-                                                                    placeholder={DEFAULT_ONE_TIME_PAYMENT_TERMS}
-                                                                    value={serviceData?.paymentTerms || ''}
-                                                                    onChange={e => {
-                                                                        const paymentTerms = e.target.value;
-                                                                        setNewProposal(prev => ({
-                                                                            ...prev,
-                                                                            services: prev.services.map(s => s.id === service.id ? { ...s, paymentTerms } : s)
-                                                                        }));
-                                                                    }}
-                                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none text-slate-900 bg-white"
-                                                                    rows={2}
-                                                                />
-                                                            </div>
-                                                        )}
-                                                     </div>
-                                                 )}
+                                                                rows={2}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}

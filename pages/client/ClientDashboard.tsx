@@ -143,7 +143,7 @@ const ClientDashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-neutral-50 dark:bg-black flex items-center justify-center text-neutral-500 animate-pulse transition-colors duration-300">
+            <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center text-neutral-500 animate-pulse transition-colors duration-300">
                 Carregando escritório virtual...
             </div>
         );
@@ -151,7 +151,7 @@ const ClientDashboard: React.FC = () => {
 
     if (allProjects.length === 0) {
         return (
-            <div className="min-h-screen bg-neutral-50 dark:bg-black flex flex-col items-center justify-center text-neutral-900 dark:text-white p-6 transition-colors duration-300">
+            <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col items-center justify-center text-neutral-900 dark:text-white p-6 transition-colors duration-300">
                 <div className="w-20 h-20 bg-white dark:bg-neutral-900 rounded-full flex items-center justify-center mb-6 shadow-2xl border border-neutral-200 dark:border-neutral-800">
                     <AlertCircle className="w-10 h-10 text-brand-coral" />
                 </div>
@@ -179,7 +179,7 @@ const ClientDashboard: React.FC = () => {
     const navActive = 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20';
 
     return (
-        <div className="min-h-screen bg-neutral-50 dark:bg-black text-neutral-900 dark:text-white font-sans flex relative overflow-hidden transition-colors duration-300">
+        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-white font-sans flex relative overflow-hidden transition-colors duration-300">
 
             {/* Preview Banner */}
             {isPreviewMode && (
@@ -285,10 +285,10 @@ const ClientDashboard: React.FC = () => {
             </aside>
 
             {/* Main Content Area */}
-            <main className={`flex-1 overflow-y-auto bg-neutral-50 dark:bg-black relative w-full ${isPreviewMode ? 'pt-10 md:pt-0' : ''} transition-colors duration-300`}>
+            <main className={`flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-950 relative w-full ${isPreviewMode ? 'pt-10 md:pt-0' : ''} transition-colors duration-300`}>
 
                 {/* Mobile Header */}
-                <div className="md:hidden sticky top-0 z-30 bg-neutral-50/90 dark:bg-black/90 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-6 py-4 flex items-center justify-between">
+                <div className="md:hidden sticky top-0 z-30 bg-neutral-50/90 dark:bg-neutral-950/90 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800 px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={toggleSidebar}

@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Building, User, Calendar, DollarSign, Clock, UserCog } from 'lucide-react';
+import { X, Check, Building, User, Calendar, DollarSign, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface CreateProjectModalProps {
     isOpen: boolean;
     onClose: () => void;
     onProjectCreated: () => void;
-    projectToEdit?: any;
-    userRole?: string | null;
-}
-
-interface AppUser {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
+    projectToEdit?: any; // Using any for simplicity to avoid import cycles, or define proper type
 }
 
 const SERVICES_OPTIONS = [
@@ -27,10 +19,8 @@ const SERVICES_OPTIONS = [
     { id: 'ai_agents', label: 'Agentes de IA' },
 ];
 
-
-const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onProjectCreated, projectToEdit, userRole }) => {
+const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose, onProjectCreated, projectToEdit }) => {
     const [loading, setLoading] = useState(false);
-    const [appUsers, setAppUsers] = useState<AppUser[]>([]);
     const [formData, setFormData] = useState({
         companyName: '',
         responsibleName: '',
@@ -38,10 +28,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
         contractValue: '',
         contractDuration: '',
         services: [] as string[],
-        responsibleUserEmail: '',
     });
-
-    const isGestor = userRole === 'gestor' || userRole === 'admin';
 
     useEffect(() => {
         if (isOpen && projectToEdit) {
@@ -55,15 +42,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                 startDate: projectToEdit.created_at ? new Date(projectToEdit.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 contractValue: '',
                 contractDuration: '',
-                services: services,
-                responsibleUserEmail: projectToEdit.responsible_user_email || '',
+                services: services
             });
-
-            // Load app_users for gestor to pick responsible
-            if (isGestor) {
-                loadAppUsers();
-            }
         } else if (isOpen && !projectToEdit) {
+            // Reset for create mode
             setFormData({
                 companyName: '',
                 responsibleName: '',
@@ -71,23 +53,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                 contractValue: '',
                 contractDuration: '',
                 services: [],
-                responsibleUserEmail: '',
             });
         }
     }, [isOpen, projectToEdit]);
-
-    const loadAppUsers = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('app_users')
-                .select('id, name, email, role')
-                .in('role', ['gestor', 'operacional', 'comercial'])
-                .order('name');
-            if (!error && data) setAppUsers(data as AppUser[]);
-        } catch {
-            // If RLS blocks direct access, users list stays empty (field still works via email input)
-        }
-    };
 
     const handleServiceToggle = (serviceId: string) => {
         setFormData(prev => {
@@ -107,9 +75,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             const servicesData = formData.services.map(id => ({ id }));
 
             if (projectToEdit) {
-                // UPDATE existing project
+                // UPDATE existing project - ONLY NAME
                 const newSlug = formData.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+                // Fetch current snapshot to preserve structure
                 const { data: currentData, error: fetchError } = await supabase
                     .from('acceptances')
                     .select('contract_snapshot')
@@ -118,16 +87,22 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
 
                 if (fetchError) throw fetchError;
 
+                // Update slug in snapshot if it exists
                 const updatedSnapshot = currentData.contract_snapshot ? {
                     ...currentData.contract_snapshot,
                     proposal: {
                         ...(currentData.contract_snapshot.proposal || {}),
                         slug: newSlug
                     }
-                } : null;
+                } : null; // If no snapshot, we don't force one
 
-                const updatePayload: any = { company_name: formData.companyName };
-                if (updatedSnapshot) updatePayload.contract_snapshot = updatedSnapshot;
+                const updatePayload: any = {
+                    company_name: formData.companyName,
+                };
+
+                if (updatedSnapshot) {
+                    updatePayload.contract_snapshot = updatedSnapshot;
+                }
 
                 const { error } = await supabase
                     .from('acceptances')
@@ -135,22 +110,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                     .eq('id', projectToEdit.id);
 
                 if (error) throw error;
-
-                // Gestor: update internal responsible (single RPC handles all service types)
-                if (isGestor && formData.responsibleUserEmail &&
-                    formData.responsibleUserEmail !== (projectToEdit.responsible_user_email ?? '')) {
-
-                    const { data: rpcResult, error: rpcError } = await supabase.rpc(
-                        'execute_update_responsible_by_acceptance',
-                        {
-                            p_acceptance_id:     projectToEdit.id,
-                            p_responsible_email: formData.responsibleUserEmail,
-                        }
-                    );
-
-                    if (rpcError) throw rpcError;
-                    if (rpcResult?.status === 'error') throw new Error(rpcResult.message);
-                }
 
             } else {
                 // CREATE new project
@@ -161,9 +120,10 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                         name: formData.responsibleName,
                         timestamp: new Date(formData.startDate).toISOString(),
                         status: 'Ativo',
-                        email: 'nao_informado@exemplo.com',
-                        cpf: '000.000.000-00',
-                        cnpj: '00.000.000/0000-00',
+                        // Required fields by schema, but not asked in form
+                        email: 'nao_informado@exemplo.com', // Placeholder to satisfy NOT NULL
+                        cpf: '000.000.000-00', // Placeholder to satisfy NOT NULL
+                        cnpj: '00.000.000/0000-00', // Placeholder (if required)
                         contract_snapshot: {
                             proposal: {
                                 services: servicesData,
@@ -179,6 +139,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
 
             onProjectCreated();
             onClose();
+            // Reset form
             if (!projectToEdit) {
                 setFormData({
                     companyName: '',
@@ -187,7 +148,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                     contractValue: '',
                     contractDuration: '',
                     services: [],
-                    responsibleUserEmail: '',
                 });
             }
 
@@ -208,7 +168,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                 {/* Header */}
                 <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                        {projectToEdit ? 'Editar Projeto' : 'Novo Projeto'}
+                        {projectToEdit ? 'Editar Nome do Projeto' : 'Novo Projeto'}
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500">
                         <X size={24} />
@@ -219,7 +179,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
 
                     <div className="grid md:grid-cols-2 gap-6">
                         {/* Company Name - Always Visible */}
-                        <div className={projectToEdit && !isGestor ? "md:col-span-2" : ""}>
+                        <div className={projectToEdit ? "md:col-span-2" : ""}>
                             <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Empresa</label>
                             <div className="relative">
                                 <Building className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
@@ -233,45 +193,6 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                                 />
                             </div>
                         </div>
-
-                        {/* Responsible Interno - Gestor editing */}
-                        {projectToEdit && isGestor && (
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                                    Responsável Interno (Equipe C4)
-                                </label>
-                                <div className="relative">
-                                    <UserCog className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                                    {appUsers.length > 0 ? (
-                                        <select
-                                            value={formData.responsibleUserEmail}
-                                            onChange={e => setFormData({ ...formData, responsibleUserEmail: e.target.value })}
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-brand-coral outline-none transition-all appearance-none"
-                                        >
-                                            <option value="">— Selecionar responsável —</option>
-                                            {appUsers.map(u => (
-                                                <option key={u.id} value={u.email}>
-                                                    {u.name} ({u.role})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <input
-                                            type="email"
-                                            placeholder="email@c4marketing.com.br"
-                                            value={formData.responsibleUserEmail}
-                                            onChange={e => setFormData({ ...formData, responsibleUserEmail: e.target.value })}
-                                            className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-brand-coral outline-none transition-all"
-                                        />
-                                    )}
-                                </div>
-                                {projectToEdit.responsible_user_name && (
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        Atual: <span className="font-medium text-slate-600 dark:text-slate-300">{projectToEdit.responsible_user_name}</span>
-                                    </p>
-                                )}
-                            </div>
-                        )}
 
                         {/* Other fields ONLY visible when CREATING */}
                         {!projectToEdit && (
@@ -388,7 +309,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                             disabled={loading}
                             className="bg-brand-coral hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-brand-coral/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Salvando...' : (projectToEdit ? 'Salvar Alterações' : 'Criar Projeto')}
+                            {loading ? 'Salvando...' : (projectToEdit ? 'Salvar Nome' : 'Criar Projeto')}
                         </button>
                     </div>
 

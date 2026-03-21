@@ -25,20 +25,7 @@
       "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); deps={**p.get\\(''dependencies'',{}\\),**p.get\\(''devDependencies'',{}\\)}; print\\(''react-markdown'' in deps, deps.get\\(''react-markdown'',''NÃO ESTÁ''\\)\\)\")",
       "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); [print\\(k,'':'',v\\) for k,v in {**p.get\\(''dependencies'',{}\\),**p.get\\(''devDependencies'',{}\\)}.items\\(\\)]\")",
       "Bash(timeout 15 node_modules/.bin/vite)",
-      "Bash(ls /Users/andrecardia/Documents/GitHub/c4marketing/.env*)",
-      "Bash(git checkout -- supabase/functions/_shared/brain-types.ts)",
-      "Bash(git add supabase/functions/chat-brain/index.ts vite.config.ts)",
-      "Bash(git commit:*)",
-      "Bash(npx supabase functions deploy chat-brain --project-ref xffdrdoaysxfkpebhywl --no-verify-jwt)",
-      "Bash(curl -si \"https://xffdrdoaysxfkpebhywl.supabase.co/functions/v1/chat-brain\" -X POST -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -d '{\"\"query\"\":\"\"teste\"\",\"\"session_id\"\":null}')",
-      "Bash(curl -s \"https://xffdrdoaysxfkpebhywl.supabase.co/functions/v1/chat-brain\" -X POST -H \"Content-Type: application/json\" -H \"Origin: http://localhost:3000\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -d '{\"\"query\"\":\"\"teste\"\",\"\"session_id\"\":null}')",
-      "Bash(npx supabase functions logs chat-brain --project-ref xffdrdoaysxfkpebhywl)",
-      "Bash(npx supabase@2.81.2 functions logs chat-brain --project-ref xffdrdoaysxfkpebhywl)",
-      "Bash(grep -n \"query_all_tasks\" supabase/migrations/*.sql)",
-      "Bash(grep -n \"p_assignee\\\\|p_user\\\\|assignee_filter\" supabase/migrations/*.sql)",
-      "Bash(curl -s \"https://xffdrdoaysxfkpebhywl.supabase.co/rest/v1/rpc/query_all_tasks\" -X POST -H \"Content-Type: application/json\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhmZmRyZG9heXN4ZmtwZWJoeXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2OTU4MDAsImV4cCI6MjA4NTI3MTgwMH0.VqCncavJBjR32WH6sA8mS5D-Is5vxpVet4elyd6CRkE\" -d '{\"\"p_status\"\":\"\"backlog\"\"}')",
-      "Bash(npx supabase@2.81.2 db push --project-ref xffdrdoaysxfkpebhywl)",
-      "Bash(npx supabase@2.81.2 db push --linked)"
+      "Bash(ls /Users/andrecardia/Documents/GitHub/c4marketing/.env*)"
     ]
   }
 }

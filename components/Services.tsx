@@ -5,7 +5,7 @@ import { TRAFFIC_MANAGEMENT_CONFIG, AI_AGENTS_CONFIG, SERVICES_CONFIG } from '..
 import { ServiceCard } from './ServiceCard';
 
 interface ServicesProps {
-  services?: { id: string; price: number; details?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
+  services?: { id: string; price: number; details?: string }[] | string[];
 }
 
 const Services: React.FC<ServicesProps> = ({ services = ['traffic_management'] }) => {

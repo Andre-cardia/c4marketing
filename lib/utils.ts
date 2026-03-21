@@ -73,16 +73,3 @@ export const isValidCNPJ = (cnpj: string): boolean => {
     result = sum % 11 < 2 ? 0 : 11 - (sum % 11);
     return result === Number(digits.charAt(1));
 };
-
-/**
- * Returns the display name for a company.
- * Alias is optional and never overwrites the legal company name.
- */
-export const getCompanyDisplayName = (
-    companyName?: string | null,
-    companyAlias?: string | null
-): string => {
-    const alias = (companyAlias || '').trim();
-    const legalName = (companyName || '').trim();
-    return alias || legalName || 'Sem empresa';
-};

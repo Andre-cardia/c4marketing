@@ -8,10 +8,6 @@ import Pricing from '../components/Pricing';
 import ContractDetails from '../components/ContractDetails';
 import Footer from '../components/Footer';
 import { maskCPF, maskCNPJ, isValidCPF, isValidCNPJ } from '../lib/utils';
-import {
-    CURRENT_CONTRACT_BODY_VERSION,
-    formatOfficialAcceptanceTimestamp,
-} from '../lib/contractTerms';
 
 interface Proposal {
     id: number;
@@ -23,71 +19,8 @@ interface Proposal {
     media_limit: number;
     created_at: string;
     contract_duration: number;
-    status?: string;
-    services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
+    services?: { id: string; price: number }[] | string[]; // Support both new (detailed) and old (simple string[]) formats
 }
-
-interface AcceptanceSubmissionResult {
-    id: number;
-    timestamp?: string;
-}
-
-type ClientAccountStatus = 'created' | 'existing' | 'error';
-
-interface ClientUserCreationResult {
-    status?: string;
-    message?: string;
-    error?: string;
-}
-
-const EXISTING_CLIENT_ACCOUNT_PATTERNS = [
-    /already\s+been\s+registered/i,
-    /already\s+registered/i,
-    /already\s+exists/i,
-    /user\s+already\s+exists/i,
-    /conta\s+ativa/i,
-    /ja\s+possui\s+conta/i,
-];
-
-const isExistingClientAccountMessage = (value?: string | null) =>
-    Boolean(
-        value && EXISTING_CLIENT_ACCOUNT_PATTERNS.some((pattern) => pattern.test(value))
-    );
-
-const isExistingClientAccountResult = (
-    result?: ClientUserCreationResult | null,
-    responseStatusText?: string
-) => (
-    result?.status === 'existing'
-    || isExistingClientAccountMessage(result?.message)
-    || isExistingClientAccountMessage(result?.error)
-    || isExistingClientAccountMessage(responseStatusText)
-);
-
-const normalizeAcceptanceSubmissionResult = (value: unknown): AcceptanceSubmissionResult | null => {
-    const candidate = Array.isArray(value) ? value[0] : value;
-    if (typeof candidate === 'number' || typeof candidate === 'string') {
-        const id = Number(candidate);
-        return Number.isFinite(id) ? { id } : null;
-    }
-
-    if (!candidate || typeof candidate !== 'object') return null;
-
-    const rawId = (candidate as { id?: unknown }).id;
-    const rawTimestamp = (candidate as { timestamp?: unknown }).timestamp;
-    const id = typeof rawId === 'number' ? rawId : Number(rawId);
-
-    if (!Number.isFinite(id)) {
-        return null;
-    }
-
-    return {
-        id,
-        timestamp: typeof rawTimestamp === 'string' && rawTimestamp.trim().length > 0
-            ? rawTimestamp
-            : undefined,
-    };
-};
 
 const ProposalView: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -108,8 +41,8 @@ const ProposalView: React.FC = () => {
         cnpj: '',
         companyName: ''
     });
-    const [acceptanceTimestamp, setAcceptanceTimestamp] = useState<string | null>(null);
-    const [clientAccountStatus, setClientAccountStatus] = useState<ClientAccountStatus>('created');
+    const [timestamp, setTimestamp] = useState<string | null>(null);
+    const [clientCreationError, setClientCreationError] = useState(false);
 
     useEffect(() => {
         fetchProposal();
@@ -147,21 +80,14 @@ const ProposalView: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: maskedValue }));
     };
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const hasStartedForm = Object.values(formData).some((value) => value.trim().length > 0);
-    const hasValidName = formData.name.trim().length >= 3;
-    const hasValidEmail = emailRegex.test(formData.email);
-    const hasValidCPFValue = isValidCPF(formData.cpf);
-    const hasValidCNPJValue = isValidCNPJ(formData.cnpj);
-    const hasValidCompanyName = formData.companyName.trim().length >= 2;
-
     const isFormValid = () => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return (
-            hasValidName &&
-            hasValidEmail &&
-            hasValidCPFValue &&
-            hasValidCNPJValue &&
-            hasValidCompanyName
+            formData.name.trim().length >= 3 &&
+            emailRegex.test(formData.email) &&
+            isValidCPF(formData.cpf) &&
+            isValidCNPJ(formData.cnpj) &&
+            formData.companyName.trim().length >= 2
         );
     };
 
@@ -176,7 +102,6 @@ const ProposalView: React.FC = () => {
 
     const handleFinalConfirm = async () => {
         setIsSubmitting(true);
-        setClientAccountStatus('created');
         try {
 
             // 1. Fetch Contract Templates for Snapshot
@@ -197,11 +122,10 @@ const ProposalView: React.FC = () => {
             const contractSnapshot = {
                 proposal: proposal,
                 templates: templatesSnapshot,
-                body_version: CURRENT_CONTRACT_BODY_VERSION,
                 generated_at: new Date().toISOString()
             };
 
-            const { data, error } = await supabase.rpc('submit_proposal_acceptance', {
+            const { data: acceptanceId, error } = await supabase.rpc('submit_proposal_acceptance', {
                 p_name: formData.name,
                 p_email: formData.email,
                 p_cpf: formData.cpf,
@@ -212,30 +136,7 @@ const ProposalView: React.FC = () => {
             });
 
             if (error) throw error;
-
-            const acceptanceData = normalizeAcceptanceSubmissionResult(data);
-            if (!acceptanceData) {
-                throw new Error('Resposta inválida ao registrar aceite.');
-            }
-
-            let officialAcceptanceTimestamp = acceptanceData.timestamp;
-            if (!officialAcceptanceTimestamp) {
-                const { data: acceptanceRecord, error: acceptanceLookupError } = await supabase
-                    .from('acceptances')
-                    .select('id, timestamp')
-                    .eq('id', acceptanceData.id)
-                    .single();
-
-                if (acceptanceLookupError) {
-                    throw acceptanceLookupError;
-                }
-
-                officialAcceptanceTimestamp = acceptanceRecord?.timestamp;
-            }
-
-            if (!officialAcceptanceTimestamp) {
-                throw new Error('Não foi possível recuperar o timestamp oficial do aceite.');
-            }
+            const acceptanceData = { id: acceptanceId as number };
 
             // 3. Create Traffic Project immediately (Frontend attempt)
             // This ensures the dashboard works instantly without waiting for Edge Function
@@ -276,39 +177,25 @@ const ProposalView: React.FC = () => {
                     }
                 );
 
-                const result: ClientUserCreationResult = await response.json();
-
-                if (isExistingClientAccountResult(result, response.statusText)) {
-                    setClientAccountStatus('existing');
-                } else if (!response.ok) {
+                if (!response.ok) {
                     throw new Error(`Edge Function failed: ${response.statusText}`);
-                } else {
-                    console.log('Client user creation result:', result);
-                    setClientAccountStatus(result.status === 'existing' ? 'existing' : 'created');
                 }
+
+                const result = await response.json();
+                console.log('Client user creation result:', result);
             } catch (clientErr) {
                 // Don't block acceptance if client creation fails, but notify UI
                 console.error('Error creating client user (non-blocking):', clientErr);
-                setClientAccountStatus('error');
+                setClientCreationError(true);
             }
 
-            setAcceptanceTimestamp(officialAcceptanceTimestamp);
+            setTimestamp(new Date().toLocaleString('pt-BR'));
             setIsAccepted(true);
             setShowForm(false);
             setIsConfirming(false);
         } catch (err: any) {
             console.error('Error saving acceptance:', err);
-            const msg: string = err?.message || '';
-            if (msg.toLowerCase().includes('nao esta disponivel') || msg.toLowerCase().includes('status: accepted')) {
-                // Proposta já foi aceita por outra pessoa — atualiza UI
-                await fetchProposal();
-                setIsConfirming(false);
-                setShowForm(false);
-            } else if (msg.toLowerCase().includes('ja foi aceita por este email')) {
-                alert('Esta proposta já foi aceita com este e-mail. Verifique sua caixa de entrada para acessar o sistema.');
-            } else {
-                alert('Ocorreu um erro ao salvar. Tente novamente.');
-            }
+            alert('Ocorreu um erro ao salvar. Tente novamente.');
         } finally {
             setIsSubmitting(false);
         }
@@ -328,22 +215,6 @@ const ProposalView: React.FC = () => {
                 <h1 className="text-4xl font-black text-slate-900 mb-4">404</h1>
                 <p className="text-slate-500 mb-8">Proposta não encontrada ou expirada.</p>
                 <a href="/" className="text-brand-coral font-bold hover:underline">Voltar ao início</a>
-            </div>
-        );
-    }
-
-    if (proposal.status === 'accepted') {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-                <div className="bg-white rounded-3xl p-12 max-w-md w-full text-center shadow-xl">
-                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h1 className="text-2xl font-black text-slate-900 mb-3">Proposta já aceita</h1>
-                    <p className="text-slate-500">Esta proposta já foi aceita e o contrato está em andamento. Em caso de dúvidas, entre em contato com nossa equipe.</p>
-                </div>
             </div>
         );
     }
@@ -438,10 +309,7 @@ const ProposalView: React.FC = () => {
 
                             <div>
                                 <label htmlFor="cpf" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">CPF</label>
-                                <input type="text" name="cpf" value={formData.cpf} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cpf && !hasValidCPFValue ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="000.000.000-00" required />
-                                {formData.cpf && !hasValidCPFValue && (
-                                    <p className="mt-2 text-xs font-medium text-red-500">CPF invalido. Revise os digitos informados.</p>
-                                )}
+                                <input type="text" name="cpf" value={formData.cpf} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cpf && !isValidCPF(formData.cpf) ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="000.000.000-00" required />
                             </div>
 
                             <div>
@@ -451,18 +319,10 @@ const ProposalView: React.FC = () => {
 
                             <div className="md:col-span-2">
                                 <label htmlFor="cnpj" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">CNPJ</label>
-                                <input type="text" name="cnpj" value={formData.cnpj} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cnpj && !hasValidCNPJValue ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="00.000.000/0000-00" required />
-                                {formData.cnpj && !hasValidCNPJValue && (
-                                    <p className="mt-2 text-xs font-medium text-red-500">CNPJ invalido. Revise os digitos informados.</p>
-                                )}
+                                <input type="text" name="cnpj" value={formData.cnpj} onChange={handleInputChange} className={`w-full px-5 py-4 rounded-2xl border-2 bg-slate-50 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-300 ${formData.cnpj && !isValidCNPJ(formData.cnpj) ? 'border-red-200 text-red-600 focus:border-red-400' : 'border-slate-100 focus:border-brand-coral'}`} placeholder="00.000.000/0000-00" required />
                             </div>
 
                             <div className="md:col-span-2 pt-4">
-                                {hasStartedForm && !isFormValid() && (
-                                    <p className="mb-3 text-sm font-medium text-amber-700">
-                                        Revise os campos destacados para continuar com o aceite.
-                                    </p>
-                                )}
                                 <button type="submit" disabled={!isFormValid()} className={`w-full py-5 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-2 ${isFormValid() ? 'bg-brand-coral text-white hover:bg-red-500 hover:shadow-brand-coral/30 hover:-translate-y-0.5' : 'bg-slate-100 text-slate-200 cursor-not-allowed shadow-none'}`}>
                                     Revisar Dados
                                 </button>
@@ -546,17 +406,9 @@ const ProposalView: React.FC = () => {
                         </div>
                         <h2 className="text-3xl font-black mb-3 text-slate-900 leading-tight">Proposta Aceita!</h2>
                         <p className="text-slate-500 mb-4 leading-relaxed">Obrigado pela confiança. Nossa parceria começa agora.</p>
-                        {acceptanceTimestamp && (
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 text-left">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Aceite Registrado</p>
-                                <p className="text-sm font-semibold text-slate-800">
-                                    {formatOfficialAcceptanceTimestamp(acceptanceTimestamp)}
-                                </p>
-                            </div>
-                        )}
-                        <div className={`rounded-2xl p-4 mb-4 text-left ${clientAccountStatus === 'error' ? 'bg-amber-50 border border-amber-100' : 'bg-blue-50 border border-blue-100'}`}>
-                            <p className={`text-sm font-medium flex items-center gap-2 ${clientAccountStatus === 'error' ? 'text-amber-800' : 'text-blue-800'}`}>
-                                {clientAccountStatus === 'error' ? (
+                        <div className={`rounded-2xl p-4 mb-8 text-left ${clientCreationError ? 'bg-amber-50 border border-amber-100' : 'bg-blue-50 border border-blue-100'}`}>
+                            <p className={`text-sm font-medium flex items-center gap-2 ${clientCreationError ? 'text-amber-800' : 'text-blue-800'}`}>
+                                {clientCreationError ? (
                                     <>
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -565,13 +417,6 @@ const ProposalView: React.FC = () => {
                                             Proposta aceita, mas houve um erro ao criar seu usuário automaticamente. <br />
                                             <strong>Por favor, entre em contato com nosso time para receber seu acesso.</strong>
                                         </span>
-                                    </>
-                                ) : clientAccountStatus === 'existing' ? (
-                                    <>
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                        </svg>
-                                        <span>Este usuário já possui conta ativa no sistema. Você pode seguir usando o mesmo acesso normalmente.</span>
                                     </>
                                 ) : (
                                     <>
@@ -582,11 +427,6 @@ const ProposalView: React.FC = () => {
                                         <span>Enviamos um email para <strong>{formData.email}</strong> com instruções para criar sua senha e acessar a Área do Cliente.</span>
                                     </>
                                 )}
-                            </p>
-                        </div>
-                        <div className="rounded-2xl p-4 mb-8 text-left bg-slate-50 border border-slate-200">
-                            <p className="text-sm font-medium text-slate-700">
-                                O contrato foi aceito e pode ser acessado a qualquer momento clicando no botão <strong>Contrato</strong>.
                             </p>
                         </div>
                         <button onClick={() => setIsAccepted(false)} className="bg-brand-dark text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all w-full shadow-lg">Fechar</button>

@@ -1,21 +1,8 @@
 
 import React from 'react';
-import {
-  getProposalServiceLabel,
-  hasServicePaymentTerms,
-  isOneTimeProposalService,
-  normalizeOneTimePaymentTerms,
-} from '../lib/proposalPaymentTerms';
 
 interface PricingProps {
-  services?: {
-    id: string;
-    price: number;
-    details?: string;
-    paymentTerms?: string;
-    recurringPrice?: number;
-    setupPrice?: number;
-  }[] | string[];
+  services?: { id: string; price: number; recurringPrice?: number; setupPrice?: number }[] | string[];
 }
 
 const Pricing: React.FC<PricingProps> = ({
@@ -27,9 +14,7 @@ const Pricing: React.FC<PricingProps> = ({
 
   // Helper to normalize services input
   const normalizedServices = Array.isArray(services)
-    ? services.map(s => typeof s === 'string'
-      ? { id: s, price: 0, details: '', paymentTerms: undefined, recurringPrice: 0, setupPrice: 0 }
-      : s)
+    ? services.map(s => typeof s === 'string' ? { id: s, price: 0, recurringPrice: 0, setupPrice: 0 } : s)
     : [];
 
   const recurringServiceIds = ['traffic_management', 'hosting', 'ai_agents'];
@@ -52,14 +37,21 @@ const Pricing: React.FC<PricingProps> = ({
   // Calculate One-Time Total (Website, LP, etc + AI Agents setup)
   const oneTimeServices = normalizedServices.filter(s => !isRecurringService(s.id) || s.id === 'ai_agents');
   const oneTimeTotal = oneTimeServices.reduce((acc, curr) => acc + getSetupAmount(curr), 0);
-  const oneTimeServicesWithPaymentTerms = normalizedServices.filter(
-    service => isOneTimeProposalService(service.id) && hasServicePaymentTerms(service.paymentTerms)
-  );
 
   const recurringFormatted = formatCurrency(recurringTotal);
   const [currencySymbol, amount] = recurringFormatted.split(/\s(.+)/);
   const safeAmount = amount || '0,00';
   const [mainAmount, centAmount] = safeAmount.split(',');
+
+  const serviceLabels: Record<string, string> = {
+    'traffic_management': 'Gestão de Tráfego',
+    'hosting': 'Hospedagem',
+    'landing_page': 'Landing Page',
+    'website': 'Web Site',
+    'ecommerce': 'E-commerce',
+    'consulting': 'Consultoria',
+    'ai_agents': 'Agentes de IA'
+  };
 
   return (
     <section className="py-20 bg-white">
@@ -116,7 +108,7 @@ const Pricing: React.FC<PricingProps> = ({
                     recurringServices.map(service => (
                       <div key={service.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2 last:border-0 last:pb-0">
                         <span className="text-slate-600 font-medium">
-                          {service.id === 'ai_agents' ? 'Agentes de IA (Recorrência)' : getProposalServiceLabel(service.id)}
+                          {service.id === 'ai_agents' ? 'Agentes de IA (Recorrência)' : (serviceLabels[service.id] || service.id)}
                         </span>
                         <span className="font-bold text-slate-900">{formatCurrency(getRecurringAmount(service))}</span>
                       </div>
@@ -133,51 +125,26 @@ const Pricing: React.FC<PricingProps> = ({
                     <span className="font-bold text-slate-700">Investimento Único (Setup & Projetos)</span>
                     <span className="font-bold text-brand-coral text-lg">{formatCurrency(oneTimeTotal)}</span>
                   </div>
-                      <div className="space-y-1">
-                        {oneTimeServices.length > 0 ? (
-                          oneTimeServices.map(service => (
-                            <div key={service.id} className="flex justify-between items-center text-xs">
-                              <span className="text-slate-500">
-                                {service.id === 'ai_agents' ? 'Agentes de IA (Setup)' : getProposalServiceLabel(service.id)}
-                              </span>
-                              <span className="font-semibold text-slate-700">{formatCurrency(getSetupAmount(service))}</span>
-                            </div>
-                          ))
-                    ) : (
-                          <p className="text-xs text-slate-400">Nenhum projeto pontual selecionado.</p>
-                        )}
-                      </div>
-                      {oneTimeServicesWithPaymentTerms.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Condições dos Projetos Únicos</p>
-                          {oneTimeServicesWithPaymentTerms.map(service => (
-                            <div key={`${service.id}-payment-terms`} className="rounded-xl border border-slate-200 bg-white p-3">
-                              <div className="flex items-center justify-between gap-3 mb-1">
-                                <span className="text-xs font-bold text-slate-700">{getProposalServiceLabel(service.id)}</span>
-                                <span className="text-xs font-semibold text-slate-500">{formatCurrency(getSetupAmount(service))}</span>
-                              </div>
-                              <p className="text-xs leading-relaxed text-slate-500">
-                                {normalizeOneTimePaymentTerms(service.paymentTerms)}
-                              </p>
-                            </div>
-                          ))}
+                  <div className="space-y-1">
+                    {oneTimeServices.length > 0 ? (
+                      oneTimeServices.map(service => (
+                        <div key={service.id} className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500">
+                            {service.id === 'ai_agents' ? 'Agentes de IA (Setup)' : (serviceLabels[service.id] || service.id)}
+                          </span>
+                          <span className="font-semibold text-slate-700">{formatCurrency(getSetupAmount(service))}</span>
                         </div>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400">Nenhum projeto pontual selecionado.</p>
+                    )}
+                  </div>
+                </div>
 
                 <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pagamento</p>
                   <p className="text-slate-700 font-semibold">Boleto ou PIX</p>
-                  {oneTimeServicesWithPaymentTerms.length > 0 ? (
-                    <>
-                      <p className="text-xs text-slate-500 mt-1">Projetos únicos: conforme as condições detalhadas acima.</p>
-                      {recurringServices.length > 0 && (
-                        <p className="text-xs text-brand-coral font-bold mt-1">Recorrências: 1º pagamento em até 7 dias úteis após o aceite</p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-xs text-brand-coral font-bold mt-1">1º pagamento: 7 dias úteis após o aceite</p>
-                  )}
+                  <p className="text-xs text-brand-coral font-bold mt-1">1º pagamento: 7 dias úteis após o aceite</p>
                 </div>
               </div>
             </div>

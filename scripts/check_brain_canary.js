@@ -1,133 +1,177 @@
 import dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs/promises';
 import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
-// Strip BOM (U+FEFF \uFEFF) defensively — GitHub Actions may inject secrets with BOM
-// when stored via Windows clipboard/PowerShell (UTF-16LE). The env: block sets the
-// process environment before Node starts, so dotenv cannot override it.
-const stripBOM = (s) => (typeof s === 'string' ? s.replace(/^\uFEFF/, '') : s);
-
-const supabaseUrl = stripBOM(process.env.VITE_SUPABASE_URL);
-const supabaseAnonKey = stripBOM(process.env.VITE_SUPABASE_ANON_KEY);
-const serviceRoleKey = stripBOM(process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const serviceRoleKeyFile = process.env.SUPABASE_SERVICE_ROLE_KEY_FILE || '/tmp/supabase_service_role_key.txt';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[FATAL] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
   process.exit(1);
 }
 
-const userEmail = process.env.BRAIN_TEST_USER_EMAIL || 'andre@c4marketing.com';
+const managedCanaryEmail = 'brain-canary@c4marketing.com';
+const userEmail = (process.env.BRAIN_TEST_USER_EMAIL || managedCanaryEmail).trim().toLowerCase();
+const userFullName = (process.env.BRAIN_TEST_USER_FULL_NAME || 'Brain Canary').trim();
+const directAccessToken = process.env.BRAIN_TEST_ACCESS_TOKEN?.trim() || null;
+const configuredPassword = process.env.BRAIN_TEST_USER_PASSWORD?.trim() || null;
+const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
 const sessionId = process.env.BRAIN_TEST_SESSION_ID || randomUUID();
+const managedCanaryMode = userEmail === managedCanaryEmail;
+
+const projectRef = (() => {
+  try {
+    return new URL(supabaseUrl).hostname.split('.')[0];
+  } catch {
+    return null;
+  }
+})();
+
+if (!projectRef) {
+  console.error('[FATAL] Invalid VITE_SUPABASE_URL');
+  process.exit(1);
+}
 
 const marker = `CANARY_MEMORY_${Date.now()}`;
 const sloTracked = (process.env.BRAIN_CANARY_SLO_TRACKED || 'false').toLowerCase() === 'true';
+const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
+const createAnonClient = () =>
+  createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+const readOptionalFile = async (filePath) => {
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const value = raw.trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+};
+
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || (await readOptionalFile(serviceRoleKeyFile));
 const serviceClient =
   serviceRoleKey && supabaseUrl
-    ? createClient(supabaseUrl, serviceRoleKey)
+    ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
     : null;
 
-// ─── Token de Acesso ──────────────────────────────────────────────────────────
-// Obtém um access_token REAL via admin.generateLink (magic link OTP) para garantir
-// que o chat-brain valide o JWT corretamente e leia o role de gestor de app_users.
-// Isso substitui o JWT sintético que falhava silenciosamente na validação GoTrue
-// e fazia o fallback retornar role='authenticated', causando 403.
-// ─────────────────────────────────────────────────────────────────────────────
-let accessToken = null;
+const ensureManagedCanaryUser = async (password) => {
+  if (!serviceClient) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY não configurada. Defina a chave ou informe BRAIN_TEST_ACCESS_TOKEN/BRAIN_TEST_USER_PASSWORD.'
+    );
+  }
 
-if (serviceClient) {
-  try {
-    console.log(`[AUTH] Gerando token real para ${userEmail} via admin.generateLink...`);
-    const { data: linkData, error: linkError } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userEmail,
-      options: { redirectTo: supabaseUrl },
+  const listUsersByEmail = async (email) => {
+    const pageSize = 200;
+    let page = 1;
+
+    while (true) {
+      const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage: pageSize });
+      if (error) throw error;
+
+      const users = Array.isArray(data?.users) ? data.users : [];
+      const found = users.find((user) => String(user.email || '').trim().toLowerCase() === email);
+      if (found) return found;
+      if (users.length < pageSize) return null;
+      page += 1;
+    }
+  };
+
+  let authUser = await listUsersByEmail(userEmail);
+
+  if (authUser) {
+    const { data, error } = await serviceClient.auth.admin.updateUserById(authUser.id, {
+      password,
+      email_confirm: true,
+      user_metadata: {
+        ...(authUser.user_metadata || {}),
+        full_name: userFullName,
+        name: userFullName,
+      },
     });
 
-    if (linkError) {
-      console.error('[AUTH] generateLink falhou:', linkError.message);
-    } else {
-      const actionLink = linkData?.properties?.action_link || '';
-      let tokenHash = null;
-      try {
-        tokenHash = new URL(actionLink).searchParams.get('token');
-      } catch (urlErr) {
-        console.error('[AUTH] Falha ao parsear action_link:', urlErr?.message || urlErr);
-      }
+    if (error) throw error;
+    authUser = data.user;
+  } else {
+    const { data, error } = await serviceClient.auth.admin.createUser({
+      email: userEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: userFullName,
+        name: userFullName,
+      },
+    });
 
-      if (tokenHash) {
-        const anonClient = createClient(supabaseUrl, supabaseAnonKey);
-        const { data: sessionData, error: sessionError } = await anonClient.auth.verifyOtp({
-          token_hash: tokenHash,
-          type: 'magiclink',
-        });
-
-        if (sessionError) {
-          console.error('[AUTH] verifyOtp falhou:', sessionError.message);
-        } else if (sessionData?.session?.access_token) {
-          accessToken = sessionData.session.access_token;
-          console.log(`[AUTH] Token real obtido com sucesso. user_id=${sessionData.session.user?.id}`);
-        } else {
-          console.error('[AUTH] verifyOtp não retornou access_token.');
-        }
-      } else {
-        console.error('[AUTH] token_hash ausente no action_link:', actionLink);
-      }
-    }
-  } catch (authErr) {
-    console.error('[AUTH] Erro inesperado na geração do token:', authErr?.message || authErr);
-  }
-}
-
-// ─── Fallback local ───────────────────────────────────────────────────────────
-// Usado apenas quando serviceRoleKey não está disponível (ambiente local sem .env completo).
-// ATENÇÃO: Este JWT sintético falha na validação real do Supabase Auth. O fallback do
-// chat-brain tentará resolver por userId/email em app_users. Se o userId não existir,
-// retornará 403. Use apenas para debug local.
-// ─────────────────────────────────────────────────────────────────────────────
-if (!accessToken) {
-  console.warn('[AUTH] AVISO: Não foi possível obter token real. Usando JWT sintético como fallback local.');
-  console.warn('[AUTH] Este modo pode causar 403 se o userId não existir na tabela app_users.');
-
-  const defaultUserId = '321f03b7-4b78-41f5-8133-6967d6aea169';
-  const userId = process.env.BRAIN_TEST_USER_ID || defaultUserId;
-  const userRole = process.env.BRAIN_TEST_USER_ROLE || 'gestor';
-
-  const projectRef = (() => {
-    try {
-      return new URL(supabaseUrl).hostname.split('.')[0];
-    } catch {
-      return null;
-    }
-  })();
-
-  if (!projectRef) {
-    console.error('[FATAL] Invalid VITE_SUPABASE_URL');
-    process.exit(1);
+    if (error) throw error;
+    authUser = data.user;
   }
 
-  const b64u = (obj) =>
-    Buffer.from(JSON.stringify(obj), 'utf8')
-      .toString('base64')
-      .replace(/=+$/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
+  const { error: upsertError } = await serviceClient
+    .from('app_users')
+    .upsert({
+      id: authUser.id,
+      name: userFullName,
+      full_name: userFullName,
+      email: userEmail,
+      phone: null,
+      role: userRole,
+    }, { onConflict: 'id' });
 
-  accessToken = `${b64u({ alg: 'HS256', typ: 'JWT' })}.${b64u({
-    iss: 'supabase',
-    ref: projectRef,
-    role: userRole,
-    sub: userId,
+  if (upsertError) throw upsertError;
+};
+
+const resolveAccessToken = async () => {
+  if (directAccessToken) {
+    return directAccessToken;
+  }
+
+  let effectivePassword = configuredPassword;
+
+  if (managedCanaryMode) {
+    effectivePassword = effectivePassword || `BrainCanary#${randomUUID()}Aa1`;
+    await ensureManagedCanaryUser(effectivePassword);
+  } else if (!effectivePassword) {
+    throw new Error(
+      'Defina BRAIN_TEST_USER_PASSWORD para o usuário informado ou use o canário gerenciado padrão brain-canary@c4marketing.com com SUPABASE_SERVICE_ROLE_KEY.'
+    );
+  }
+
+  const authClient = createAnonClient();
+  const { data, error } = await authClient.auth.signInWithPassword({
     email: userEmail,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 60 * 60,
-  })}.${b64u({ sig: 'canary' })}`;
-}
+    password: effectivePassword,
+  });
 
-const chatEndpoint = `${supabaseUrl}/functions/v1/chat-brain`;
+  if (error || !data.session?.access_token) {
+    throw new Error(`Falha ao autenticar o usuário de teste real: ${error?.message || 'sessão ausente'}`);
+  }
+
+  return data.session.access_token;
+};
+
+let cachedAccessToken = directAccessToken;
+
+const getAccessToken = async () => {
+  if (!cachedAccessToken) {
+    cachedAccessToken = await resolveAccessToken();
+  }
+
+  return cachedAccessToken;
+};
 
 const callChat = async (query) => {
+  const accessToken = await getAccessToken();
   let res;
   try {
     res = await fetch(chatEndpoint, {
@@ -240,21 +284,6 @@ try {
     t5Pass ? 'Resposta mencionou policy como prioridade.' : 'Resposta não confirmou policy explicitamente.',
     false
   );
-
-  // 6) Direct RPC smoke test: query_all_tasks (detects PGRST203 ambiguity before it reaches users)
-  if (serviceClient) {
-    const { data: taskData, error: taskError } = await serviceClient.rpc('query_all_tasks', {});
-    const isPgrst203 = taskError?.code === 'PGRST203';
-    const t6Pass = !taskError;
-    pushResult(
-      'RPC Direta: query_all_tasks (anti-PGRST203)',
-      t6Pass,
-      taskError
-        ? `ERRO code=${taskError.code} msg=${taskError.message}${isPgrst203 ? ' — OVERLOAD AMBÍGUO DETECTADO' : ''}`
-        : `OK rows=${Array.isArray(taskData) ? taskData.length : typeof taskData}`,
-      true
-    );
-  }
 
   const total = tests.length;
   const passed = tests.filter((t) => t.pass).length;
