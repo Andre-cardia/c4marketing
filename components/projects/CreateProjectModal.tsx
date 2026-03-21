@@ -23,6 +23,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         companyName: '',
+        companyAlias: '',
         responsibleName: '',
         startDate: new Date().toISOString().split('T')[0],
         contractValue: '',
@@ -38,6 +39,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
 
             setFormData({
                 companyName: projectToEdit.company_name || '',
+                companyAlias: projectToEdit.company_alias || '',
                 responsibleName: projectToEdit.responsible_name || '',
                 startDate: projectToEdit.created_at ? new Date(projectToEdit.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 contractValue: '',
@@ -48,6 +50,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             // Reset for create mode
             setFormData({
                 companyName: '',
+                companyAlias: '',
                 responsibleName: '',
                 startDate: new Date().toISOString().split('T')[0],
                 contractValue: '',
@@ -75,34 +78,11 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             const servicesData = formData.services.map(id => ({ id }));
 
             if (projectToEdit) {
-                // UPDATE existing project - ONLY NAME
-                const newSlug = formData.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-                // Fetch current snapshot to preserve structure
-                const { data: currentData, error: fetchError } = await supabase
-                    .from('acceptances')
-                    .select('contract_snapshot')
-                    .eq('id', projectToEdit.id)
-                    .single();
-
-                if (fetchError) throw fetchError;
-
-                // Update slug in snapshot if it exists
-                const updatedSnapshot = currentData.contract_snapshot ? {
-                    ...currentData.contract_snapshot,
-                    proposal: {
-                        ...(currentData.contract_snapshot.proposal || {}),
-                        slug: newSlug
-                    }
-                } : null; // If no snapshot, we don't force one
-
+                // UPDATE existing project alias (display name only)
+                const sanitizedAlias = formData.companyAlias.trim();
                 const updatePayload: any = {
-                    company_name: formData.companyName,
+                    company_alias: sanitizedAlias.length > 0 ? sanitizedAlias : null,
                 };
-
-                if (updatedSnapshot) {
-                    updatePayload.contract_snapshot = updatedSnapshot;
-                }
 
                 const { error } = await supabase
                     .from('acceptances')
@@ -117,6 +97,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                     .from('acceptances')
                     .insert([{
                         company_name: formData.companyName,
+                        company_alias: formData.companyAlias.trim() || null,
                         name: formData.responsibleName,
                         timestamp: new Date(formData.startDate).toISOString(),
                         status: 'Ativo',
@@ -143,6 +124,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             if (!projectToEdit) {
                 setFormData({
                     companyName: '',
+                    companyAlias: '',
                     responsibleName: '',
                     startDate: new Date().toISOString().split('T')[0],
                     contractValue: '',
@@ -166,9 +148,9 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
             <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
 
                 {/* Header */}
-                <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+                    <div className="px-8 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                        {projectToEdit ? 'Editar Nome do Projeto' : 'Novo Projeto'}
+                        {projectToEdit ? 'Editar Alias da Empresa' : 'Novo Projeto'}
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500">
                         <X size={24} />
@@ -178,20 +160,49 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                 <form onSubmit={handleSubmit} className="p-8 space-y-6 overflow-y-auto max-h-[80vh]">
 
                     <div className="grid md:grid-cols-2 gap-6">
-                        {/* Company Name - Always Visible */}
-                        <div className={projectToEdit ? "md:col-span-2" : ""}>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Empresa</label>
+                        {/* Company Legal Name - Always Visible */}
+                        <div className={projectToEdit ? 'md:col-span-2' : ''}>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
+                                {projectToEdit ? 'Razão Social (não editável aqui)' : 'Empresa'}
+                            </label>
                             <div className="relative">
                                 <Building className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
                                 <input
                                     type="text"
-                                    required
+                                    required={!projectToEdit}
+                                    readOnly={!!projectToEdit}
                                     placeholder="Nome da empresa"
                                     value={formData.companyName}
                                     onChange={e => setFormData({ ...formData, companyName: e.target.value })}
+                                    className={`w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none transition-all ${projectToEdit ? 'opacity-80 cursor-not-allowed' : 'focus:border-brand-coral'
+                                        }`}
+                                />
+                            </div>
+                            {projectToEdit && (
+                                <p className="text-[11px] text-slate-500 mt-2">
+                                    A razão social permanece intacta. Você está alterando apenas o nome de exibição.
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Alias field: edit mode and create mode */}
+                        <div className={projectToEdit ? 'md:col-span-2' : ''}>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
+                                Alias da Empresa (apelido)
+                            </label>
+                            <div className="relative">
+                                <Building className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Ex: Dainese (Grupo), C4 Matriz..."
+                                    value={formData.companyAlias}
+                                    onChange={e => setFormData({ ...formData, companyAlias: e.target.value })}
                                     className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-brand-coral outline-none transition-all"
                                 />
                             </div>
+                            <p className="text-[11px] text-slate-500 mt-2">
+                                Se vazio, o sistema usa automaticamente a razão social.
+                            </p>
                         </div>
 
                         {/* Other fields ONLY visible when CREATING */}
@@ -309,7 +320,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
                             disabled={loading}
                             className="bg-brand-coral hover:bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-brand-coral/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {loading ? 'Salvando...' : (projectToEdit ? 'Salvar Nome' : 'Criar Projeto')}
+                            {loading ? 'Salvando...' : (projectToEdit ? 'Salvar Alias' : 'Criar Projeto')}
                         </button>
                     </div>
 

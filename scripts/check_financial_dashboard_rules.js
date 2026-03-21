@@ -78,6 +78,38 @@ function getMonthlyFee(acc) {
   return 0;
 }
 
+function getSetupFee(acc) {
+  if (acc?.proposal?.setup_fee != null) return Number(acc.proposal.setup_fee) || 0;
+  if (acc?.contract_snapshot?.proposal?.setup_fee != null) return Number(acc.contract_snapshot.proposal.setup_fee) || 0;
+  if (acc?.contract_snapshot?.proposal?.value != null) return Number(acc.contract_snapshot.proposal.value) || 0;
+  if (acc?.contract_snapshot?.setup_fee != null) return Number(acc.contract_snapshot.setup_fee) || 0;
+  if (acc?.contract_snapshot?.value != null) return Number(acc.contract_snapshot.value) || 0;
+  return 0;
+}
+
+function getNonRecurringTotal(acc) {
+  return getSetupFee(acc);
+}
+
+function isPendingFinancialReview(acc) {
+  return String(acc?.financial_review_status || 'pending').trim().toLowerCase() !== 'completed';
+}
+
+function getScheduledSetupRevenueForMonth(acc, monthStart, monthEnd) {
+  if (isPendingFinancialReview(acc)) return 0;
+
+  const installments = Array.isArray(acc?.acceptance_financial_installments)
+    ? acc.acceptance_financial_installments
+    : [];
+
+  return installments.reduce((sum, installment) => {
+    const expectedDate = parseDateLike(installment?.expected_date, true);
+    if (!expectedDate) return sum;
+    if (expectedDate < monthStart || expectedDate > monthEnd) return sum;
+    return sum + (Number(installment?.amount) || 0);
+  }, 0);
+}
+
 // Keep this aligned with lib/commercial-ai-agent.ts.
 function getFinancialStartDate(acc) {
   const billingStart = parseDateLike(acc?.billing_start_date);
@@ -197,6 +229,66 @@ const syntheticTests = [
   },
 ];
 
+const syntheticSetupRevenueTests = [
+  {
+    name: 'pending review blocks non-recurring revenue',
+    acc: {
+      financial_review_status: 'pending',
+      proposal: { setup_fee: 5000 },
+      acceptance_financial_installments: [
+        { amount: 5000, expected_date: '2026-03-15' },
+      ],
+    },
+    monthStart: new Date('2026-03-01T00:00:00'),
+    monthEnd: new Date('2026-03-31T23:59:59'),
+    expected: 0,
+  },
+  {
+    name: 'single payment recognized only in scheduled month',
+    acc: {
+      financial_review_status: 'completed',
+      financial_review_mode: 'single_payment',
+      proposal: { setup_fee: 4800 },
+      acceptance_financial_installments: [
+        { amount: 4800, expected_date: '2026-04-10' },
+      ],
+    },
+    monthStart: new Date('2026-04-01T00:00:00'),
+    monthEnd: new Date('2026-04-30T23:59:59'),
+    expected: 4800,
+  },
+  {
+    name: 'installments split revenue across months',
+    acc: {
+      financial_review_status: 'completed',
+      financial_review_mode: 'installments',
+      proposal: { setup_fee: 10000 },
+      acceptance_financial_installments: [
+        { amount: 5000, expected_date: '2026-03-05' },
+        { amount: 5000, expected_date: '2026-05-20' },
+      ],
+    },
+    monthStart: new Date('2026-03-01T00:00:00'),
+    monthEnd: new Date('2026-03-31T23:59:59'),
+    expected: 5000,
+  },
+  {
+    name: 'installments outside month are ignored',
+    acc: {
+      financial_review_status: 'completed',
+      financial_review_mode: 'installments',
+      proposal: { setup_fee: 10000 },
+      acceptance_financial_installments: [
+        { amount: 5000, expected_date: '2026-03-05' },
+        { amount: 5000, expected_date: '2026-05-20' },
+      ],
+    },
+    monthStart: new Date('2026-04-01T00:00:00'),
+    monthEnd: new Date('2026-04-30T23:59:59'),
+    expected: 0,
+  },
+];
+
 try {
   console.log('=== Financial Dashboard Rule Check ===');
   console.log(`Year: ${targetYear}`);
@@ -218,6 +310,21 @@ try {
     }
   }
 
+  let syntheticSetupPass = 0;
+  let syntheticSetupFail = 0;
+
+  for (const test of syntheticSetupRevenueTests) {
+    const actual = getScheduledSetupRevenueForMonth(test.acc, test.monthStart, test.monthEnd);
+    const ok = Math.abs(actual - test.expected) <= tolerance;
+    if (ok) {
+      syntheticSetupPass += 1;
+      console.log(`[PASS] synthetic setup: ${test.name}`);
+    } else {
+      syntheticSetupFail += 1;
+      console.log(`[FAIL] synthetic setup: ${test.name} (actual=${actual}, expected=${test.expected})`);
+    }
+  }
+
   const { data: acceptances, error } = await supabase
     .from('acceptances')
     .select(`
@@ -227,8 +334,11 @@ try {
       timestamp,
       billing_start_date,
       expiration_date,
+      financial_review_status,
+      financial_review_mode,
       contract_snapshot,
-      proposal:proposals(monthly_fee)
+      proposal:proposals(monthly_fee, setup_fee),
+      acceptance_financial_installments(amount, expected_date)
     `)
     .order('timestamp', { ascending: true });
 
@@ -239,6 +349,12 @@ try {
 
   const rows = acceptances || [];
   console.log(`Contracts loaded: ${rows.length}`);
+  const pendingFinancialReviews = rows.filter((acc) => isPendingFinancialReview(acc)).length;
+  const blockedNonRecurringRevenue = rows
+    .filter((acc) => isPendingFinancialReview(acc) && getNonRecurringTotal(acc) > 0)
+    .reduce((sum, acc) => sum + getNonRecurringTotal(acc), 0);
+  console.log(`Pending financial reviews: ${pendingFinancialReviews}`);
+  console.log(`Blocked non-recurring revenue: ${blockedNonRecurringRevenue.toFixed(2)}`);
 
   const billingCandidates = rows.filter((acc) => isActiveContract(acc) && getFinancialStartDate(acc));
   let billingPass = 0;
@@ -339,6 +455,21 @@ try {
     console.log(`  ${row.month}/${targetYear} (${row.date}) => ${row.localMrr.toFixed(2)}`);
   }
 
+  const setupMonthlyRows = [];
+  for (let month = 0; month < 12; month += 1) {
+    const monthStart = new Date(targetYear, month, 1, 0, 0, 0, 0);
+    const monthEnd = new Date(targetYear, month + 1, 0, 23, 59, 59, 999);
+    setupMonthlyRows.push({
+      month: String(month + 1).padStart(2, '0'),
+      revenue: rows.reduce((sum, acc) => sum + getScheduledSetupRevenueForMonth(acc, monthStart, monthEnd), 0),
+    });
+  }
+
+  console.log('Setup revenue by month (local logic):');
+  for (const row of setupMonthlyRows) {
+    console.log(`  ${row.month}/${targetYear} => ${row.revenue.toFixed(2)}`);
+  }
+
   let rpcFail = 0;
   if (serviceRoleKey) {
     for (const row of mrrMonthlyRows) {
@@ -374,12 +505,14 @@ try {
 
   const hardFailures =
     syntheticFail +
+    syntheticSetupFail +
     billingFail +
     expirationFail +
     rpcFail;
 
   console.log('=== Summary ===');
   console.log(`Synthetic tests: ${syntheticPass}/${syntheticTests.length}`);
+  console.log(`Synthetic setup tests: ${syntheticSetupPass}/${syntheticSetupRevenueTests.length}`);
   console.log(`Billing transition failures: ${billingFail}`);
   console.log(`Expiration transition failures: ${expirationFail}`);
   console.log(`RPC parity failures: ${rpcFail}`);

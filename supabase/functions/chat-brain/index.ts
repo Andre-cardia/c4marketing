@@ -718,6 +718,7 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             const normalized = normalizeText(text)
 
             if (hasAny(normalized, ['crm', 'lead', 'leads', 'oportunidade', 'oportunidades', 'followup', 'follow up', 'follow-up', 'kanban', 'pipeline', 'funil', 'novo lead', 'contato realizado', 'reuniao agendada', 'proposta aceita', 'proposta perdida'])) inferred.push('crm', 'comercial')
+            if (hasAny(normalized, ['crm chat', 'whatsapp', 'inbox', 'chat do cliente', 'mensagem do cliente', 'mensagens do cliente', 'conversa com o cliente', 'conversa do cliente'])) inferred.push('crm', 'comercial')
             if (hasAny(normalized, ['comercial', 'pipeline', 'vendas', 'funil'])) inferred.push('comercial')
             if (hasAny(normalized, ['cliente', 'clientes'])) inferred.push('clientes', 'comercial')
             if (hasAny(normalized, ['proposta', 'propostas', 'orcamento', 'orçamento'])) inferred.push('propostas', 'comercial')
@@ -1621,6 +1622,21 @@ Liderar no Brasil em marketing de performance com IA, ajudando clientes a multip
             && hasAny(query, ['projeto', 'projetos'])
             && !isExplicitMemoryRecallIntent
             && !isExplicitMemorySaveIntent(query)
+
+        const isCrmChatIntent =
+            !isExplicitMemoryRecallIntent
+            && hasAny(query, [
+                'crm chat',
+                'whatsapp',
+                'inbox',
+                'chat do cliente',
+                'mensagem do cliente',
+                'mensagens do cliente',
+                'conversa com o cliente',
+                'conversa do cliente',
+                'historico do whatsapp',
+                'histórico do whatsapp',
+            ])
 
         // LLM Router com Function Calling — o LLM escolhe qual RPC usar
         const availableTools = [
@@ -3400,7 +3416,22 @@ Retorne apenas function calls (sem texto livre).`
             }
         } else {
             // === RAG (busca semântica) ===
-            const ragContext = await runVectorRetrieval()
+            const ragContext = isCrmChatIntent
+                ? await runVectorRetrieval({
+                    topK: Math.max(effectiveDecision.top_k, 8),
+                    overrideFilters: {
+                        tenant_id: null,
+                        artifact_kind: null,
+                        source_table: ['crm_chat_conversations', 'crm_leads'],
+                        type_allowlist: ['official_doc', 'session_summary'],
+                        type_blocklist: ['chat_log'],
+                        status: 'active',
+                        time_window_minutes: null,
+                    },
+                    retrievalLabel: 'base vetorial do CRM Chat',
+                    forcedPolicy: 'STRICT_DOCS_ONLY',
+                })
+                : await runVectorRetrieval()
             contextText = [liveStateContext, ragContext].filter((block) => String(block || '').trim().length > 0).join('\n\n')
         }
 

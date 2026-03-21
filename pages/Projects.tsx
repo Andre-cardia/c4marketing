@@ -6,11 +6,14 @@ import { useUserRole } from '../lib/UserRoleContext';
 import KanbanBoardModal from '../components/projects/KanbanBoardModal';
 import CreateProjectModal from '../components/projects/CreateProjectModal';
 import ProjectCredentialsModal from '../components/projects/ProjectCredentialsModal';
+import { getCompanyDisplayName } from '../lib/utils';
 
 interface Project {
     id: number;
     proposal_id: number;
     company_name: string;
+    company_alias?: string | null;
+    company_display_name: string;
     responsible_name: string;
     status: string;
     services: any[];
@@ -85,6 +88,8 @@ const Projects: React.FC = () => {
                     id: acc.id,
                     proposal_id: acc.proposal_id,
                     company_name: acc.company_name,
+                    company_alias: acc.company_alias || null,
+                    company_display_name: getCompanyDisplayName(acc.company_name, acc.company_alias),
                     responsible_name: acc.name,
                     status: acc.status,
                     services: services,
@@ -112,7 +117,7 @@ const Projects: React.FC = () => {
             const project = projects.find(p => p.id == Number(kanbanProjectId));
 
             if (project) {
-                console.log('Project found, opening modal:', project.company_name);
+                console.log('Project found, opening modal:', project.company_display_name);
                 setSelectedProjectForKanban(project);
                 // Optional: Clear the param so it doesn't reopen on refresh?
                 // navigate('/projects', { replace: true });
@@ -135,6 +140,7 @@ const Projects: React.FC = () => {
         if (searchTerm) {
             const lowerTerm = searchTerm.toLowerCase();
             sorted = sorted.filter(p =>
+                p.company_display_name.toLowerCase().includes(lowerTerm) ||
                 p.company_name.toLowerCase().includes(lowerTerm) ||
                 p.responsible_name.toLowerCase().includes(lowerTerm)
             );
@@ -143,8 +149,8 @@ const Projects: React.FC = () => {
         sorted.sort((a, b) => {
             if (sortConfig.key === 'company_name') {
                 return sortConfig.direction === 'asc'
-                    ? a.company_name.localeCompare(b.company_name)
-                    : b.company_name.localeCompare(a.company_name);
+                    ? a.company_display_name.localeCompare(b.company_display_name)
+                    : b.company_display_name.localeCompare(a.company_display_name);
             } else if (sortConfig.key === 'responsible_name') {
                 return sortConfig.direction === 'asc'
                     ? a.responsible_name.localeCompare(b.responsible_name)
@@ -204,7 +210,7 @@ const Projects: React.FC = () => {
     };
 
     const handleDeleteProject = async (project: Project) => {
-        if (!window.confirm(`Tem certeza que deseja excluir o projeto "${project.company_name}"?`)) return;
+        if (!window.confirm(`Tem certeza que deseja excluir o projeto "${project.company_display_name}"?`)) return;
 
         try {
             setLoading(true);
@@ -229,6 +235,49 @@ const Projects: React.FC = () => {
         setShowCreateModal(true);
     };
 
+    const handleAliasInputChange = (projectId: number, value: string) => {
+        setProjects((prev) =>
+            prev.map((project) =>
+                project.id === projectId
+                    ? {
+                        ...project,
+                        company_alias: value,
+                        company_display_name: getCompanyDisplayName(project.company_name, value),
+                    }
+                    : project
+            )
+        );
+    };
+
+    const handleAliasBlur = async (projectId: number, companyName: string, aliasValue: string) => {
+        const sanitizedAlias = (aliasValue || '').trim();
+        const aliasToSave = sanitizedAlias.length > 0 ? sanitizedAlias : null;
+
+        const { error } = await supabase
+            .from('acceptances')
+            .update({ company_alias: aliasToSave })
+            .eq('id', projectId);
+
+        if (error) {
+            console.error('Error updating company alias:', error);
+            alert('Erro ao atualizar alias da empresa.');
+            fetchProjects();
+            return;
+        }
+
+        setProjects((prev) =>
+            prev.map((item) =>
+                item.id === projectId
+                    ? {
+                        ...item,
+                        company_alias: aliasToSave,
+                        company_display_name: getCompanyDisplayName(companyName, aliasToSave),
+                    }
+                    : item
+            )
+        );
+    };
+
     return (
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
@@ -241,7 +290,7 @@ const Projects: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Buscar projeto..."
+                            placeholder="Buscar projeto, alias ou responsável..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm focus:border-brand-coral outline-none transition-all w-64 text-slate-600 dark:text-slate-300 placeholder:text-slate-400"
@@ -311,7 +360,20 @@ const Projects: React.FC = () => {
                                                 className="font-bold text-slate-800 dark:text-white cursor-pointer hover:text-brand-coral transition-colors"
                                                 onClick={() => setSelectedProjectForKanban(project)}
                                             >
-                                                {project.company_name}
+                                                {project.company_display_name}
+                                            </div>
+                                            <div className="mt-2">
+                                                <label className="block text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                                                    Apelido (alias)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={project.company_alias || ''}
+                                                    onChange={(e) => handleAliasInputChange(project.id, e.target.value)}
+                                                    onBlur={(e) => handleAliasBlur(project.id, project.company_name, e.target.value)}
+                                                    placeholder="Digite um apelido para exibição"
+                                                    className="w-full max-w-sm px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-neutral-900 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:border-brand-coral outline-none transition-colors"
+                                                />
                                             </div>
                                             <div className="md:hidden text-xs text-slate-400">{project.responsible_name}</div>
                                         </td>
@@ -362,7 +424,7 @@ const Projects: React.FC = () => {
                                                 <button
                                                     onClick={() => handleEditProject(project)}
                                                     className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
-                                                    title="Editar Projeto"
+                                                    title="Editar Alias no Modal"
                                                 >
                                                     <Edit size={16} />
                                                 </button>
@@ -416,7 +478,7 @@ const Projects: React.FC = () => {
                     isOpen={!!credentialProject}
                     onClose={() => setCredentialProject(null)}
                     projectId={credentialProject.id}
-                    companyName={credentialProject.company_name}
+                    companyName={credentialProject.company_display_name}
                 />
             )}
         </div>

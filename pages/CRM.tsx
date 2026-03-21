@@ -230,10 +230,10 @@ const CRM: React.FC = () => {
         }
     };
 
-    if (!roleLoading && !['gestor', 'comercial'].includes(userRole || '')) {
+    if (!roleLoading && !['admin', 'gestor', 'comercial'].includes(userRole || '')) {
         return (
             <div className="flex min-h-[420px] items-center justify-center rounded-c4 border border-slate-200 bg-white text-slate-500 dark:border-neutral-800 dark:bg-black/30 dark:text-neutral-400">
-                <p>Acesso restrito a gestores e comercial.</p>
+                <p>Acesso restrito a administradores, gestores e comercial.</p>
             </div>
         );
     }

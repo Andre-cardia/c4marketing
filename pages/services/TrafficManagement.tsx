@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './traffic/SurveyAnswersModal';
 import AccessAnswersModal from './traffic/AccessAnswersModal';
 import TaskModal from '../../components/projects/TaskModal';
+import { getCompanyDisplayName } from '../../lib/utils';
 
 const STEP_CONFIG = {
     planning: { label: 'Planejamento', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -135,11 +136,11 @@ const TrafficManagement: React.FC = () => {
             // 1. Get Company Name
             const { data: acceptance } = await supabase
                 .from('acceptances')
-                .select('company_name')
+                .select('company_name, company_alias')
                 .eq('id', id)
                 .single();
 
-            if (acceptance) setCompanyName(acceptance.company_name);
+            if (acceptance) setCompanyName(getCompanyDisplayName(acceptance.company_name, acceptance.company_alias));
 
             // 2. Get Traffic Project
             const { data: tpData } = await supabase

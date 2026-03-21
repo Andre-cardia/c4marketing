@@ -8,22 +8,98 @@ const SetPassword: React.FC = () => {
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [checkingRecovery, setCheckingRecovery] = useState(true);
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
+        let isMounted = true;
         const checkUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user && user.email) {
-                setEmail(user.email);
-            } else {
-                // If not logged in (no session from magic link), redirect home
-                navigate('/');
+            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+            const hasRecoveryInHash =
+                window.location.hash.includes('type=recovery') ||
+                hashParams.has('access_token') ||
+                hashParams.has('refresh_token');
+            const searchParams = new URLSearchParams(window.location.search);
+            const hasRecoveryInQuery =
+                searchParams.get('type') === 'recovery' ||
+                searchParams.has('token_hash') ||
+                searchParams.has('code');
+            const isRecoveryFlow = hasRecoveryInHash || hasRecoveryInQuery;
+
+            if (isRecoveryFlow) {
+                const code = searchParams.get('code');
+                const tokenHash = searchParams.get('token_hash');
+                const recoveryType = searchParams.get('type');
+                const accessToken = hashParams.get('access_token');
+                const refreshToken = hashParams.get('refresh_token');
+
+                // Legacy hash flow from recovery emails.
+                if (accessToken && refreshToken) {
+                    await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken,
+                    });
+                }
+
+                // PKCE flow recovery links can arrive with ?code=...
+                if (code) {
+                    await supabase.auth.exchangeCodeForSession(code);
+                }
+
+                // Some recovery links arrive with token_hash/type in query.
+                if (tokenHash && recoveryType === 'recovery') {
+                    await supabase.auth.verifyOtp({
+                        type: 'recovery',
+                        token_hash: tokenHash,
+                    });
+                }
             }
+
+            const resolveUserFromSession = async () => {
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) return user;
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                }
+                return null;
+            };
+
+            const user = await resolveUserFromSession();
+            if (user && user.email) {
+                if (isMounted) setEmail(user.email);
+            } else {
+                // Recovery links can take a moment to hydrate the auth session in SPA.
+                if (isRecoveryFlow) {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user?.email) {
+                        if (isMounted) setEmail(session.user.email);
+                        return;
+                    }
+                    if (isMounted) {
+                        setMessage({
+                            type: 'error',
+                            text: 'Link de recuperação inválido ou expirado. Solicite um novo e-mail de recuperação.',
+                        });
+                    }
+                    if (isMounted) setCheckingRecovery(false);
+                    return;
+                }
+
+                // Non-recovery navigation should return to login.
+                navigate('/');
+                if (isMounted) setCheckingRecovery(false);
+                return;
+            }
+            if (isMounted) setCheckingRecovery(false);
         };
         checkUser();
+
+        return () => {
+            isMounted = false;
+        };
     }, [navigate]);
 
     const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -58,6 +134,17 @@ const SetPassword: React.FC = () => {
         }
     };
 
+    if (checkingRecovery) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+                <div className="flex items-center gap-3 text-slate-300">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Validando link de recuperação...</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-500">
@@ -71,7 +158,7 @@ const SetPassword: React.FC = () => {
                     </div>
 
                     <h1 className="text-2xl font-black text-center text-slate-800 dark:text-white mb-2">
-                        Bem-vindo(a)!
+                        Recuperação de Senha
                     </h1>
                     {email && (
                         <div className="flex justify-center mb-4">
@@ -81,7 +168,7 @@ const SetPassword: React.FC = () => {
                         </div>
                     )}
                     <p className="text-center text-slate-500 dark:text-slate-400 mb-8 text-sm">
-                        Para garantir sua segurança, defina uma senha de acesso para sua conta.
+                        Defina sua nova senha para acessar sua conta.
                     </p>
 
                     {message && (
@@ -135,7 +222,7 @@ const SetPassword: React.FC = () => {
                             disabled={loading}
                             className="w-full bg-brand-coral hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-500/20 transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed mt-2 flex items-center justify-center gap-2"
                         >
-                            {loading ? <Loader2 className="animate-spin" /> : 'Definir Senha e Entrar'}
+                            {loading ? <Loader2 className="animate-spin" /> : 'Salvar Nova Senha'}
                         </button>
                     </form>
                 </div>

@@ -1,8 +1,5 @@
 import { supabase } from './supabase';
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-const BASE_URL = import.meta.env.DEV ? '/api/openai' : 'https://api.openai.com';
-
 export interface AgentReport {
     executiveSummary: string;
     tasks: {
@@ -111,126 +108,26 @@ async function fetchSystemContext() {
 }
 
 /**
- * Analyzes the system context using OpenAI GPT-4o and returns a structured JSON report.
+ * Analyzes the system context using the ai-proxy Edge Function and returns a structured JSON report.
  */
 export async function analyzeSystem(): Promise<AgentReport> {
-    if (!OPENAI_API_KEY) {
-        console.error('Missing OpenAI API Key');
-        throw new Error('OpenAI API Key is missing. Please check your .env file.');
-    }
-
-    console.log('Starting AI Analysis...');
-    console.log('API Key present:', OPENAI_API_KEY.slice(0, 8) + '...');
-
-    // Test Connection First
-    try {
-        console.log('Testing OpenAI connection...');
-        const testResponse = await fetch(`${BASE_URL}/v1/models`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            }
-        });
-        if (!testResponse.ok) {
-            console.error('Connection test failed:', await testResponse.text());
-        } else {
-            console.log('Connection test successful.');
-        }
-    } catch (e) {
-        console.error('Connection test error (CORS/Network):', e);
-        throw new Error('Falha de conexão com OpenAI (CORS/Rede). Verifique se sua chave permite acesso via browser ou use um servidor backend.');
-    }
-
     const context = await fetchSystemContext();
 
-    const systemPrompt = `
-    Você é o Gerente Geral de IA da C4 Marketing. 
-    Analise os dados do sistema e gere um relatório executivo ESTRUTURADO em JSON.
-    
-    DADOS DE VENDAS (CRÍTICO):
-    - O valor TOTAL de vendas deste mês é EXATAMENTE: ${context.sales.totalFormatted}.
-    - NÃO altere e NÃO recalcule esse valor. Use exatemente string fornecida.
-    - Liste exatamente as ${context.sales.won.length} vendas fornecidas no contexto.
-
-    Retorne APENAS um objeto JSON com a seguinte estrutura (sem markdown, sem \`\`\`json):
-    {
-        "executiveSummary": "Texto corrido de 2-3 frases resumindo o estado geral da empresa.",
-        "tasks": {
-            "inProgress": [
-                { "name": "Nome da tarefa", "assignee": "Responsável", "priority": "Alta/Média/Baixa", "daysActive": 3 }
-            ],
-            "backlog": [
-                { "name": "Nome da tarefa", "assignee": "Responsável", "deadline": "DD/MM/AAAA", "priority": "Alta/Média/Baixa" }
-            ],
-            "analysis": "Uma frase analisando gargalos ou fluxo de trabalho."
+    const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: {
+            action: 'analyze_system',
+            tasks: context.tasks,
+            sales: context.sales,
+            users: context.users,
         },
-        "proposals": {
-            "recentWon": [
-                { "client": "Nome Cliente", "service": "Descrição curta", "value": "R$ 0.000,00" }
-            ],
-            "totalValue": "${context.sales.totalFormatted}",
-            "celebrationMessage": "Uma frase curta celebrando as conquistas."
-        },
-        "users": {
-            "newUsers": [
-                { "name": "Nome", "role": "Cargo" }
-            ],
-            "totalActive": 5,
-            "analysis": "Breve comentário sobre o time."
-        },
-        "recommendations": [
-            "Ação prática 1",
-            "Ação prática 2",
-            "Ação prática 3"
-        ]
-    }
+    });
 
-    Dados do sistema:
-    ${JSON.stringify({
-        tasks: context.tasks,
-        sales: context.sales,
-        users: context.users
-    }, null, 2)}
-  `;
+    if (error) throw new Error(error.message || 'Falha ao gerar relatório.');
 
-    try {
-        const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: 'Gere o JSON do relatório.' }
-                ],
-                temperature: 0.2,
-                response_format: { type: "json_object" }
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error?.message || 'Failed to fetch analysis from OpenAI');
-        }
-
-        const reportData = JSON.parse(data.choices[0].message.content);
-
-        return {
-            ...reportData,
-            timestamp: new Date().toISOString()
-        };
-    } catch (error: any) {
-        console.error('Error calling OpenAI:', error);
-        // Enhance error message for user
-        if (error.message === 'Failed to fetch') {
-            throw new Error('Erro de conexão (CORS/Network). Verifique sua internet ou a validade da chave API. O navegador pode estar bloqueando a requisição.');
-        }
-        throw error;
-    }
+    return {
+        ...data,
+        timestamp: new Date().toISOString(),
+    };
 }
 
 export interface AiFeedback {
@@ -281,76 +178,34 @@ export async function markFeedbackRead(id: number): Promise<void> {
  * Generates new feedback for a user based on their tasks and performance.
  */
 export async function generateUserFeedback(userEmail: string, userName: string): Promise<AiFeedback> {
-    if (!OPENAI_API_KEY) {
-        throw new Error('OpenAI API Key is missing.');
-    }
+    const { activeTasks, approvalTasks, overdueTasks, highPriority } = await getUserTaskStats(userName);
 
-    try {
-        const { activeTasks, approvalTasks, overdueTasks, highPriority } = await getUserTaskStats(userName);
+    const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: {
+            action: 'generate_user_feedback',
+            userName,
+            activeTasks: activeTasks.length,
+            approvalTasks: approvalTasks.length,
+            overdueTasks: overdueTasks.length,
+            highPriority: highPriority.length,
+        },
+    });
 
-        const systemPrompt = `
-        Você é um Gerente de Projetos de IA experiente e mentor.
-        Seu objetivo é enviar uma mensagem CURTA e DIRETA (máximo 2 frases) para o usuário "${userName}" sobre o desempenho dele.
-        
-        Contexto do Usuário:
-        - Tarefas em andamento/backlog: ${activeTasks.length}
-        - Tarefas aguardando aprovação: ${approvalTasks.length}
-        - ENTRE AS TAREFAS EM ANDAMENTO, atrasadas: ${overdueTasks.length}
-        - Alta prioridade (Ativas): ${highPriority.length}
-        
-        Diretrizes:
-        - Se houver tarefas atrasadas (active + overdue), cobre de forma firme mas profissional.
-        - Se houver tarefas em aprovação, mencione que estão sendo revisadas (positivo).
-        - Se não houver tarefas atrasadas e o backlog estiver limpo, parabenize e motive.
-        - Use emojis profissionais e encorajadores.
-        - Não use markdown, apenas texto puro.
-        `;
+    if (error) throw new Error(error.message || 'Falha ao gerar feedback.');
 
-        const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: 'Gere a mensagem para o usuário.' }
-                ],
-                temperature: 0.7,
-            }),
-        });
+    const { data: insertData, error: insertError } = await supabase
+        .from('ai_feedback')
+        .insert({
+            user_email: userEmail,
+            message: data.message,
+            is_read: false,
+        })
+        .select()
+        .single();
 
-        const data = await response.json();
+    if (insertError) throw insertError;
 
-        if (!response.ok) {
-            throw new Error(data.error?.message || 'Failed to generate feedback');
-        }
-
-        const messageContent = data.choices[0].message.content.trim();
-
-        // 3. Save to Database
-        const { data: insertData, error: insertError } = await supabase
-            .from('ai_feedback')
-            .insert({
-                user_email: userEmail,
-                message: messageContent,
-                is_read: false
-            })
-            .select()
-            .single();
-
-        if (insertError) {
-            throw insertError;
-        }
-
-        return insertData;
-
-    } catch (error) {
-        console.error('Error generating user feedback:', error);
-        throw error;
-    }
+    return insertData;
 }
 
 // Helper to get stats (shared)

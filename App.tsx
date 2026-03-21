@@ -78,10 +78,10 @@ const App: React.FC = () => {
                 <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional', 'comercial']}><DashboardLayout><Dashboard /></DashboardLayout></ProtectedRoute>} />
                 <Route path="/users" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><Users /></DashboardLayout></ProtectedRoute>} />
                 <Route path="/proposals/new" element={<ProtectedRoute allowedRoles={['gestor']}><DashboardLayout><CreateProposal /></DashboardLayout></ProtectedRoute>} />
-                <Route path="/proposals" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><Proposals /></DashboardLayout></ProtectedRoute>} />
-                <Route path="/crm" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><CRM /></DashboardLayout></ProtectedRoute>} />
-                <Route path="/crm-chat" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><CRMChat /></DashboardLayout></ProtectedRoute>} />
-                <Route path="/commercial-dashboard" element={<ProtectedRoute allowedRoles={['gestor', 'comercial']}><DashboardLayout><CommercialDashboard /></DashboardLayout></ProtectedRoute>} />
+                <Route path="/proposals" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial']}><DashboardLayout><Proposals /></DashboardLayout></ProtectedRoute>} />
+                <Route path="/crm" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial']}><DashboardLayout><CRM /></DashboardLayout></ProtectedRoute>} />
+                <Route path="/crm-chat" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial']}><DashboardLayout><CRMChat /></DashboardLayout></ProtectedRoute>} />
+                <Route path="/commercial-dashboard" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'comercial']}><DashboardLayout><CommercialDashboard /></DashboardLayout></ProtectedRoute>} />
                 <Route path="/projects" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><Projects /></DashboardLayout></ProtectedRoute>} />
                 <Route path="/projects/:id/traffic" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><TrafficManagement /></DashboardLayout></ProtectedRoute>} />
                 <Route path="/projects/:id/traffic/strategy" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'operacional']}><DashboardLayout><StrategyMeeting /></DashboardLayout></ProtectedRoute>} />

@@ -8,6 +8,7 @@ import BookingModal from './BookingModal';
 interface Project {
     id: number;
     company_name: string;
+    company_display_name?: string;
 }
 
 interface Task {
@@ -175,6 +176,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     };
 
     if (!isOpen || !project) return null;
+    const displayCompanyName = project.company_display_name || project.company_name;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -186,7 +188,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                         <div className="w-2 h-8 rounded-full bg-brand-coral" />
                         <div>
                             <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white leading-tight">
-                                {project.company_name}
+                                {displayCompanyName}
                             </h2>
                             <p className="text-xs text-neutral-400 font-medium">Quadro de Tarefas</p>
                         </div>
@@ -287,7 +289,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                                         <div className="flex flex-col gap-1.5 mt-2 pt-2.5 border-t border-neutral-200 dark:border-neutral-700">
                                                             <div className="flex items-center gap-1.5 text-brand-coral text-xs font-semibold">
                                                                 <Briefcase size={11} />
-                                                                <span className="truncate">{project.company_name}</span>
+                                                                <span className="truncate">{displayCompanyName}</span>
                                                             </div>
                                                             <div className="flex items-center gap-3 text-xs text-neutral-400">
                                                                 {task.assignee && (
@@ -332,7 +334,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                     onClose={() => setShowTaskModal(false)}
                     projectId={project.id}
                     task={editingTask}
-                    projectName={project.company_name}
+                    projectName={displayCompanyName}
                     onSave={fetchTasks}
                 />
 
@@ -340,7 +342,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                     isOpen={showBookingModal}
                     onClose={() => setShowBookingModal(false)}
                     calLink={SHARED_CAL_LINK}
-                    companyName={project.company_name}
+                    companyName={displayCompanyName}
                 />
             </div>
         </div>

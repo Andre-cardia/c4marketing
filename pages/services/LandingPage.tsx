@@ -5,6 +5,7 @@ import { ArrowLeft, Layout, Send, CheckCircle, Settings, Users, Plus, Edit, Eye,
 import { supabase } from '../../lib/supabase';
 import SurveyAnswersModal from './lp/SurveyAnswersModal';
 import AccessGuideModal from '../../components/AccessGuideModal';
+import { getCompanyDisplayName } from '../../lib/utils';
 
 interface LandingPageProject {
     id: string;
@@ -40,11 +41,11 @@ const LandingPageManagement: React.FC = () => {
             // 1. Get Company Name
             const { data: acceptance } = await supabase
                 .from('acceptances')
-                .select('company_name')
+                .select('company_name, company_alias')
                 .eq('id', id)
                 .single();
 
-            if (acceptance) setCompanyName(acceptance.company_name);
+            if (acceptance) setCompanyName(getCompanyDisplayName(acceptance.company_name, acceptance.company_alias));
 
             // 2. Get Landing Page Project
             const { data: lpData } = await supabase

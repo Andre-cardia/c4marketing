@@ -23,6 +23,20 @@ const Home: React.FC = () => {
   }, []);
 
   const checkUser = async () => {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const hasRecoveryInHash =
+      window.location.hash.includes('type=recovery') ||
+      hashParams.has('access_token') ||
+      hashParams.has('refresh_token');
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasRecoveryInQuery =
+      searchParams.get('type') === 'recovery' ||
+      searchParams.has('token_hash') ||
+      searchParams.has('code');
+    if (hasRecoveryInHash || hasRecoveryInQuery) {
+      return;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
@@ -53,11 +67,33 @@ const Home: React.FC = () => {
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
+        await supabase.auth.signOut().catch(() => null);
+
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+
+        let activeSession = data.session;
+        const firstUserCheck = await supabase.auth.getUser();
+        if (firstUserCheck.error || !firstUserCheck.data?.user) {
+          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshed.session) {
+            throw new Error('Não foi possível validar sua sessão. Faça login novamente.');
+          }
+          activeSession = refreshed.session;
+
+          const secondUserCheck = await supabase.auth.getUser();
+          if (secondUserCheck.error || !secondUserCheck.data?.user) {
+            throw new Error('Não foi possível validar sua sessão. Faça login novamente.');
+          }
+        }
+
+        if (!activeSession) {
+          throw new Error('Não foi possível iniciar sua sessão. Faça login novamente.');
+        }
+
         navigate('/dashboard');
       } else {
         // Register Mode (First Access)
@@ -106,7 +142,7 @@ const Home: React.FC = () => {
     setSuccessMessage(null);
 
     try {
-      const redirectTo = `${window.location.origin}/update-password`;
+      const redirectTo = `${window.location.origin}/recover-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');

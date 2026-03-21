@@ -49,6 +49,40 @@ const getLeadStatusLabel = (stage: any) => {
     return 'em aberto'
 }
 
+const getChatContactLabel = (contact: any) => {
+    const profileName = String(contact?.profile_name || '').trim()
+    const pushName = String(contact?.push_name || '').trim()
+    const phoneNumber = String(contact?.phone_number || '').trim()
+    const whatsappJid = String(contact?.whatsapp_jid || '').trim()
+    return profileName || pushName || phoneNumber || whatsappJid || 'Contato sem nome'
+}
+
+const getChatConversationStatusLabel = (status?: string | null) => {
+    const normalized = String(status || '').trim().toLowerCase()
+    if (normalized === 'resolved') return 'resolvida'
+    if (normalized === 'pending') return 'pendente'
+    if (normalized === 'archived') return 'arquivada'
+    return 'aberta'
+}
+
+const getChatMessagePreview = (message: any) => {
+    const body = String(message?.body || '').replace(/\s+/g, ' ').trim()
+    if (body) return body
+    const messageType = String(message?.message_type || 'mensagem').trim().toLowerCase()
+    return `[${messageType}]`
+}
+
+const getChatMessageActorLabel = (message: any, usersById: Map<string, any>) => {
+    const direction = String(message?.direction || '').trim().toLowerCase()
+    if (direction === 'inbound') return 'Cliente'
+    if (direction === 'outbound') {
+        const actor = usersById.get(String(message?.created_by || ''))
+        const actorLabel = getUserLabel(actor)
+        return actorLabel === 'Sem responsavel' ? 'Equipe C4' : `Equipe C4 (${actorLabel})`
+    }
+    return 'Sistema'
+}
+
 const getErrorMessage = (error: unknown) => {
     if (error instanceof Error) return error.message
     return String(error)
@@ -93,6 +127,7 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
         historyResp,
         proposalResp,
         acceptanceResp,
+        chatConversationsResp,
     ] = await Promise.all([
         supabase
             .from('crm_lead_activities')
@@ -126,6 +161,26 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
                 .eq('id', lead.acceptance_id)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
+        supabase
+            .from('crm_chat_conversations')
+            .select(`
+                id,
+                status,
+                assigned_user_id,
+                last_message_preview,
+                last_message_at,
+                unread_count,
+                contact:crm_chat_contacts(
+                    id,
+                    push_name,
+                    profile_name,
+                    phone_number,
+                    whatsapp_jid
+                )
+            `)
+            .eq('lead_id', leadId)
+            .order('last_message_at', { ascending: false, nullsFirst: false })
+            .limit(3),
     ])
 
     if (activitiesResp.error) throw activitiesResp.error
@@ -133,18 +188,35 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
     if (historyResp.error) throw historyResp.error
     if (proposalResp.error) throw proposalResp.error
     if (acceptanceResp.error) throw acceptanceResp.error
+    if (chatConversationsResp.error) throw chatConversationsResp.error
 
     const activities = Array.isArray(activitiesResp.data) ? activitiesResp.data : []
     const followups = Array.isArray(followupsResp.data) ? followupsResp.data : []
     const history = Array.isArray(historyResp.data) ? historyResp.data : []
     const proposal = proposalResp.data || null
     const acceptance = acceptanceResp.data || null
+    const chatConversations = Array.isArray(chatConversationsResp.data) ? chatConversationsResp.data : []
+    const chatConversationIds = chatConversations.map((conversation: any) => String(conversation.id)).filter(Boolean)
+
+    const chatMessagesResp = chatConversationIds.length > 0
+        ? await supabase
+            .from('crm_chat_messages')
+            .select('id, conversation_id, direction, message_type, status, body, sent_at, created_by')
+            .in('conversation_id', chatConversationIds)
+            .order('sent_at', { ascending: false })
+            .limit(24)
+        : { data: [], error: null }
+
+    if (chatMessagesResp.error) throw chatMessagesResp.error
+    const chatMessages = Array.isArray(chatMessagesResp.data) ? chatMessagesResp.data : []
 
     const userIds = Array.from(new Set([
         lead.owner_user_id,
         ...activities.map((activity: any) => activity.created_by),
         ...followups.map((followup: any) => followup.owner_user_id),
         ...history.map((entry: any) => entry.moved_by),
+        ...chatConversations.map((conversation: any) => conversation.assigned_user_id),
+        ...chatMessages.map((message: any) => message.created_by),
     ].filter(Boolean)))
 
     const stageIds = Array.from(new Set([
@@ -177,6 +249,15 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
 
     const pendingFollowups = followups.filter((followup: any) => followup.status === 'pending')
     const overdueFollowups = pendingFollowups.filter((followup: any) => new Date(followup.due_at) < new Date())
+    const chatMessagesByConversation = new Map<string, any[]>()
+
+    for (const message of chatMessages) {
+        const key = String(message?.conversation_id || '')
+        if (!key) continue
+        const list = chatMessagesByConversation.get(key) || []
+        list.push(message)
+        chatMessagesByConversation.set(key, list)
+    }
 
     const activityLines = activities.length > 0
         ? activities.map((activity: any) => {
@@ -208,6 +289,30 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
         }).join('\n')
         : '- Nenhuma movimentacao registrada.'
 
+    const crmChatLines = chatConversations.length > 0
+        ? chatConversations.map((conversation: any) => {
+            const assignedUser = usersById.get(String(conversation.assigned_user_id || ''))
+            const contactLabel = getChatContactLabel(conversation.contact)
+            const recentConversationMessages = (chatMessagesByConversation.get(String(conversation.id)) || [])
+                .slice()
+                .sort((a: any, b: any) => {
+                    const aTs = Date.parse(String(a?.sent_at || ''))
+                    const bTs = Date.parse(String(b?.sent_at || ''))
+                    const safeA = Number.isFinite(aTs) ? aTs : 0
+                    const safeB = Number.isFinite(bTs) ? bTs : 0
+                    return safeA - safeB
+                })
+                .slice(-4)
+
+            return [
+                `- ${getChatConversationStatusLabel(conversation.status)} | contato=${contactLabel} | ultima=${formatDateTimePt(conversation.last_message_at)} | unread=${conversation.unread_count ?? 0} | responsavel=${getUserLabel(assignedUser)}`,
+                conversation.last_message_preview ? `  Prévia: ${conversation.last_message_preview}` : '',
+                recentConversationMessages.length > 0 ? '  Mensagens recentes:' : '',
+                ...recentConversationMessages.map((message: any) => `  - ${formatDateTimePt(message.sent_at)} | ${getChatMessageActorLabel(message, usersById)} | ${getChatMessagePreview(message)}`),
+            ].filter(Boolean).join('\n')
+        }).join('\n')
+        : '- Nenhuma conversa vinculada no CRM Chat.'
+
     const acceptanceCompanyName = acceptance
         ? getDisplayCompanyName(acceptance)
         : 'n/a'
@@ -236,6 +341,9 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
         '',
         'Historico de estagio:',
         historyLines,
+        '',
+        'CRM Chat recente:',
+        crmChatLines,
     ].filter(Boolean).join('\n')
 
     const docMetadata = {
@@ -258,6 +366,8 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
         crm_owner_name: getUserLabel(owner),
         crm_followups_pending: pendingFollowups.length,
         crm_followups_overdue: overdueFollowups.length,
+        crm_chat_conversations_count: chatConversations.length,
+        crm_chat_unread_total: chatConversations.reduce((sum: number, conversation: any) => sum + Number(conversation?.unread_count || 0), 0),
         proposal_id: lead.proposal_id ?? null,
         acceptance_id: lead.acceptance_id ?? null,
         lead_name: lead.name,
@@ -277,6 +387,187 @@ const buildCrmLeadBrainDocument = async (supabase: any, leadId: string) => {
             owner?.email,
             proposal?.company_name,
             acceptanceCompanyName !== 'n/a' ? acceptanceCompanyName : null,
+            ...chatConversations.map((conversation: any) => getChatContactLabel(conversation.contact)),
+            ...chatConversations.map((conversation: any) => conversation?.contact?.phone_number),
+            ...chatConversations.map((conversation: any) => conversation?.contact?.whatsapp_jid),
+            ...chatMessages.map((message: any) => getChatMessagePreview(message)),
+        ].filter(Boolean).join(' | '),
+    }
+
+    return { docContent, docMetadata }
+}
+
+const buildCrmChatConversationBrainDocument = async (supabase: any, conversationId: string) => {
+    const { data: conversation, error: conversationError } = await supabase
+        .from('crm_chat_conversations')
+        .select(`
+            id,
+            instance_id,
+            contact_id,
+            lead_id,
+            assigned_user_id,
+            status,
+            subject,
+            last_message_preview,
+            last_message_at,
+            unread_count,
+            created_at,
+            updated_at,
+            contact:crm_chat_contacts(
+                id,
+                whatsapp_jid,
+                phone_number,
+                phone_number_normalized,
+                push_name,
+                profile_name,
+                lead_id,
+                last_message_at
+            ),
+            lead:crm_leads(
+                id,
+                name,
+                company_name,
+                whatsapp,
+                email,
+                stage_id,
+                owner_user_id,
+                archived_at
+            ),
+            instance:crm_chat_instances(
+                id,
+                label,
+                evolution_instance_name,
+                status,
+                connected_number,
+                profile_name,
+                webhook_configured
+            ),
+            assigned_user:app_users(
+                id,
+                full_name,
+                name,
+                email
+            )
+        `)
+        .eq('id', conversationId)
+        .maybeSingle()
+
+    if (conversationError) throw conversationError
+    if (!conversation) return null
+
+    let lead = conversation.lead || null
+    const fallbackLeadId = conversation.lead_id || conversation.contact?.lead_id || null
+
+    if (!lead && fallbackLeadId) {
+        const { data: fallbackLead, error: fallbackLeadError } = await supabase
+            .from('crm_leads')
+            .select('id, name, company_name, whatsapp, email, stage_id, owner_user_id, archived_at')
+            .eq('id', fallbackLeadId)
+            .maybeSingle()
+
+        if (fallbackLeadError) throw fallbackLeadError
+        lead = fallbackLead || null
+    }
+
+    const { data: messagesData, error: messagesError } = await supabase
+        .from('crm_chat_messages')
+        .select('id, conversation_id, direction, message_type, status, body, media_url, sent_at, created_by, sender_jid, recipient_jid')
+        .eq('conversation_id', conversationId)
+        .order('sent_at', { ascending: false })
+        .limit(18)
+
+    if (messagesError) throw messagesError
+
+    const messages = Array.isArray(messagesData) ? messagesData.slice().reverse() : []
+    const userIds = Array.from(new Set([
+        conversation.assigned_user_id,
+        lead?.owner_user_id,
+        ...messages.map((message: any) => message.created_by),
+    ].filter(Boolean)))
+    const stageIds = Array.from(new Set([lead?.stage_id].filter(Boolean)))
+
+    const [usersResp, stagesResp] = await Promise.all([
+        userIds.length > 0
+            ? supabase
+                .from('app_users')
+                .select('id, full_name, name, email')
+                .in('id', userIds)
+            : Promise.resolve({ data: [], error: null }),
+        stageIds.length > 0
+            ? supabase
+                .from('crm_pipeline_stages')
+                .select('id, key, name')
+                .in('id', stageIds)
+            : Promise.resolve({ data: [], error: null }),
+    ])
+
+    if (usersResp.error) throw usersResp.error
+    if (stagesResp.error) throw stagesResp.error
+
+    const usersById = new Map<string, any>((usersResp.data || []).map((user: any) => [String(user.id), user]))
+    const stagesById = new Map<string, any>((stagesResp.data || []).map((stage: any) => [String(stage.id), stage]))
+    const assignedUser = conversation.assigned_user || usersById.get(String(conversation.assigned_user_id || '')) || null
+    const leadOwner = usersById.get(String(lead?.owner_user_id || '')) || null
+    const currentStage = stagesById.get(String(lead?.stage_id || '')) || null
+    const contactLabel = getChatContactLabel(conversation.contact)
+
+    const messageLines = messages.length > 0
+        ? messages.map((message: any) => `- ${formatDateTimePt(message.sent_at)} | ${getChatMessageActorLabel(message, usersById)} | ${getChatMessagePreview(message)} | status=${String(message.status || 'n/a')}`)
+            .join('\n')
+        : '- Nenhuma mensagem registrada.'
+
+    const docContent = [
+        `[CRM CHAT] ${contactLabel}`,
+        `Status da conversa: ${getChatConversationStatusLabel(conversation.status)} | Nao lidas: ${conversation.unread_count ?? 0}`,
+        `Responsavel interno: ${getUserLabel(assignedUser)}`,
+        `Instancia WhatsApp: ${conversation.instance?.label || conversation.instance?.evolution_instance_name || 'n/a'} | Status da instancia: ${conversation.instance?.status || 'n/a'}`,
+        `Contato: Telefone=${conversation.contact?.phone_number || 'n/a'} | JID=${conversation.contact?.whatsapp_jid || 'n/a'}`,
+        lead
+            ? `Lead vinculado: ${lead.name} | Empresa=${lead.company_name} | Estagio=${currentStage?.name || 'Sem estagio'} (${String(currentStage?.key || 'n/a')}) | Responsavel CRM=${getUserLabel(leadOwner)}`
+            : 'Lead vinculado: nao vinculado no CRM.',
+        `Assunto: ${conversation.subject || 'n/a'}`,
+        `Criada em: ${formatDateTimePt(conversation.created_at)} | Ultima mensagem: ${formatDateTimePt(conversation.last_message_at)} | Atualizada em: ${formatDateTimePt(conversation.updated_at)}`,
+        '',
+        'Mensagens recentes:',
+        messageLines,
+    ].filter(Boolean).join('\n')
+
+    const docMetadata = {
+        type: 'official_doc',
+        artifact_kind: 'crm_chat',
+        title: `CRM Chat: ${contactLabel}${lead?.company_name ? ` - ${lead.company_name}` : ''}`,
+        source_table: 'crm_chat_conversations',
+        source_id: conversation.id,
+        source: 'crm_chat_snapshot',
+        tenant_id: 'c4_corporate_identity',
+        status: conversation.status === 'archived' ? 'archived' : 'active',
+        is_current: true,
+        searchable: true,
+        authority_type: 'memo',
+        authority_rank: 65,
+        effective_from: conversation.updated_at || conversation.last_message_at || conversation.created_at || new Date().toISOString(),
+        crm_entity: 'chat_conversation',
+        crm_chat_conversation_id: conversation.id,
+        crm_chat_contact_id: conversation.contact_id,
+        crm_chat_instance_id: conversation.instance_id,
+        crm_chat_status: conversation.status,
+        crm_chat_unread_count: Number(conversation.unread_count || 0),
+        lead_id: lead?.id || fallbackLeadId || null,
+        lead_name: lead?.name || null,
+        company_name: lead?.company_name || null,
+        crm_stage_key: currentStage?.key || null,
+        crm_stage_name: currentStage?.name || null,
+        crm_owner_name: getUserLabel(assignedUser),
+        search_terms: [
+            contactLabel,
+            conversation.contact?.phone_number,
+            conversation.contact?.phone_number_normalized,
+            conversation.contact?.whatsapp_jid,
+            lead?.name,
+            lead?.company_name,
+            conversation.subject,
+            conversation.last_message_preview,
+            ...messages.map((message: any) => getChatMessagePreview(message)),
         ].filter(Boolean).join(' | '),
     }
 
@@ -457,6 +748,15 @@ Deno.serve(async (req) => {
 
                         docContent = crmDoc.docContent
                         docMetadata = crmDoc.docMetadata
+
+                    } else if (item.source_table === 'crm_chat_conversations') {
+                        const crmChatDoc = await buildCrmChatConversationBrainDocument(supabase, item.source_id)
+                        if (!crmChatDoc) {
+                            throw new Error(`Conversa do CRM Chat ${item.source_id} não encontrada para sincronização`)
+                        }
+
+                        docContent = crmChatDoc.docContent
+                        docMetadata = crmChatDoc.docMetadata
 
                     } else {
                         throw new Error(`Processador para ${item.source_table} não implementado`)

@@ -18,11 +18,40 @@ Deno.serve(async (req) => {
             throw new Error('Email is required')
         }
 
+        const normalizedEmail = String(email).trim().toLowerCase()
+
         // Initialize Supabase with Service Role Key (admin privileges)
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
+
+        const resolveRecoveryRedirectUrl = (): string => {
+            const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app'
+            return siteUrl.includes('localhost')
+                ? 'https://c4marketing.vercel.app/recover-password'
+                : `${siteUrl}/recover-password`
+        }
+
+        const parseRateLimitSeconds = (message: string): number | null => {
+            const match = (message || '').match(/after\s+(\d+)\s+seconds?/i)
+            if (!match) return null
+            const seconds = Number(match[1])
+            return Number.isFinite(seconds) ? seconds : null
+        }
+
+        const sendRecoveryEmail = async (): Promise<{ ok: true } | { ok: false; message: string; retryAfterSeconds: number | null }> => {
+            const { error } = await supabaseAdmin.auth.resetPasswordForEmail(normalizedEmail, {
+                redirectTo: resolveRecoveryRedirectUrl(),
+            })
+            if (!error) return { ok: true }
+            const message = error.message || 'Failed to send recovery email'
+            return {
+                ok: false,
+                message,
+                retryAfterSeconds: parseRateLimitSeconds(message),
+            }
+        }
 
         // --- SELF-HEALING: Check for or create traffic_projects record ---
         // Run this regardless of user existence to ensure data consistency
@@ -30,7 +59,7 @@ Deno.serve(async (req) => {
             const { data: latestAcceptance } = await supabaseAdmin
                 .from('acceptances')
                 .select('id, company_name, name')
-                .eq('email', email.toLowerCase())
+                .eq('email', normalizedEmail)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .single();
@@ -69,7 +98,7 @@ Deno.serve(async (req) => {
         const { data: existingUser } = await supabaseAdmin
             .from('app_users')
             .select('id, email, role')
-            .eq('email', email.toLowerCase())
+            .eq('email', normalizedEmail)
             .single()
 
         if (existingUser) {
@@ -83,18 +112,30 @@ Deno.serve(async (req) => {
                     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                 )
             }
-            // Send password reset email (acts as welcome/invite email) - even if existing, maybe they forgot password?
-            // Optional: Uncomment to resend invite for existing users
-            const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
-            const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/client' : `${siteUrl}/client`;
-            await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
-                redirectTo: finalRedirectUrl,
-            })
+            const recovery = await sendRecoveryEmail()
+            if (!recovery.ok) {
+                return new Response(
+                    JSON.stringify({
+                        status: 'existing',
+                        email_sent: false,
+                        error_code: recovery.retryAfterSeconds ? 'over_email_send_rate_limit' : 'email_send_failed',
+                        retry_after_seconds: recovery.retryAfterSeconds,
+                        message: recovery.retryAfterSeconds
+                            ? `Email de recuperação em rate limit. Aguarde ${recovery.retryAfterSeconds}s para tentar novamente.`
+                            : `Falha ao enviar email de recuperação: ${recovery.message}`,
+                    }),
+                    {
+                        status: recovery.retryAfterSeconds ? 429 : 502,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    }
+                )
+            }
 
             return new Response(
                 JSON.stringify({
                     status: 'existing',
-                    message: 'Client user already exists. Project check complete. Welcome email resent.',
+                    email_sent: true,
+                    message: 'Client user already exists. Recovery email resent.',
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
@@ -103,7 +144,7 @@ Deno.serve(async (req) => {
         // 2. Create user in Supabase Auth (with random password — they'll set it via reset email)
         const tempPassword = crypto.randomUUID() + 'Aa1!' // Ensure it meets password requirements
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             password: tempPassword,
             email_confirm: true, // Auto-confirm to avoid double emails
         })
@@ -113,29 +154,41 @@ Deno.serve(async (req) => {
             if (authError.message?.includes('already been registered')) {
                 // Get the existing auth user
                 const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
-                const existingAuthUser = users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+                const existingAuthUser = users?.find(u => u.email?.toLowerCase() === normalizedEmail)
 
                 if (existingAuthUser) {
                     // Insert into app_users with the auth user's ID
                     await supabaseAdmin.from('app_users').insert({
                         id: existingAuthUser.id,
-                        email: email.toLowerCase(),
+                        email: normalizedEmail,
                         name: name || email.split('@')[0],
                         role: 'cliente',
                     })
 
-                    // Send password reset (welcome email)
-                    const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
-                    const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
-
-                    await supabaseAdmin.auth.resetPasswordForEmail(email.toLowerCase(), {
-                        redirectTo: finalRedirectUrl,
-                    })
+                    const recovery = await sendRecoveryEmail()
+                    if (!recovery.ok) {
+                        return new Response(
+                            JSON.stringify({
+                                status: 'created',
+                                email_sent: false,
+                                error_code: recovery.retryAfterSeconds ? 'over_email_send_rate_limit' : 'email_send_failed',
+                                retry_after_seconds: recovery.retryAfterSeconds,
+                                message: recovery.retryAfterSeconds
+                                    ? `Conta criada, mas email em rate limit. Aguarde ${recovery.retryAfterSeconds}s para tentar novamente.`
+                                    : `Conta criada, mas falha ao enviar email: ${recovery.message}`,
+                            }),
+                            {
+                                status: recovery.retryAfterSeconds ? 429 : 502,
+                                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                            }
+                        )
+                    }
 
                     return new Response(
                         JSON.stringify({
                             status: 'created',
-                            message: 'Client profile created. Welcome email sent.',
+                            email_sent: true,
+                            message: 'Client profile created. Recovery email sent.',
                         }),
                         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                     )
@@ -147,7 +200,7 @@ Deno.serve(async (req) => {
         // 3. Insert into app_users with role 'cliente'
         const { error: dbError } = await supabaseAdmin.from('app_users').insert({
             id: authUser.user.id,
-            email: email.toLowerCase(),
+            email: normalizedEmail,
             name: name || email.split('@')[0],
             role: 'cliente',
         })
@@ -157,26 +210,30 @@ Deno.serve(async (req) => {
             // Don't fail entirely — auth user was created
         }
 
-        // 4. Send password reset email (acts as welcome/invite email)
-        const siteUrl = Deno.env.get('SITE_URL') || 'https://c4marketing.vercel.app';
-        // Ensure we don't accidentally use localhost in production if env var is wrong
-        const finalRedirectUrl = siteUrl.includes('localhost') ? 'https://c4marketing.vercel.app/update-password' : `${siteUrl}/update-password`;
-
-        const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(
-            email.toLowerCase(),
-            {
-                redirectTo: finalRedirectUrl,
-            }
-        )
-
-        if (resetError) {
-            console.error('Error sending reset email:', resetError)
+        const recovery = await sendRecoveryEmail()
+        if (!recovery.ok) {
+            return new Response(
+                JSON.stringify({
+                    status: 'created',
+                    email_sent: false,
+                    error_code: recovery.retryAfterSeconds ? 'over_email_send_rate_limit' : 'email_send_failed',
+                    retry_after_seconds: recovery.retryAfterSeconds,
+                    message: recovery.retryAfterSeconds
+                        ? `Conta criada, mas email em rate limit. Aguarde ${recovery.retryAfterSeconds}s para tentar novamente.`
+                        : `Conta criada, mas falha ao enviar email: ${recovery.message}`,
+                }),
+                {
+                    status: recovery.retryAfterSeconds ? 429 : 502,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                }
+            )
         }
 
         return new Response(
             JSON.stringify({
                 status: 'created',
-                message: 'Client user created/verified. Project check complete. Welcome email sent.',
+                email_sent: true,
+                message: 'Client user created/verified. Recovery email sent.',
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

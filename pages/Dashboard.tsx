@@ -11,6 +11,7 @@ import {
     X, ArrowRight, BarChart2, ChevronRight
 } from 'lucide-react';
 import { useUserRole } from '../lib/UserRoleContext';
+import { getCompanyDisplayName } from '../lib/utils';
 
 interface Acceptance {
     id: number;
@@ -18,6 +19,8 @@ interface Acceptance {
     email: string | null;
     cpf: string;
     company_name: string;
+    company_alias?: string | null;
+    company_display_name?: string;
     cnpj: string;
     timestamp: string;
     status?: string;
@@ -230,8 +233,12 @@ const Dashboard: React.FC = () => {
     const fetchAcceptances = async () => {
         const { data } = await supabase.from('acceptances').select('*').order('timestamp', { ascending: false });
         if (data) {
-            setAcceptances(data);
-            return data;
+            const mapped = data.map((item: any) => ({
+                ...item,
+                company_display_name: getCompanyDisplayName(item.company_name, item.company_alias),
+            }));
+            setAcceptances(mapped);
+            return mapped;
         }
         return [];
     };
@@ -294,7 +301,10 @@ const Dashboard: React.FC = () => {
         const { data } = await supabase.from('project_tasks').select('*');
         if (data) {
             // Enrich with Project Name
-            const projectsMap = new Map(loadedAcceptances?.map(a => [a.id, a.company_name]) || acceptances.map(a => [a.id, a.company_name]));
+            const projectsMap = new Map(
+                (loadedAcceptances?.map(a => [a.id, getCompanyDisplayName(a.company_name, (a as any).company_alias)])
+                    || acceptances.map(a => [a.id, getCompanyDisplayName(a.company_name, a.company_alias)]))
+            );
 
             const enrichedTasks = data.map((t: any) => ({
                 ...t,
@@ -711,7 +721,7 @@ const Dashboard: React.FC = () => {
                                                     return (
                                                         <tr key={project.id} className="border-b border-neutral-50 dark:border-neutral-800/50 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
                                                             <td className="py-4 pl-2 font-bold text-neutral-800 dark:text-white">
-                                                                {project.company_name}
+                                                                {project.company_display_name || getCompanyDisplayName(project.company_name, project.company_alias)}
                                                             </td>
                                                             <td className="py-4">
                                                                 <span className="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-bold rounded-full border border-neutral-200 dark:border-neutral-700">

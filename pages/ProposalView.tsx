@@ -43,6 +43,7 @@ const ProposalView: React.FC = () => {
     });
     const [timestamp, setTimestamp] = useState<string | null>(null);
     const [clientCreationError, setClientCreationError] = useState(false);
+    const [clientCreationErrorMessage, setClientCreationErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         fetchProposal();
@@ -160,15 +161,19 @@ const ProposalView: React.FC = () => {
 
             // 4. Create client user account (Edge Function)
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                setClientCreationError(false);
+                setClientCreationErrorMessage(null);
                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
                 const response = await fetch(
                     `${supabaseUrl}/functions/v1/create-client-user`,
                     {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                            apikey: supabaseAnonKey,
+                            // Always use anon key on this public flow to avoid stale local sessions breaking the call.
+                            Authorization: `Bearer ${supabaseAnonKey}`,
                         },
                         body: JSON.stringify({
                             email: formData.email,
@@ -177,16 +182,27 @@ const ProposalView: React.FC = () => {
                     }
                 );
 
+                const result = await response.json().catch(() => null);
                 if (!response.ok) {
-                    throw new Error(`Edge Function failed: ${response.statusText}`);
+                    const details = result?.message || result?.error || `${response.status} ${response.statusText}`;
+                    throw new Error(String(details));
                 }
 
-                const result = await response.json();
                 console.log('Client user creation result:', result);
             } catch (clientErr) {
                 // Don't block acceptance if client creation fails, but notify UI
                 console.error('Error creating client user (non-blocking):', clientErr);
                 setClientCreationError(true);
+                const rawMessage = clientErr instanceof Error ? clientErr.message : String(clientErr);
+                const normalized = rawMessage.toLowerCase();
+                const rateLimited = normalized.includes('over_email_send_rate_limit')
+                    || normalized.includes('rate limit')
+                    || normalized.includes('aguarde');
+                setClientCreationErrorMessage(
+                    rateLimited
+                        ? 'A conta foi criada, mas o e-mail de recuperação entrou em limite de envio temporário. Aguarde alguns segundos e use "Esqueci minha senha" na tela de login.'
+                        : 'A conta foi criada, mas houve falha no envio do e-mail de acesso. Nosso time pode reenviar manualmente.'
+                );
             }
 
             setTimestamp(new Date().toLocaleString('pt-BR'));
@@ -414,8 +430,12 @@ const ProposalView: React.FC = () => {
                                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                         </svg>
                                         <span>
-                                            Proposta aceita, mas houve um erro ao criar seu usuário automaticamente. <br />
-                                            <strong>Por favor, entre em contato com nosso time para receber seu acesso.</strong>
+                                            {clientCreationErrorMessage || (
+                                                <>
+                                                    Proposta aceita, mas houve um erro ao criar seu usuário automaticamente. <br />
+                                                    <strong>Por favor, entre em contato com nosso time para receber seu acesso.</strong>
+                                                </>
+                                            )}
                                         </span>
                                     </>
                                 ) : (

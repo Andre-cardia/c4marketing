@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { TrafficProjectView } from './components/TrafficProjectView';
 import { LandingPageProjectView } from './components/LandingPageProjectView';
 import { WebsiteProjectView } from './components/WebsiteProjectView';
+import { getCompanyDisplayName } from '../../lib/utils';
 
 const LOGO_URL = '/logo-c4-prancheta-7.png';
 
@@ -60,7 +61,7 @@ const ClientDashboard: React.FC = () => {
             setLoading(true);
             const { data: acceptance, error: accErr } = await supabase
                 .from('acceptances')
-                .select('id, name, email, company_name, timestamp')
+                .select('id, name, email, company_name, company_alias, timestamp')
                 .eq('id', accId)
                 .single();
             if (accErr || !acceptance) { setLoading(false); return; }
@@ -76,7 +77,7 @@ const ClientDashboard: React.FC = () => {
             setLoading(true);
             const { data: acceptances, error: accErr } = await supabase
                 .from('acceptances')
-                .select('id, name, email, company_name, timestamp')
+                .select('id, name, email, company_name, company_alias, timestamp')
                 .eq('email', email);
             if (accErr || !acceptances || acceptances.length === 0) { setLoading(false); return; }
             const results: ProjectSummary[] = [];
@@ -173,7 +174,10 @@ const ClientDashboard: React.FC = () => {
     }
 
     const firstProject = allProjects[0];
-    const clientName = firstProject.acceptance?.company_name || firstProject.acceptance?.name || 'Cliente';
+    const clientName = getCompanyDisplayName(
+        firstProject.acceptance?.company_name,
+        firstProject.acceptance?.company_alias
+    ) || firstProject.acceptance?.name || 'Cliente';
 
     const navInactive = 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white border border-transparent';
     const navActive = 'bg-brand-coral/10 text-brand-coral border border-brand-coral/20';

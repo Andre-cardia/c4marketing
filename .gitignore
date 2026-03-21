@@ -27,3 +27,4 @@ dist-ssr
 
 # Large files
 assets/C4*.pdf
+.vercel
