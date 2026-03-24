@@ -5,6 +5,13 @@ import {
   normalizeWebsiteDeliveryTimeline,
   WEBSITE_MAX_LAYOUT_REVISIONS,
 } from '../lib/contractTerms';
+import {
+  getProposalServiceLabel,
+  hasServicePaymentTerms,
+  isOneTimeProposalService,
+  normalizeOneTimePaymentTerms,
+  DEFAULT_ONE_TIME_PAYMENT_TERMS,
+} from '../lib/proposalPaymentTerms';
 
 interface ContractDetailsProps {
   services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
@@ -34,6 +41,19 @@ const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
   const deadlineText = deadlines.length > 0
     ? `Prazos estimados após recebimento do material: ${deadlines.join('; ')}.`
     : "O prazo de entrega inicia-se após o recebimento de todo o material (briefing, textos e imagens) por parte do cliente.";
+
+  // Payment terms for one-time services
+  const oneTimeServicesWithData = normalizedServices.filter(
+    (service: any) => isOneTimeProposalService(service.id)
+  );
+  const oneTimePaymentTermsContent = oneTimeServicesWithData.length > 0
+    ? oneTimeServicesWithData.map((service: any) => {
+        const terms = hasServicePaymentTerms(service.paymentTerms)
+          ? normalizeOneTimePaymentTerms(service.paymentTerms)
+          : DEFAULT_ONE_TIME_PAYMENT_TERMS;
+        return `${getProposalServiceLabel(service.id)}: ${terms}`;
+      }).join(' | ')
+    : '';
 
   const clauses = [
     {
@@ -67,6 +87,11 @@ const ContractDetails: React.FC<ContractDetailsProps> = ({ services = [] }) => {
       title: "Acessos e Migração",
       content: "Para websites, a CONTRATADA deve disponibilizar acessos administrativos, arquivos, banco de dados e backups necessários para gestão ou migração, inclusive em caso de rescisão, em até 5 dias úteis.",
       show: hasWebsite
+    },
+    {
+      title: "Condições de Pagamento dos Projetos Únicos",
+      content: oneTimePaymentTermsContent,
+      show: hasOneTime && oneTimePaymentTermsContent.length > 0
     },
     {
       title: "Uso de Marca",

@@ -6,12 +6,14 @@ import {
   isOneTimeProposalService,
   normalizeOneTimePaymentTerms,
 } from '../lib/proposalPaymentTerms';
+import { normalizeWebsiteDeliveryTimeline } from '../lib/contractTerms';
 
 interface PricingProps {
   services?: {
     id: string;
     price: number;
     details?: string;
+    deliveryTimeline?: string;
     paymentTerms?: string;
     recurringPrice?: number;
     setupPrice?: number;
@@ -28,7 +30,7 @@ const Pricing: React.FC<PricingProps> = ({
   // Helper to normalize services input
   const normalizedServices = Array.isArray(services)
     ? services.map(s => typeof s === 'string'
-      ? { id: s, price: 0, details: '', paymentTerms: undefined, recurringPrice: 0, setupPrice: 0 }
+      ? { id: s, price: 0, details: '', deliveryTimeline: undefined, paymentTerms: undefined, recurringPrice: 0, setupPrice: 0 }
       : s)
     : [];
 
@@ -150,17 +152,28 @@ const Pricing: React.FC<PricingProps> = ({
                       {oneTimeServicesWithPaymentTerms.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Condições dos Projetos Únicos</p>
-                          {oneTimeServicesWithPaymentTerms.map(service => (
-                            <div key={`${service.id}-payment-terms`} className="rounded-xl border border-slate-200 bg-white p-3">
-                              <div className="flex items-center justify-between gap-3 mb-1">
-                                <span className="text-xs font-bold text-slate-700">{getProposalServiceLabel(service.id)}</span>
-                                <span className="text-xs font-semibold text-slate-500">{formatCurrency(getSetupAmount(service))}</span>
+                          {oneTimeServicesWithPaymentTerms.map(service => {
+                            const deliveryTimeline = normalizeWebsiteDeliveryTimeline((service as { deliveryTimeline?: string }).deliveryTimeline);
+                            return (
+                              <div key={`${service.id}-payment-terms`} className="rounded-xl border border-slate-200 bg-white p-3">
+                                <div className="flex items-center justify-between gap-3 mb-1">
+                                  <span className="text-xs font-bold text-slate-700">{getProposalServiceLabel(service.id)}</span>
+                                  <span className="text-xs font-semibold text-slate-500">{formatCurrency(getSetupAmount(service))}</span>
+                                </div>
+                                {deliveryTimeline && (
+                                  <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Prazo estimado: {deliveryTimeline}
+                                  </p>
+                                )}
+                                <p className="text-xs leading-relaxed text-slate-500">
+                                  {normalizeOneTimePaymentTerms(service.paymentTerms)}
+                                </p>
                               </div>
-                              <p className="text-xs leading-relaxed text-slate-500">
-                                {normalizeOneTimePaymentTerms(service.paymentTerms)}
-                              </p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
