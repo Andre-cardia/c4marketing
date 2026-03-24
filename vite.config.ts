@@ -21,8 +21,11 @@ export default defineConfig(({ mode }) => {
     envDir: projectRoot,
     server: {
       port: 3000,
-      strictPort: true,
       host: '0.0.0.0',
+      watch: {
+        ignored: ['**/.claude/**'],
+      },
+      preTransformRequests: false,
       proxy: {
         '/api/openai': {
           target: 'https://api.openai.com',
@@ -32,6 +35,9 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: [react()],
+    optimizeDeps: {
+      holdUntilCrawlEnd: false,
+    },
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),

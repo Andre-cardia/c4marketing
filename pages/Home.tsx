@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { useUserRole } from '../lib/UserRoleContext';
 import { ArrowRight, UserPlus, Lock, Mail, KeyRound, Eye, EyeOff, Shield, Zap, BarChart3 } from 'lucide-react';
 
-/** Returns the home path for a given role */
-const homePathForRole = (role: string | null): string => {
-  if (role === 'cliente') return '/client';
-  if (role === 'financeiro' || role === 'leitor') return '/account';
-  return '/dashboard';
-};
-
 const Home: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,36 +13,50 @@ const Home: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { userRole, loading: roleLoading } = useUserRole();
 
-  // Redirect already-authenticated users to their home page
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setError(`ERRO DE CONFIGURAÇÃO: ${supabaseConfigError || 'As variáveis de ambiente do Supabase (URL/KEY) não foram carregadas.'} O sistema não pode se conectar ao banco de dados.`);
+    } else {
+      checkUser();
+    }
+  }, []);
+
+  const checkUser = async () => {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const hasRecoveryInHash =
+      window.location.hash.includes('type=recovery') ||
+      hashParams.has('access_token') ||
+      hashParams.has('refresh_token');
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasRecoveryInQuery =
+      searchParams.get('type') === 'recovery' ||
+      searchParams.has('token_hash') ||
+      searchParams.has('code');
+    if (hasRecoveryInHash || hasRecoveryInQuery) {
       return;
     }
-    if (!roleLoading && userRole) {
-      navigate(homePathForRole(userRole), { replace: true });
-    }
-  }, [roleLoading, userRole]);
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      });
-      if (error) throw error;
-      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada e clique no link para redefinir sua senha.');
-    } catch (err: any) {
-      setError(err.message || 'Não foi possível enviar o e-mail. Tente novamente.');
-    } finally {
-      setLoading(false);
+    // If browser has stale auth state, clear it instead of redirecting in loop.
+    const firstUserCheck = await supabase.auth.getUser();
+    if (firstUserCheck.error || !firstUserCheck.data?.user) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshed.session) {
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const secondUserCheck = await supabase.auth.getUser();
+      if (secondUserCheck.error || !secondUserCheck.data?.user) {
+        await supabase.auth.signOut();
+        return;
+      }
     }
+
+    navigate('/dashboard');
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -61,13 +67,33 @@ const Home: React.FC = () => {
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
+        await supabase.auth.signOut().catch(() => null);
+
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        // Navigate based on role — role will be resolved by UserRoleContext after SIGNED_IN event
-        // Use a generic navigate; ProtectedRoute will handle role-based redirects.
+
+        let activeSession = data.session;
+        const firstUserCheck = await supabase.auth.getUser();
+        if (firstUserCheck.error || !firstUserCheck.data?.user) {
+          const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshed.session) {
+            throw new Error('Não foi possível validar sua sessão. Faça login novamente.');
+          }
+          activeSession = refreshed.session;
+
+          const secondUserCheck = await supabase.auth.getUser();
+          if (secondUserCheck.error || !secondUserCheck.data?.user) {
+            throw new Error('Não foi possível validar sua sessão. Faça login novamente.');
+          }
+        }
+
+        if (!activeSession) {
+          throw new Error('Não foi possível iniciar sua sessão. Faça login novamente.');
+        }
+
         navigate('/dashboard');
       } else {
         // Register Mode (First Access)
@@ -104,6 +130,24 @@ const Home: React.FC = () => {
       } else {
         setError(err.message || 'Ocorreu um erro. Tente novamente.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const redirectTo = `${window.location.origin}/recover-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) throw error;
+      setSuccessMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao enviar e-mail. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -198,7 +242,7 @@ const Home: React.FC = () => {
             <div className="relative mb-8">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2.5 bg-brand-coral/10 border border-brand-coral/20 rounded-xl">
-                  {mode === 'login' ? <KeyRound size={20} className="text-brand-coral" /> : mode === 'register' ? <UserPlus size={20} className="text-brand-coral" /> : <Mail size={20} className="text-brand-coral" />}
+                  {mode === 'register' ? <UserPlus size={20} className="text-brand-coral" /> : <KeyRound size={20} className="text-brand-coral" />}
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">
@@ -232,7 +276,7 @@ const Home: React.FC = () => {
             )}
 
             {/* Form */}
-            <form onSubmit={mode === 'forgot-password' ? handleForgotPassword : handleAuth} className="space-y-5">
+            <form onSubmit={mode === 'forgot' ? handleForgotPassword : handleAuth} className="space-y-5">
               {/* Email */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
@@ -251,44 +295,31 @@ const Home: React.FC = () => {
                 </div>
               </div>
 
-              {/* Password (hidden on forgot-password mode) */}
-              {mode !== 'forgot-password' && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between ml-1">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-                      Senha
-                    </label>
-                    {mode === 'login' && (
-                      <button
-                        type="button"
-                        onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
-                        className="text-[10px] text-slate-500 hover:text-brand-coral transition-colors font-medium uppercase tracking-wider"
-                      >
-                        Esqueci minha senha
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative group">
-                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
-                      placeholder="••••••••"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
+              {/* Password */}
+              {mode !== 'forgot' && <div className="space-y-2">
+                <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 ml-1">
+                  Senha
+                </label>
+                <div className="relative group">
+                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-brand-coral transition-colors" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-11 pr-12 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder:text-slate-600 focus:border-brand-coral/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-brand-coral/10 outline-none transition-all text-sm font-medium"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-              )}
+              </div>}
 
               {/* Confirm Password (Register mode) */}
               {mode === 'register' && (
@@ -325,20 +356,10 @@ const Home: React.FC = () => {
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                       Processando...
                     </>
-                  ) : mode === 'forgot-password' ? (
-                    <>
-                      Enviar link de recuperação
-                      <Mail className="w-4 h-4" />
-                    </>
-                  ) : mode === 'login' ? (
-                    <>
-                      Acessar Dashboard
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </>
                   ) : (
                     <>
-                      Criar Senha de Acesso
-                      <Lock className="w-4 h-4" />
+                      {mode === 'login' ? 'Acessar Dashboard' : mode === 'register' ? 'Criar Senha de Acesso' : 'Enviar link de recuperação'}
+                      {mode === 'login' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : mode === 'register' ? <Lock className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
                     </>
                   )}
                 </span>
@@ -352,7 +373,7 @@ const Home: React.FC = () => {
                   <p className="text-sm text-slate-600">
                     Primeiro acesso?{' '}
                     <button
-                      onClick={() => { setMode('register'); setError(null); setSuccessMessage(null); }}
+                      onClick={() => { setMode('register'); setError(null); }}
                       className="text-brand-coral font-bold hover:text-white transition-colors"
                     >
                       Criar senha
@@ -361,7 +382,7 @@ const Home: React.FC = () => {
                   <p className="text-sm text-slate-600">
                     Esqueceu a senha?{' '}
                     <button
-                      onClick={() => { setMode('forgot-password'); setError(null); setSuccessMessage(null); }}
+                      onClick={() => { setMode('forgot'); setError(null); }}
                       className="text-brand-coral font-bold hover:text-white transition-colors"
                     >
                       Recuperar senha
@@ -370,9 +391,9 @@ const Home: React.FC = () => {
                 </>
               ) : (
                 <p className="text-sm text-slate-600">
-                  {mode === 'forgot-password' ? 'Lembrou a senha?' : 'Já tem conta?'}{' '}
+                  Lembrou a senha?{' '}
                   <button
-                    onClick={() => { setMode('login'); setError(null); setSuccessMessage(null); }}
+                    onClick={() => { setMode('login'); setError(null); }}
                     className="text-brand-coral font-bold hover:text-white transition-colors"
                   >
                     Fazer login

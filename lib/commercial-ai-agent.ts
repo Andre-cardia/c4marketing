@@ -1,8 +1,5 @@
 import { supabase } from './supabase';
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
-const BASE_URL = import.meta.env.DEV ? '/api/openai' : 'https://api.openai.com';
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface MonthlyMetrics {
@@ -434,10 +431,6 @@ export async function chatWithDirector(
     messages: ChatMessage[],
     context: CommercialContext
 ): Promise<string> {
-    if (!OPENAI_API_KEY) {
-        throw new Error('OpenAI API Key não encontrada. Verifique seu arquivo .env.');
-    }
-
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
@@ -458,58 +451,15 @@ ${context.months.map(m => `${m.monthLabel}: MRR ${formatCurrency(m.mrr)} | Novos
 ${context.comparisonMonths ? `\nCOMPARAÇÃO COM ${context.comparisonYear}:\n${context.comparisonMonths.map(m => `${m.monthLabel}: MRR ${formatCurrency(m.mrr)} | Novos: ${m.newContracts} | Churn: ${m.churnedContracts} | Conversão: ${m.conversionRate}%`).join('\n')}` : ''}
 `;
 
-    const systemPrompt = `Você é o Diretor Comercial de IA da C4 Marketing.
-Seu papel é analisar métricas comerciais, identificar tendências, fazer análises preditivas e recomendar ações estratégicas.
+    const { data, error } = await supabase.functions.invoke('ai-proxy', {
+        body: {
+            action: 'chat_director',
+            messages,
+            contextSummary,
+        },
+    });
 
-Capacidades:
-- Análise de MRR, ARR, churn e conversão
-- Identificação de tendências de crescimento ou declínio
-- Análise preditiva baseada em padrões históricos
-- Recomendações de estratégia comercial
-- Comparações entre períodos
+    if (error) throw new Error(error.message || 'Erro ao comunicar com a IA.');
 
-Regras:
-- Responda SEMPRE em português do Brasil
-- Seja direto e objetivo, com insights acionáveis
-- Use dados numéricos para embasar suas análises
-- Quando fizer previsões, explique o raciocínio
-- Use emojis profissionais de forma moderada
-- Formate números monetários em BRL (R$)
-- Não invente dados que não existam no contexto
-
-${contextSummary}`;
-
-    const fullMessages = [
-        { role: 'system' as const, content: systemPrompt },
-        ...messages
-    ];
-
-    try {
-        const response = await fetch(`${BASE_URL}/v1/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: fullMessages,
-                temperature: 0.4,
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error?.message || 'Erro ao comunicar com a IA.');
-        }
-
-        return data.choices[0].message.content.trim();
-    } catch (error: any) {
-        console.error('Erro no chatbot comercial:', error);
-        if (error.message === 'Failed to fetch') {
-            throw new Error('Erro de conexão. Verifique sua internet e a chave API.');
-        }
-        throw error;
-    }
+    return data.reply;
 }

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getCompanyDisplayName } from '../../lib/utils';
 
 const Ecommerce: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -16,12 +17,12 @@ const Ecommerce: React.FC = () => {
             try {
                 const { data, error } = await supabase
                     .from('acceptances')
-                    .select('company_name')
+                    .select('company_name, company_alias')
                     .eq('id', id)
                     .single();
 
                 if (data) {
-                    setCompanyName(data.company_name);
+                    setCompanyName(getCompanyDisplayName(data.company_name, data.company_alias));
                 }
             } catch (error) {
                 console.error('Error fetching project:', error);

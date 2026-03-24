@@ -4,6 +4,7 @@ import { useUserRole } from '../lib/UserRoleContext';
 import { supabase } from '../lib/supabase';
 import TaskModal from '../components/projects/TaskModal';
 import { getLatestFeedback, markFeedbackRead, generateUserFeedback, getSmartUserFeedback, AiFeedback } from '../lib/ai-agent';
+import { getCompanyDisplayName } from '../lib/utils';
 
 interface Task {
     id: string;
@@ -214,8 +215,10 @@ const Account: React.FC = () => {
         setLoadingTasks(true);
         try {
             // 1. Fetch Acceptances (Projects) for name mapping
-            const { data: projectsData } = await supabase.from('acceptances').select('id, company_name');
-            const projectsMap = new Map(projectsData?.map((p: any) => [p.id, p.company_name]) || []);
+            const { data: projectsData } = await supabase.from('acceptances').select('id, company_name, company_alias');
+            const projectsMap = new Map(
+                projectsData?.map((p: any) => [p.id, getCompanyDisplayName(p.company_name, p.company_alias)]) || []
+            );
 
             // 2. Fetch Pending Tasks
             const { data: tasksData, error } = await supabase

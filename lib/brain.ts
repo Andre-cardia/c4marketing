@@ -33,64 +33,11 @@ function isInvalidJwtMessage(message: string): boolean {
         || normalized.includes('jwt expired')
         || normalized.includes('token is expired')
         || normalized.includes('jwt malformed')
-        || normalized.includes('session from session_id claim in jwt does not exist');
-}
-
-type TokenDebug = {
-    ref: string | null;
-    role: string | null;
-    sub: string | null;
-    exp: number | null;
-};
-
-function getProjectRefFromSupabaseUrl(url?: string): string | null {
-    if (!url) return null;
-    try {
-        const host = new URL(url).hostname; // <ref>.supabase.co
-        return host.split('.')[0] || null;
-    } catch {
-        return null;
-    }
-}
-
-function decodeJwtPayload(token: string): Record<string, any> | null {
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
-        const json = atob(padded);
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
-
-function getProjectRefFromJwt(token: string): string | null {
-    const payload = decodeJwtPayload(token);
-    if (!payload) return null;
-
-    const fromRef = typeof payload.ref === 'string' ? payload.ref : null;
-    if (fromRef) return fromRef;
-
-    const iss = typeof payload.iss === 'string' ? payload.iss : '';
-    const match = iss.match(/https:\/\/([a-z0-9]+)\.supabase\.co\/auth\/v1/i);
-    return match?.[1] ?? null;
-}
-
-function getTokenDebug(token: string): TokenDebug {
-    const payload = decodeJwtPayload(token) || {};
-    return {
-        ref: getProjectRefFromJwt(token),
-        role: typeof payload.role === 'string' ? payload.role : null,
-        sub: typeof payload.sub === 'string' ? payload.sub : null,
-        exp: typeof payload.exp === 'number' ? payload.exp : null,
-    };
-}
-
-function isExpired(exp: number | null): boolean {
-    if (!exp) return false;
-    return exp <= Math.floor(Date.now() / 1000);
+        || normalized.includes('session from session_id claim in jwt does not exist')
+        || normalized.includes('sessao invalida')
+        || normalized.includes('sessão inválida')
+        || normalized.includes('sessao expirada')
+        || normalized.includes('sessão expirada');
 }
 
 type ChatBrainPayload = {
@@ -99,24 +46,15 @@ type ChatBrainPayload = {
     client_today?: string;
     client_tz?: string;
     forced_agent?: string;
-    screenshot_base64?: string;   // Vision Perception: captura da tela atual (opcional)
 }
 
-/** Captura a tela atual via html2canvas e retorna base64 JPEG comprimido. */
-export async function capturePageScreenshot(): Promise<string | null> {
-    try {
-        const html2canvas = (await import('html2canvas')).default
-        const canvas = await html2canvas(document.body, {
-            scale: 0.6,
-            useCORS: true,
-            logging: false,
-            removeContainer: true,
-        })
-        return canvas.toDataURL('image/jpeg', 0.75).split(',')[1] // só o base64
-    } catch (err) {
-        console.warn('[brain] capturePageScreenshot failed (silenced):', err)
-        return null
-    }
+function normalizeAccessToken(token?: string | null): string | null {
+    if (!token) return null;
+    const cleaned = token.trim().replace(/^Bearer\s+/i, '');
+    const parts = cleaned.split('.');
+    if (parts.length !== 3) return null;
+    if (!parts[0] || !parts[1] || !parts[2]) return null;
+    return cleaned;
 }
 
 async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: string): Promise<AskBrainResponse> {
@@ -127,12 +65,17 @@ async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: strin
         throw new Error('Supabase env ausente no frontend (URL/ANON_KEY).');
     }
 
+    const safeToken = normalizeAccessToken(bearerToken);
+    if (!safeToken) {
+        throw new Error('invalid_jwt_format');
+    }
+
     const res = await fetch(`${supabaseUrl}/functions/v1/chat-brain`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             apikey: anonKey,
-            Authorization: `Bearer ${bearerToken}`,
+            Authorization: `Bearer ${safeToken}`,
         },
         body: JSON.stringify(payload),
     });
@@ -151,7 +94,8 @@ async function callChatBrainDirect(payload: ChatBrainPayload, bearerToken: strin
 }
 
 async function callChatBrainInvoke(payload: ChatBrainPayload, bearerToken?: string | null): Promise<AskBrainResponse> {
-    const headers = bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined;
+    const safeToken = normalizeAccessToken(bearerToken);
+    const headers = safeToken ? { Authorization: `Bearer ${safeToken}` } : undefined;
     const { data, error } = await supabase.functions.invoke('chat-brain', {
         body: payload,
         headers,
@@ -171,47 +115,27 @@ async function callChatBrainInvoke(payload: ChatBrainPayload, bearerToken?: stri
 }
 
 async function getValidAccessToken(): Promise<string | null> {
-    const { data: sessionData } = await supabase.auth.getSession();
-    let session = sessionData.session;
-    if (!session?.access_token) return null;
-
-    const ensureTokenIsUsable = async (candidateToken: string): Promise<boolean> => {
-        const { error } = await supabase.auth.getUser(candidateToken);
-        return !error;
+    const getSessionToken = async (): Promise<string | null> => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        return normalizeAccessToken(sessionData.session?.access_token ?? null);
     };
 
-    const initialToken = session.access_token;
-    const initialValid = await ensureTokenIsUsable(initialToken);
-    if (!initialValid) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshed.session?.access_token) return null;
-        session = refreshed.session;
-        const refreshedValid = await ensureTokenIsUsable(session.access_token);
-        if (!refreshedValid) return null;
-        return session.access_token;
+    // Pré-check não bloqueante: usa token local se existir.
+    const localToken = await getSessionToken();
+    if (localToken) return localToken;
+
+    // Mitiga corrida de inicialização do Supabase Auth no carregamento da página.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const retryLocalToken = await getSessionToken();
+    if (retryLocalToken) return retryLocalToken;
+
+    // Se não houver token local, tenta refresh uma vez.
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshed.session?.access_token) {
+        return normalizeAccessToken(refreshed.session.access_token);
     }
 
-    const initialDebug = getTokenDebug(initialToken);
-    const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
-    const isNearExpiry = !!expiresAtMs && (expiresAtMs - Date.now()) < 60_000;
-    const hasSubMismatch = !!(session.user?.id && initialDebug.sub && session.user.id !== initialDebug.sub);
-    const shouldRefresh = isNearExpiry || hasSubMismatch || isExpired(initialDebug.exp);
-
-    if (shouldRefresh) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshed.session?.access_token) {
-            session = refreshed.session;
-            const refreshedValid = await ensureTokenIsUsable(session.access_token);
-            if (!refreshedValid) return null;
-        } else {
-            // If token is already invalid/expired and refresh failed, do not reuse a stale token.
-            if (hasSubMismatch || isExpired(initialDebug.exp)) {
-                return null;
-            }
-        }
-    }
-
-    return session?.access_token ?? null;
+    return null;
 }
 
 async function parseInvokeError(error: any, fallback: string): Promise<string> {
@@ -228,6 +152,17 @@ async function parseInvokeError(error: any, fallback: string): Promise<string> {
     }
 
     return details;
+}
+
+function buildReauthRequiredResponse(details?: string): AskBrainResponse {
+    return {
+        answer: 'Sua sessão expirou ou ficou inválida. Por favor, atualize a página ou faça login novamente para continuar usando o agente.',
+        documents: [],
+        meta: {
+            auth: 'reauth_required',
+            ...(details ? { reason: details } : {}),
+        },
+    };
 }
 
 export async function addToBrain(content: string, metadata: Record<string, any> = {}) {
@@ -266,7 +201,7 @@ export async function addToBrain(content: string, metadata: Record<string, any> 
 export async function askBrain(
     query: string,
     sessionId?: string,
-    options?: { forcedAgent?: string; screenshotBase64?: string }
+    options?: { forcedAgent?: string }
 ): Promise<AskBrainResponse> {
     const now = new Date();
     const clientToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -281,117 +216,74 @@ export async function askBrain(
     if (options?.forcedAgent) {
         payload.forced_agent = options.forcedAgent;
     }
-
-    // Vision Perception: usa screenshot fornecido ou captura automaticamente
-    const screenshot = options?.screenshotBase64 ?? await capturePageScreenshot()
-    if (screenshot) {
-        payload.screenshot_base64 = screenshot
-        console.log('[brain] screenshot capturado:', screenshot.length, 'chars base64')
-    } else {
-        console.warn('[brain] screenshot não disponível (capturePageScreenshot retornou null)')
-    }
-
-    const expectedRef = getProjectRefFromSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
-
-    let token = await getValidAccessToken();
-    if (!token) {
-        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshed.session?.access_token) {
-            token = refreshed.session.access_token;
-        }
-    }
-
-    if (token) {
-        const { error: tokenValidationError } = await supabase.auth.getUser(token);
-        if (tokenValidationError) {
-            token = null;
-        }
-    }
-
-    if (!token) {
-        return {
-            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: Sessão expirada. Faça login novamente.',
-            documents: [],
-        };
-    }
-
     // Para agentes especializados (forced_agent), faz refresh proativo do token.
     if (options?.forcedAgent) {
-        const { data: preRefreshed, error: preRefreshError } = await supabase.auth.refreshSession();
-        if (!preRefreshError && preRefreshed?.session?.access_token) {
-            token = preRefreshed.session.access_token;
-        }
+        await supabase.auth.refreshSession().catch(() => null);
     }
 
-    const tokenInfo = getTokenDebug(token);
-    if (expectedRef && tokenInfo.ref && expectedRef !== tokenInfo.ref) {
-        return {
-            answer: `Falha de integração com o Segundo Cérebro. Detalhes: token de autenticação de outro projeto (token: ${tokenInfo.ref}, app: ${expectedRef}). Corrija VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY do frontend.`,
-            documents: [],
-        };
-    }
-
-    if (tokenInfo.role === 'anon') {
-        return {
-            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: sessão atual está anônima (role=anon), não autenticada.',
-            documents: [],
-        };
-    }
-
-    if (isExpired(tokenInfo.exp)) {
-        return {
-            answer: 'Falha de integração com o Segundo Cérebro. Detalhes: token expirado. Faça login novamente.',
-            documents: [],
-        };
-    }
-
-    const { error: userCheckError } = await supabase.auth.getUser(token);
-    if (userCheckError) {
-        console.warn('askBrain auth precheck warning (continuing to edge function validation):', userCheckError.message);
+    const initialToken = await getValidAccessToken();
+    if (!initialToken) {
+        return buildReauthRequiredResponse('missing_or_expired_session');
     }
 
     try {
-        return await callChatBrainInvoke(payload, token);
+        // Sempre enviar o token explicitamente para evitar chamadas anônimas no Edge Function.
+        return await callChatBrainInvoke(payload, initialToken);
     } catch (firstError: any) {
         const firstMessage = firstError?.message || String(firstError);
         console.error('askBrain first attempt failed:', firstMessage);
 
         // Se o JWT do usuário estiver inválido, tenta com sessão renovada.
         if (isInvalidJwtMessage(firstMessage)) {
-            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
-            const retryToken = refreshed?.session?.access_token;
-            if (!refreshError && retryToken) {
-                try {
+            // Tenta chamada direta com o token atual antes do refresh
+            // para evitar perda de sessão em refresh com estado inconsistente.
+            try {
+                return await callChatBrainDirect(payload, initialToken);
+            } catch (directInitialError: any) {
+                const directInitialMessage = directInitialError?.message || String(directInitialError);
+                console.error('askBrain direct attempt with initial token failed:', directInitialMessage);
+                if (!isInvalidJwtMessage(directInitialMessage)) {
+                    return {
+                        answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${directInitialMessage}`,
+                        documents: [],
+                    };
+                }
+            }
+
+            await supabase.auth.refreshSession().catch(() => null);
+            const retryToken = await getValidAccessToken();
+
+            try {
+                if (retryToken) {
                     return await callChatBrainInvoke(payload, retryToken);
-                } catch (secondError: any) {
-                    const secondMessage = secondError?.message || String(secondError);
-                    console.error('askBrain second attempt (refreshed token) failed:', secondMessage);
-                    if (!isInvalidJwtMessage(secondMessage)) {
+                }
+            } catch (secondError: any) {
+                const secondMessage = secondError?.message || String(secondError);
+                console.error('askBrain second attempt (refresh + invoke) failed:', secondMessage);
+                if (!isInvalidJwtMessage(secondMessage)) {
+                    return {
+                        answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${secondMessage}`,
+                        documents: [],
+                    };
+                }
+            }
+
+            if (retryToken) {
+                try {
+                    return await callChatBrainDirect(payload, retryToken);
+                } catch (thirdError: any) {
+                    const thirdMessage = thirdError?.message || String(thirdError);
+                    console.error('askBrain third attempt (direct fetch) failed:', thirdMessage);
+                    if (!isInvalidJwtMessage(thirdMessage)) {
                         return {
-                            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${secondMessage}`,
+                            answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${thirdMessage}`,
                             documents: [],
                         };
                     }
-
-                    // Fallback final para contornar possíveis inconsistências de header no invoke.
-                    try {
-                        return await callChatBrainDirect(payload, retryToken);
-                    } catch (thirdError: any) {
-                        const thirdMessage = thirdError?.message || String(thirdError);
-                        console.error('askBrain third attempt (direct fetch) failed:', thirdMessage);
-                        if (!isInvalidJwtMessage(thirdMessage)) {
-                            return {
-                                answer: `Falha de integração com o Segundo Cérebro. Detalhes: ${thirdMessage}`,
-                                documents: [],
-                            };
-                        }
-                    }
                 }
             }
-            return {
-                answer: 'Sua sessão expirou ou ficou inválida. Por favor, atualize a página ou faça login novamente para continuar usando o agente.',
-                documents: [],
-            };
+
+            return buildReauthRequiredResponse('invalid_jwt_after_refresh');
         }
 
         return {

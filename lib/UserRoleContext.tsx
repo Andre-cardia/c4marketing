@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
-import { logUserAccess } from './accessTracking';
 
-type UserRole = 'admin' | 'leitor' | 'financeiro' | 'comercial' | 'gestor' | 'operacional' | 'cliente' | null;
+type UserRole = 'admin' | 'leitor' | 'comercial' | 'gestor' | 'operacional' | 'cliente' | null;
 
 interface UserRoleContextType {
     userRole: UserRole;
@@ -23,6 +22,27 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [calComLink, setCalComLink] = useState<string | null>(null);
     const [email, setEmail] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const logAccess = async (userId: string, userEmail: string) => {
+        const THROTTLE_MINUTES = 15;
+        const lastLogKey = `lastAccessLog_${userId}`;
+        const lastLogTime = localStorage.getItem(lastLogKey);
+        const now = new Date().getTime();
+
+        if (lastLogTime && (now - parseInt(lastLogTime)) < THROTTLE_MINUTES * 60 * 1000) {
+            return; // Skip if logged recently
+        }
+
+        try {
+            await supabase.from('access_logs').insert({
+                user_id: userId,
+                user_email: userEmail
+            });
+            localStorage.setItem(lastLogKey, now.toString());
+        } catch (error) {
+            console.error('Error logging access:', error);
+        }
+    };
 
     const fetchUserRole = async () => {
         setLoading(true);
@@ -48,19 +68,19 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 setEmail(activeSession.user.email ?? null);
                 const { data } = await supabase
                     .from('app_users')
-                    .select('role, full_name, name, avatar_url, cal_com_link')
+                    .select('role, full_name, avatar_url, cal_com_link')
                     .eq('email', activeSession.user.email)
                     .single();
 
                 if (data) {
                     setUserRole(data.role as UserRole);
-                    setFullName(data.full_name || data.name || null);
+                    setFullName(data.full_name);
                     setAvatarUrl(data.avatar_url);
                     setCalComLink(data.cal_com_link);
 
                     // Log access
                     if (activeSession.user.email) {
-                        void logUserAccess({ force: true });
+                        logAccess(activeSession.user.id, activeSession.user.email);
                     }
                 } else {
                     setUserRole(null);
@@ -105,25 +125,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
         });
 
-        const heartbeat = window.setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                void logUserAccess();
-            }
-        }, 5 * 60 * 1000);
-
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                void logUserAccess({ force: true });
-            }
-        };
-
-        document.addEventListener('visibilitychange', onVisibilityChange);
-
-        return () => {
-            subscription.unsubscribe();
-            window.clearInterval(heartbeat);
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-        };
+        return () => subscription.unsubscribe();
     }, []);
 
     return (

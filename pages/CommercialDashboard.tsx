@@ -131,7 +131,8 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
             {/* Bars */}
             {months.map((m, i) => {
                 const x = padding.left + (i * chartW / 12) + barGap / 2;
-                const mrrHeight = (m.mrr / maxVal) * chartH;
+                const recurringValue = m.isForecast ? m.forecastMRR : m.mrr;
+                const mrrHeight = (recurringValue / maxVal) * chartH;
                 const setupHeight = (m.setupRevenue / maxVal) * chartH;
                 const totalHeight = mrrHeight + setupHeight;
                 const y = padding.top + chartH - totalHeight;
@@ -141,7 +142,7 @@ const RevenueBarChart: React.FC<{ months: MonthlyMetrics[] }> = ({ months }) => 
                         {/* Recorrente (bottom) */}
                         <rect x={x} y={padding.top + chartH - mrrHeight} width={barWidth} height={mrrHeight}
                             rx={3} fill="#10b981" opacity={0.9}>
-                            <title>{`${m.monthLabel} - Recorrente: ${formatCurrency(m.mrr)}`}</title>
+                            <title>{`${m.monthLabel} - Recorrente: ${formatCurrency(recurringValue)}`}</title>
                         </rect>
                         {/* Setup (top) */}
                         <rect x={x} y={y} width={barWidth} height={setupHeight}
@@ -595,6 +596,15 @@ ${context.months.map(m =>
                 </div>
             ) : context ? (
                 <>
+                    {context.blockedNonRecurringContracts > 0 && (
+                        <div className="rounded-c4 border border-amber-900/60 bg-amber-950/20 px-4 py-3 text-sm text-amber-200">
+                            <span className="font-bold">{context.blockedNonRecurringContracts} contrato(s)</span> com revisao financeira pendente.
+                            <span className="ml-2">
+                                {formatCurrency(context.blockedNonRecurringRevenue)} de receita nao recorrente seguem fora da projecao ate o gestor concluir o cronograma.
+                            </span>
+                        </div>
+                    )}
+
                     {/* KPI Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
                         <KPICard
@@ -663,7 +673,7 @@ ${context.months.map(m =>
                         <div className="bg-neutral-900 border border-neutral-800 rounded-c4 p-6">
                             <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
                                 <BarChart3 size={16} className="text-blue-400" />
-                                Receita Mensal (Recorrente + Setup)
+                                Receita Mensal (Recorrente + Cronograma Nao Recorrente)
                             </h3>
                             <RevenueBarChart months={context.months} />
                         </div>
@@ -726,10 +736,10 @@ ${context.months.map(m =>
                                                 {formatCurrency(m.forecastMRR)}
                                             </td>
                                             <td className="py-3 px-3 text-right text-blue-400 font-medium">
-                                                {m.isForecast ? '—' : formatCurrency(m.setupRevenue)}
+                                                {formatCurrency(m.setupRevenue)}
                                             </td>
                                             <td className="py-3 px-3 text-right text-white font-bold">
-                                                {m.isForecast ? formatCurrency(m.forecastMRR) : formatCurrency(m.totalRevenue)}
+                                                {formatCurrency(m.totalRevenue)}
                                             </td>
                                             <td className="py-3 px-3 text-center text-slate-400">{m.isForecast ? '—' : m.totalProposals}</td>
                                             <td className="py-3 px-3 text-center text-emerald-400 font-medium">{m.isForecast ? '—' : m.acceptedProposals}</td>
@@ -758,10 +768,10 @@ ${context.months.map(m =>
                                             {formatCurrency(context.months.reduce((s, m) => s + m.forecastMRR, 0))}
                                         </td>
                                         <td className="py-3 px-3 text-right text-blue-400">
-                                            {formatCurrency(context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.setupRevenue, 0))}
+                                            {formatCurrency(context.months.reduce((s, m) => s + m.setupRevenue, 0))}
                                         </td>
                                         <td className="py-3 px-3 text-right text-white">
-                                            {formatCurrency(context.months.reduce((s, m) => s + (m.isForecast ? m.forecastMRR : m.totalRevenue), 0))}
+                                            {formatCurrency(context.months.reduce((s, m) => s + m.totalRevenue, 0))}
                                         </td>
                                         <td className="py-3 px-3 text-center text-slate-400">
                                             {context.months.filter(m => !m.isForecast).reduce((s, m) => s + m.totalProposals, 0)}

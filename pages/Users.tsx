@@ -9,7 +9,6 @@ import { useUserRole } from '../lib/UserRoleContext';
 interface AppUser {
     id: string; // generated uuid
     name: string;
-    full_name?: string | null;
     email: string;
     phone: string;
     role: 'leitor' | 'comercial' | 'gestor' | 'operacional';
@@ -133,7 +132,6 @@ const Users: React.FC = () => {
                 const { error: dbError } = await supabase.from('app_users').insert([{
                     id: authUser.id,
                     name: newUser.name,
-                    full_name: newUser.name,
                     email: newUser.email,
                     phone: newUser.phone,
                     role: newUser.role
@@ -163,13 +161,9 @@ const Users: React.FC = () => {
     };
 
     const handleUpdateRole = async (userId: string, newRole: string) => {
-        const { error } = await supabase
-            .from('app_users')
-            .update({ role: newRole })
-            .eq('id', userId);
+        const { error } = await supabase.from('app_users').update({ role: newRole }).eq('id', userId);
         if (error) {
-            console.error('Erro ao atualizar role:', error);
-            alert(`Erro ao atualizar permissão: ${error.message}`);
+            alert('Erro ao atualizar permissão.');
         } else {
             fetchUsers();
         }

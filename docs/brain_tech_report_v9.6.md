@@ -1,16 +1,8 @@
-## Relatório Técnico v9.6: Infraestrutura Resiliente + Análise de Divergências Pós-Go-Live
+## Relatório Técnico v9.6: Ajuste Financeiro Determinístico + Reforço Cognitivo Estratégico
 
-**Sistema "Segundo Cérebro" da C4 Marketing — 18 de Março de 2026**
+**Sistema "Segundo Cérebro" da C4 Marketing — 4 de Março de 2026**
 
-> Esta versão **inclui integralmente** todo o conteúdo da v9.5 (sem cortes) e acrescenta, ao final, o **Bloco 10 — Novo Ciclo v9.6** com a correção de incidentes críticos de infraestrutura e análise formal de divergências entre o documento v9.5 e o estado real de produção.
-
----
-
-## Relatório Técnico v9.5: Hardening Operacional e Governança de Memória Viva
-
-**Sistema "Segundo Cérebro" da C4 Marketing — 3 de Março de 2026**
-
-> Esta versão **inclui integralmente** todo o conteúdo da v9.2 (sem cortes) e acrescenta, ao final, o **Bloco 9 — Novo Ciclo v9.5** com o hardening operacional executado após o go-live controlado.
+> Esta versão **inclui integralmente** todo o conteúdo da v9.5 (sem cortes) e acrescenta, ao final, o **Bloco 10 — Novo Ciclo v9.6** com os ajustes cognitivos estratégicos e o fechamento financeiro determinístico (chat-brain + dashboard).
 
 ---
 
@@ -2591,343 +2583,218 @@ Atualização em 3 de março de 2026 (pós-hotfix): a pendência de higiene oper
 
 A v9.5 consolidou o Segundo Cérebro em um patamar de operação controlada com base técnica robusta, evidência contínua e governança ativa. O bloqueio principal para declaração de maturidade total deixou de ser estrutural e passou a ser **temporal/operacional** (cumprimento das janelas T+7/T+30 e streak de 14 dias).
 
-
 ---
 
-## Bloco 10 — Novo Ciclo v9.6: Infraestrutura Resiliente + Análise de Divergências Pós-Go-Live (18 de março de 2026)
+## Bloco 10 — Novo Ciclo v9.6: Ajuste Financeiro Determinístico + Reforço Cognitivo Estratégico (04 de março de 2026)
 
-> Data de fechamento deste ciclo: **18 de março de 2026**.
+> Data de fechamento deste ciclo: **4 de março de 2026**.
 
 ### 10.1 Objetivo do ciclo v9.6
 
-Após o fechamento técnico da v9.5 (2026-03-03), o ciclo v9.6 foi acionado por incidentes de infraestrutura detectados em produção entre 2026-03-03 e 2026-03-18:
+O ciclo v9.6 foi executado para fechar dois gaps críticos observados no uso real do Segundo Cérebro:
 
-1. resolução de três bugs críticos que impediam o uso do Segundo Cérebro localmente e comprometiam métricas de produção;
-2. realização de análise comparativa formal entre o documento v9.5 e o estado real de produção;
-3. hardening do canário operacional com detecção preventiva de conflito de sobrecarga de RPC (PGRST203);
-4. documentação das variáveis de ambiente necessárias para execução dos scripts de verificação.
-
----
+1. respostas estratégicas/financeiras com baixa recuperação de contexto canônico (missão, visão, valores, metas);
+2. desalinhamento entre fechamento comercial e início de faturamento no cálculo financeiro mensal (MRR/meta de mês e dashboard financeiro).
 
 ### 10.2 Linha do tempo técnica executada
 
 | Commit | Entrega | Resultado |
 |---|---|---|
-| CORS fix | `isAllowedOrigin()` + `strictPort` | Produção local restaurada |
-| JWT fix | Redeploy com `--no-verify-jwt` | Autenticação de edge function restaurada |
-| PGRST203 fix | Migration `20260318000000_drop_query_all_tasks_legacy_overload.sql` | Queries de tarefa restauradas |
-| Canary M5 | Teste T6 direto de RPC em `check_brain_canary.js` | Detecção preventiva de overload ativa |
-| `.env.example` | SUPABASE_SERVICE_ROLE_KEY + BRAIN_TEST_* | Documentação de setup de verificação |
-
----
+| `b943af7` | Fortalecimento de recuperação estratégica no `chat-brain` | Estratégia passou a usar fallback lexical determinístico com telemetria |
+| `7dac461` | Higiene operacional do canário | Cleanup seguro de marcadores `CANARY_MEMORY_*` via RPC |
+| `aaa2beb` | Ajuste financeiro operacional no Segundo Cérebro | Nova ação executora para corrigir início de faturamento + meta mensal robusta |
+| `0ba0692` | Correção do Dashboard Financeiro | Cálculo mensal de MRR passou a respeitar `billing_start_date`/`expiration_date` |
+| `workspace local (v9.6)` | Validador de regras financeiras ponta a ponta | Script dedicado com checagem sintética + paridade RPC + projeção mensal |
 
 ### 10.3 Implementações detalhadas
 
-#### 10.3.1 Bug Fix P0.1 — CORS rompido em ambiente local
+#### 10.3.1 Recuperação estratégica reforçada (chat-brain)
 
-**Arquivo:** `supabase/functions/chat-brain/index.ts`
+Implementado no `supabase/functions/chat-brain/index.ts`:
 
-**Causa raiz:** Deploy de 2026-03-16 substituiu `'Access-Control-Allow-Origin': '*'` por lista restrita de origens aceitas, incluindo apenas `localhost:3000` e `localhost:5173`. Se o Vite iniciasse em qualquer outra porta, o browser bloqueava a requisição no preflight CORS antes mesmo de chegar à edge function, resultando em `FunctionsFetchError` (falha de rede, não HTTP).
+- extração de palavras-chave de intenção estratégica (missão, visão, valores, metas, financeiro, comercial, operacional, estratégia, C4);
+- override de roteamento para RAG estratégico quando a pergunta exige contexto corporativo;
+- fallback lexical determinístico via RPC `search_strategic_context_docs` antes do fallback semântico puro;
+- metadados de rastreabilidade no retorno:
+  - `strategic_intent_keywords`
+  - `strategic_lexical_fallback_attempted`
+  - `strategic_lexical_docs_loaded`
+  - `strategic_lexical_fallback_error` (quando aplicável).
 
-**Diagnóstico:** `supabase functions download chat-brain` revelou divergência entre código local e código em produção.
+Migration:
 
-**Solução implementada:**
+- `supabase/migrations/20260303214000_add_search_strategic_context_docs_rpc.sql`
 
-```typescript
-const ALLOWED_ORIGINS = [
-    'https://sistema.c4marketing.com.br',
-    'https://c4marketing.vercel.app',
-]
+#### 10.3.2 Higiene de canário e prevenção de contaminação cognitiva
 
-function isAllowedOrigin(origin: string): boolean {
-    if (!origin) return false
-    if (ALLOWED_ORIGINS.includes(origin)) return true
-    // Permite qualquer porta de localhost em desenvolvimento
-    try {
-        const url = new URL(origin)
-        return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
-    } catch {
-        return false
-    }
-}
+Implementado:
 
-function makeCorsHeaders(req: Request): Record<string, string> {
-    const origin = req.headers.get('Origin') ?? ''
-    const requestedHeaders = req.headers.get('Access-Control-Request-Headers')
-    const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0]
-    return {
-        'Access-Control-Allow-Origin': allowedOrigin,
-        'Access-Control-Allow-Headers': requestedHeaders || 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Max-Age': '86400',
-        'Vary': 'Origin, Access-Control-Request-Headers',
-    }
-}
-```
+- RPC `cleanup_brain_canary_marker(p_marker)` com guardrail de prefixo `CANARY_MEMORY_`;
+- remoção segura de artefatos de teste explícito de memória;
+- atualização do canário para chamar cleanup via RPC ao final da execução.
 
-**Correção complementar em `vite.config.ts`:**
+Migration:
 
-`strictPort: true` adicionado ao servidor de desenvolvimento. Aborta se a porta 3000 estiver ocupada em vez de mudar silenciosamente para outra porta, o que causaria falha de CORS mesmo com `isAllowedOrigin()` corrigida.
+- `supabase/migrations/20260303223000_add_cleanup_brain_canary_marker_rpc.sql`
 
----
+Script ajustado:
 
-#### 10.3.2 Bug Fix P0.2 — Gateway JWT rejeitando tokens válidos
+- `scripts/check_brain_canary.js`
 
-**Arquivo:** Deploy da edge function `chat-brain`
+#### 10.3.3 Ajuste financeiro operacional por linguagem natural (Segundo Cérebro)
 
-**Causa raiz:** O redeploy realizado para a correção de CORS (10.3.1) foi feito sem a flag `--no-verify-jwt`. Isso reativou a verificação JWT no gateway do Supabase, que passou a rejeitar tokens com `401 Invalid JWT` antes do código da função ser executado.
+Implementado no `chat-brain` + banco:
 
-**Histórico:** A documentação em `docs/guia_deploy_supabase.md` já registrava que `chat-brain` sempre deve ser implantado com `--no-verify-jwt`, pois a função realiza sua própria verificação interna via `auth.getUser()` com fallback resiliente por claims.
+- nova tool executora `execute_adjust_financial_start_date` com suporte a:
+  - `p_acceptance_id`
+  - `p_company_name` (match parcial)
+  - `p_origin_reference_date` (último contrato do mês de origem)
+  - `p_billing_start_date` (obrigatório);
+- detecção de intenção no prompt do usuário para ajustar início de faturamento sem alterar data de fechamento;
+- enriquecimento automático de parâmetros (mês de origem e mês de início);
+- logging em `brain.execution_logs` da alteração financeira.
 
-**Solução:**
+Migration principal:
 
-```bash
-npx supabase functions deploy chat-brain \
-  --project-ref xffdrdoaysxfkpebhywl \
-  --no-verify-jwt
-```
+- `supabase/migrations/20260304002000_add_financial_billing_start_adjustment.sql`
 
-**Lição aprendida:** Todo pipeline de deploy de `chat-brain` deve incluir verificação obrigatória da flag `--no-verify-jwt`. A ausência silenciosa desta flag é causa raiz de incidentes recorrentes de JWT.
+#### 10.3.4 Query financeira determinística alinhada ao faturamento real
 
----
+A função `query_financial_summary` foi reconstruída para:
 
-#### 10.3.3 Sincronização de código produção → local (durante P0.1)
+- considerar `coalesce(billing_start_date, accepted_at::date)` como data efetiva de entrada no MRR;
+- respeitar `expiration_date` na saída do contrato da base ativa;
+- manter cálculo robusto de `mrr`, `arr`, clientes e projetos ativos;
+- retornar contratos ativos já com `effective_billing_start_date` no payload.
 
-Durante o diagnóstico de CORS, o `supabase functions download` revelou implementações presentes em produção mas não versionadas localmente (deploy de 2026-03-16). Foram sincronizadas:
+Resultado prático validado para o caso real (Dainese):
 
-| Funcionalidade | Descrição |
-|---|---|
-| Tratamento de corpo JSON inválido | Retorno `400 Bad Request` com mensagem estruturada em vez de crash interno |
-| Fallback de role por `userId` | Após `applyProfileByEmail` falhar, tenta lookup por `.eq('id', userId)` em `app_users` |
-| Logging aprimorado | `console.error/warn` com mais contexto nos caminhos de autenticação |
-| `decodeJwtPayload()` | Decoder local de claims JWT para path de fallback resiliente |
-| `getProjectRefFromPayload()` | Verifica `payload.ref` e parse de `payload.iss` para validação de projeto |
+- referência `2026-03-31`: contrato fora do MRR;
+- referência `2026-04-30`: contrato dentro do MRR (`R$ 3.500,00`).
 
----
+#### 10.3.5 Hardening da avaliação de meta mensal
 
-#### 10.3.4 Bug Fix P0.3 — PGRST203: Ambiguidade de sobrecarga em `query_all_tasks`
+Implementado no `chat-brain`:
 
-**Arquivo:** `supabase/migrations/20260318000000_drop_query_all_tasks_legacy_overload.sql`
+- detecção de intenção de “batemos/atingimos meta do mês”;
+- leitura determinística de MRR do mês via `query_financial_summary`;
+- extração de meta de MRR dos documentos estratégicos (`R$ ...`) com comparação objetiva;
+- inclusão no contexto de bloco determinístico:
+  - `realized_mrr`
+  - `target_mrr`
+  - `attained`
+  - `attainment_pct`
+  - `target_source`.
 
-**Causa raiz:** Duas sobrecargas da função `query_all_tasks` coexistiam no banco:
+Metadados adicionados:
 
-- `query_all_tasks(bigint, text)` — overload legado com 2 parâmetros posicionais, criado na v4.5 e que deveria ter sido removido pela migration `20260220103000`
-- `query_all_tasks(bigint, text, boolean, date, text, date)` — assinatura canônica com 6 parâmetros nomeados, adicionada em `20260225160000`
+- `monthly_goal_check_intent`
+- `monthly_goal_reference_date`
+- `monthly_goal_comparison`
 
-O PostgREST utiliza chamada por nome de parâmetro (`p_project_id => valor`). Com dois overloads, o engine não conseguia resolver qual função chamar, retornando `PGRST203 — Could not choose the best candidate function`.
+#### 10.3.6 Blindagem contra ruído de canário na busca estratégica
 
-**Impacto:** Todas as queries de tarefas via o Segundo Cérebro falhavam silenciosamente com mensagem de fallback LLM: _"não tenho acesso aos dados específicos das tarefas"_. Período afetado: 2026-02-25 a 2026-03-18 (~21 dias).
+Refino da RPC de busca estratégica para excluir conteúdo de teste:
 
-**Diagnóstico:** Chamada direta a `POST /rest/v1/rpc/query_all_tasks` com parâmetro nomeado retornava `PGRST203` com lista de ambas as sobrecargas.
+- filtro adicional: `d.content NOT ILIKE '%CANARY_MEMORY_%'`.
 
-**Solução:**
+Migration:
 
-```sql
--- Remove legacy 2-param overload of query_all_tasks that causes PGRST203 ambiguity.
--- The current canonical signature (6 params) was added in 20260225160000.
--- PostgREST fails to resolve the call when both overloads exist.
+- `supabase/migrations/20260303232000_exclude_canary_from_strategic_search.sql`
 
-DROP FUNCTION IF EXISTS public.query_all_tasks(bigint, text);
-```
+#### 10.3.7 Correção do Dashboard Financeiro (camada de apresentação)
 
-**Aplicação:**
+Implementado em `lib/commercial-ai-agent.ts`:
 
-```bash
-# Reparar histórico de migrations remotas não presentes localmente
-npx supabase@2.81.2 migration repair --status reverted 20260314000000 20260316193000
-# Aplicar nova migration
-npx supabase db push --linked
-```
+- `fetchCommercialContext` passou a carregar `billing_start_date` e `expiration_date`;
+- cálculo mensal passou a usar `isFinanciallyActiveAtDate(...)` no fim do mês;
+- inclusão de fallback de início financeiro também em `contract_snapshot`;
+- `forecastMRR` deixou de usar MRR estático global e passou a refletir o mês projetado.
 
-**Verificação pós-fix:** Consulta direta retornou dados estruturados. Brain respondeu corretamente a "quais tarefas estão em backlog?".
+Impacto direto:
 
----
+- contratos fechados em fevereiro com faturamento iniciando em abril não entram no MRR de fevereiro/março no dashboard.
 
-#### 10.3.5 Hardening M5 — Canário anti-PGRST203 (detecção preventiva)
+#### 10.3.8 Script de validação v9.6 (regra financeira ponta a ponta)
 
-**Arquivo:** `scripts/check_brain_canary.js`
+Novos artefatos:
 
-O bug PGRST203 permaneceu ativo por ~21 dias sem detecção automática. Para prevenir regressão futura, foi adicionado um teste de fumaça direto ao canário operacional: chama `query_all_tasks` diretamente via `serviceClient` (sem passar pelo brain), detectando imediatamente qualquer overload ambíguo.
+- `scripts/check_financial_dashboard_rules.js`
+- comando `npm run check:finance:dashboard-rules` em `package.json`
 
-**Novo teste T6 — crítico:**
+Cobertura do script:
 
-```javascript
-// 6) Direct RPC smoke test: query_all_tasks (detects PGRST203 ambiguity before it reaches users)
-if (serviceClient) {
-  const { data: taskData, error: taskError } = await serviceClient.rpc('query_all_tasks', {});
-  const isPgrst203 = taskError?.code === 'PGRST203';
-  const t6Pass = !taskError;
-  pushResult(
-    'RPC Direta: query_all_tasks (anti-PGRST203)',
-    t6Pass,
-    taskError
-      ? `ERRO code=${taskError.code} msg=${taskError.message}${isPgrst203 ? ' — OVERLOAD AMBÍGUO DETECTADO' : ''}`
-      : `OK rows=${Array.isArray(taskData) ? taskData.length : typeof taskData}`,
-    true  // crítico — falha com exit code 1
-  );
-}
-```
+1. testes sintéticos de regra (`billing_start_date`, `expiration_date`, fallback snapshot);
+2. validação de transição no dado real de `acceptances`;
+3. cálculo de MRR mensal por lógica local;
+4. paridade mês a mês com `query_financial_summary` (RPC oficial).
 
-Com `critical = true`, o canário falha com `exit code 1` ao detectar PGRST203, disparando alerta imediato no workflow do GitHub Actions.
+Resultado executado em 4 de março de 2026 (rodada inicial):
 
----
+- `Synthetic tests`: `3/3` PASS
+- `billing_start_date transition`: `17/17` PASS
+- `expiration_date transition`: sem contratos ativos com `expiration_date` (sem falha de regra)
+- `RPC parity`: `12/12` PASS
+- falhas totais: `0`
 
-#### 10.3.6 Documentação de variáveis de ambiente (`.env.example`)
+Atualização complementar em 4 de março de 2026 (item 6 executado):
 
-**Arquivo:** `.env.example`
+- contrato de teste controlado criado no Supabase:
+  - `company_name=ZZ_TEST_EXPIRATION_RULE`
+  - `id=44`
+  - `monthly_fee=0` (sem impacto no MRR real)
+  - `billing_start_date=2026-01-10`
+  - `expiration_date=2026-01-31`
+- reexecução do checker após fixture:
+  - `Synthetic tests`: `3/3` PASS
+  - `billing_start_date transition`: `18/18` PASS
+  - `expiration_date transition`: `1/1` PASS
+  - `RPC parity`: `12/12` PASS
+  - falhas totais: `0`
 
-Adicionadas entradas documentadas para execução dos scripts de verificação do Segundo Cérebro:
+### 10.4 Arquivos impactados no ciclo v9.6
 
-```bash
-# Necessário para scripts de manutenção do Segundo Cérebro (check_brain_canary, streak, quality, governance)
-# Obtenha em: Supabase Dashboard > Project Settings > API > service_role key
-SUPABASE_SERVICE_ROLE_KEY=
+#### Backend/Edge Function
 
-# Usuário de teste para o canário do Segundo Cérebro (check_brain_canary.js)
-# BRAIN_TEST_USER_ID deve ser o UUID do usuário em auth.users E em app_users (com role=gestor)
-# Obtenha em: Supabase Dashboard > Authentication > Users > copie o UUID do usuário gestor
-BRAIN_TEST_USER_ID=
-BRAIN_TEST_USER_EMAIL=andre@c4marketing.com
-BRAIN_TEST_USER_ROLE=gestor
-```
+- `supabase/functions/chat-brain/index.ts`
 
----
+#### Migrations novas
 
-### 10.4 Análise de divergências v9.5 vs. produção (2026-03-18)
+- `supabase/migrations/20260303214000_add_search_strategic_context_docs_rpc.sql`
+- `supabase/migrations/20260303223000_add_cleanup_brain_canary_marker_rpc.sql`
+- `supabase/migrations/20260303232000_exclude_canary_from_strategic_search.sql`
+- `supabase/migrations/20260304002000_add_financial_billing_start_adjustment.sql`
 
-Análise formal realizada comparando o documento v9.5 (fechado em 2026-03-03) com o estado real de produção em 2026-03-18.
+#### Frontend/Integração
 
-#### 10.4.1 Capacidades conforme o documento ✅
+- `lib/commercial-ai-agent.ts`
 
-| Capacidade | Status verificado |
-|---|---|
-| Roteamento híbrido (heurística + LLM) | Ativo em `router.ts` + `specialists.ts` |
-| 8 agentes especializados | Presentes (Agent_Contracts, Agent_Proposals, Agent_MarketingTraffic, Agent_Operations, Agent_Financial, Agent_Executive, Agent_Tasks, Agent_Survey) |
-| Tier-1 canônico hardcoded no system prompt | Ativo — missão, visão, valores, end game sempre injetados |
-| Feature flags `BRAIN_NORMATIVE_GOVERNANCE_ENABLED` / `BRAIN_CANONICAL_MEMORY_ENABLED` | Presentes no código; dependem de env vars em Supabase Secrets |
-| Priorização de `explicit_fact_store` no recall | Implementado (v9.5 item 9) |
-| SLO com canário oficial `slo_tracked=true` | Migration aplicada (v9.5 item 11) |
-| Guardrail de perfil gestor | Ativo (HTTP 403 para outros perfis) |
-| Log centralizado `log_agent_execution` | Ativo (v8.6) |
-| GenUI (JSON blocks em markdown) | Ativo nos agentes que suportam |
-| 19 RPCs disponíveis | Todas registradas em `dbRpcNames` |
-| Idempotency key (header `x-idempotency-key`) | Suportado |
-| Fuso de Brasília como referência de data padrão | Ativo (`runtimeToday` em `America/Sao_Paulo`) |
-| `p_reference_tz` e `p_created_date` no schema do LLM router | **Confirmado presente** — documento v9.5 estava desatualizado neste ponto; params já existiam no código |
+#### Scripts operacionais
 
-#### 10.4.2 Divergências identificadas ⚠️
+- `scripts/check_brain_canary.js`
+- `scripts/check_financial_dashboard_rules.js`
+- `package.json` (novo script `check:finance:dashboard-rules`)
 
-| ID | Divergência | Impacto |
+### 10.5 Estado consolidado pós-v9.6
+
+| Frente | Status em 2026-03-04 | Evidência |
 |---|---|---|
-| D1 | Streak de 14 dias provavelmente interrompido pelo bug PGRST203 (ativo por 21 dias) | Gate de maturidade pode precisar reiniciar |
-| D2 | Janela T+7 (prevista 2026-03-09) não confirmada — 8 dias de atraso na validação | Evidência de maturidade pendente |
-| D3 | Custo por interação $0.0131 vs limite $0.0100 — sem ação desde 2026-03-03 | Governança em atraso |
-| D4 | Recall hit-rate 90% vs meta 95% — não revalidado após fix de `explicit_fact_store` | Métricas distorcidas pelo período de PGRST203 |
-| D5 | Feature flags `BRAIN_NORMATIVE_GOVERNANCE_ENABLED` / `BRAIN_CANONICAL_MEMORY_ENABLED` — estado em Supabase Secrets não verificável via código | Features podem estar desligadas silenciosamente |
+| Recuperação estratégica (missão/visão/valores/metas) | Pronto | fallback lexical + metadados de rastreio |
+| Ajuste financeiro por linguagem natural | Pronto | `execute_adjust_financial_start_date` ativo |
+| Cálculo financeiro por início de faturamento | Pronto | `query_financial_summary` alinhada |
+| Dashboard financeiro (MRR mensal) | Pronto | commit `0ba0692` + validação de valores |
+| Validação automática de regra financeira | Pronto | `check:finance:dashboard-rules` com `0` falhas + `expiration_date transition 1/1 PASS` |
+| Gate temporal de memória viva total (T+7/T+30/streak) | Em acompanhamento | depende de calendário operacional |
 
-**Nota sobre D1/D4:** O bug PGRST203 ficou ativo de 2026-02-25 a 2026-03-18. Canários diários que incluíam testes de tarefa provavelmente registraram falhas nesse período, quebrando o streak. Métricas de recall e custo acumuladas nesse período podem estar distorcidas e necessitam revalidação com janela pós-fix.
+### 10.6 Próximos passos objetivos (v9.6 → v9.7)
 
----
+1. manter execução diária oficial (`canário + long horizon + SLO + streak`) até completar os 14 dias de estabilidade;
+2. registrar o fechamento formal de `T+7` em **9 de março de 2026** e anexar evidência no relatório técnico;
+3. registrar o fechamento formal de `T+30` em **1 de abril de 2026** e consolidar decisão de maturidade total;
+4. manter o contrato de teste controlado com `expiration_date` (`ZZ_TEST_EXPIRATION_RULE`) e monitorar a validação contínua de saída de MRR no checker.
 
-### 10.5 Estado consolidado da matriz (itens v9.5 + novos v9.6)
+### 10.7 Encerramento da v9.6
 
-| Item | Status em 2026-03-18 | Observação |
-|---|---|---|
-| 6 | Pronto | RPC determinística aplicada e validada (v9.5) |
-| 7 | Pronto | Higiene de migrations regularizada — migration PGRST203 aplicada (v9.6) |
-| 8 | Pronto | Cron parametrizado e ativo por ambiente (v9.5) |
-| 9 | Em risco | T+1 passou (v9.5); T+7 (2026-03-09) com atraso de validação; T+30 (2026-04-01) pendente |
-| 10 | Pronto | Carga 20/50/100 com 100% sucesso (v9.5) |
-| 11 | Pronto | SLO 24h com canário oficial tracked (v9.5) + canário anti-PGRST203 (v9.6) |
-| 12 | Pronto | Runbook publicado e simulado (v9.5) |
-| 13 | Pronto | Bug PGRST203 corrigido; canário detecta regressão proativamente (v9.6) |
-| 14 | Pronto | CORS e JWT gateway corrigidos; produção restaurada (v9.6) |
+A v9.6 fecha o gap entre cognição estratégica e consistência financeira operacional: o Segundo Cérebro passou a recuperar melhor os documentos corporativos críticos, executar ajuste financeiro de início de faturamento de forma determinística e refletir o resultado corretamente no dashboard.
 
----
-
-### 10.6 Pendências remanescentes para "memória viva total"
-
-1. **Executar validação T+7 atrasada** (8 dias após data prevista de 2026-03-09):
-   - `node scripts/check_brain_canary.js`
-   - `node scripts/check_brain_memory_long_horizon.js`
-   - `node scripts/check_brain_memory_stability_streak.js`
-2. **Revalidar métricas pós-fix PGRST203** — recall hit-rate e custo/interação podem estar distorcidos pelo período de falha silenciosa.
-3. **Reiniciar streak de 14 dias** com base em 2026-03-18 como "dia 1 pós-fix", com evidência documental do motivo do reset.
-4. **Verificar feature flags em Supabase Secrets**: confirmar `BRAIN_NORMATIVE_GOVERNANCE_ENABLED` e `BRAIN_CANONICAL_MEMORY_ENABLED` ativas em produção.
-5. **Validar T+30** em 2026-04-01 e reexecutar governança mensal de custo x qualidade.
-
----
-
-### 10.7 Sugestões objetivas de próximos passos (v9.6 → v9.7)
-
-1. Em **18 de março de 2026 (streak dia 1)**: iniciar nova janela de 14 dias com evidência documental do reset motivado pelo PGRST203.
-2. Em **25 de março de 2026 (T+7 retrospectivo)**: executar e registrar rodada formal (canário + long horizon + SLO + streak).
-3. Entre **18 e 31 de março de 2026**: manter rotina diária automática; revisar qualquer `ALERT` em até 15 minutos.
-4. Em **1 de abril de 2026 (T+30)**: validar `T+30=PASS`, atualizar matriz/checklist e recalcular gate final de maturidade.
-5. Em **1 de abril de 2026** (governança mensal): reexecutar custo x qualidade pós-fix e decidir entre `OTIMIZAR_CUSTO` ou `MANTER_E_MONITORAR`.
-
----
-
-### 10.8 Arquivos impactados no ciclo v9.6
-
-| Arquivo | Tipo | Operação | Descrição |
-|---------|------|----------|-----------|
-| `supabase/functions/chat-brain/index.ts` | TypeScript | MODIFICAR | CORS: `isAllowedOrigin()` aceitando qualquer localhost; sync de melhorias de produção (JSON body 400, fallback por userId, logging) |
-| `vite.config.ts` | TypeScript | MODIFICAR | `strictPort: true` — previne fallback silencioso de porta que rompia CORS |
-| `supabase/migrations/20260318000000_drop_query_all_tasks_legacy_overload.sql` | SQL | CRIAR | Remove overload legado `query_all_tasks(bigint, text)` que causava PGRST203 |
-| `scripts/check_brain_canary.js` | JavaScript | MODIFICAR | Teste T6: smoke test direto de `query_all_tasks` via serviceClient com detecção de PGRST203 |
-| `.env.example` | Texto | MODIFICAR | Documentação de `SUPABASE_SERVICE_ROLE_KEY` e vars `BRAIN_TEST_*` |
-
----
-
-### 10.9 Bugs críticos resolvidos no ciclo v9.6
-
-| # | Bug | Causa Raiz | Solução |
-|---|-----|-----------|---------|
-| 1 | `FunctionsFetchError` — brain inacessível localmente | Deploy 2026-03-16 com lista restrita de origens CORS (portas específicas) | `isAllowedOrigin()` aceita qualquer localhost/127.0.0.1 |
-| 2 | `401 Invalid JWT` — gateway rejeitando tokens | Redeploy de CORS omitiu `--no-verify-jwt` | Redeploy com a flag obrigatória |
-| 3 | "falha na consulta ao sistema" — todas as queries de tarefa falhando | PGRST203: overload legado `query_all_tasks(bigint, text)` coexistia com assinatura canônica de 6 parâmetros | Migration `20260318000000` dropa overload legado |
-
----
-
-### 10.10 Linha do Tempo Consolidada (v1 → v9.6)
-
-| Versão | Nome | Capacidade Principal |
-|--------|------|---------------------|
-| v1 | Chat RAG | Busca vetorial + filtro anti-eco |
-| v2 | Agentic RAG | Router heurístico, 6 agentes, ETL automático |
-| v3 | Hybrid Intelligence | Tool use (RAG + SQL direto) |
-| v4.1 | Cognitive Agent | Identidade + memória de sessão + cobertura total |
-| v4.5 | Semantic Router | LLM Router (Function Calling) + gestão de propostas |
-| v5.0 | Resilient Cognitive Router | JWT resiliente + Multi-RPC SQL + resposta composta |
-| v6.0 | Cognitive Stabilization | Memória viva cognitiva + guardrails anti-alucinação |
-| v6.5 | Normative Governance | NORMATIVE_FIRST + versionamento + canário automático |
-| v7.0 | Corporate Canonical Layer | Guardrail corporativo absoluto + controle por cargo |
-| v8.0 | Executor Proposal | Plano para agentes executores com auditoria |
-| v8.5 | Agent Executor | Escrita operacional no Kanban via linguagem natural |
-| v8.6 | Generative UI Engine | GenUI no chat + sanitização PII + anti-duplicação |
-| v8.7 | Especialização de Domínio + Observabilidade | 8 agentes especializados, chat de tráfego, telemetria IA, RLS email-based |
-| v9.0 | Governança de Dados + Segurança Operacional | Credenciais criptografadas, trigger fix FK, assinatura anônima via RPC, títulos de sessão |
-| v9.2 | Memória Viva Corporativa | Recall determinístico, guardrail gestor, canário 5/5, migrations regularizadas |
-| v9.5 | Hardening Operacional | Rotinas contínuas de SLO, streak 14 dias, carga 20/50/100, canário oficial tracked |
-| **v9.6** | **Infraestrutura Resiliente + Análise de Produção** | **Correção de CORS/JWT/PGRST203, canário anti-overload, análise formal de divergências v9.5 vs produção** |
-
----
-
-### 10.11 Encerramento da v9.6
-
-O ciclo v9.6 eliminou três bloqueadores críticos de infraestrutura que comprometiam silenciosamente o funcionamento do Segundo Cérebro desde pelo menos 2026-02-25 (PGRST203) e 2026-03-16 (CORS/JWT).
-
-Com a resolução desses incidentes, o sistema retornou ao estado operacional completo e fortaleceu a capacidade de detecção proativa de regressão via canário.
-
-O principal bloqueador restante para declaração de maturidade total é **temporal/operacional**: execução das janelas T+7 (atrasada) e T+30 (2026-04-01), reinício do streak de 14 dias a partir de 2026-03-18, e revalidação das métricas de custo/recall após o período de falha silenciosa do PGRST203.
-
-**Checklist de aceite v9.6:**
-
-- [x] CORS: `isAllowedOrigin()` aceita qualquer porta de localhost.
-- [x] `vite.config.ts`: `strictPort: true` evita fallback silencioso de porta.
-- [x] JWT: `chat-brain` implantado com `--no-verify-jwt`.
-- [x] PGRST203: overload legado `query_all_tasks(bigint, text)` removido.
-- [x] Canário T6: smoke test direto de `query_all_tasks` com detecção de PGRST203 como teste crítico.
-- [x] `.env.example`: `SUPABASE_SERVICE_ROLE_KEY` e `BRAIN_TEST_*` documentados.
-- [x] Análise de divergências v9.5 vs produção documentada (8 divergências identificadas, 3 corrigidas neste ciclo).
+Com isso, o risco principal remanescente para “memória viva total” fica concentrado no cumprimento das janelas temporais de estabilidade (T+7/T+30 + streak), e não mais em falhas estruturais de cálculo ou recuperação de contexto.

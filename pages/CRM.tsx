@@ -230,10 +230,10 @@ const CRM: React.FC = () => {
         }
     };
 
-    if (!roleLoading && !['gestor', 'comercial'].includes(userRole || '')) {
+    if (!roleLoading && !['admin', 'gestor', 'comercial'].includes(userRole || '')) {
         return (
             <div className="flex min-h-[420px] items-center justify-center rounded-c4 border border-slate-200 bg-white text-slate-500 dark:border-neutral-800 dark:bg-black/30 dark:text-neutral-400">
-                <p>Acesso restrito a gestores e comercial.</p>
+                <p>Acesso restrito a administradores, gestores e comercial.</p>
             </div>
         );
     }
@@ -551,32 +551,32 @@ const CRM: React.FC = () => {
     }
 
     return (
-        <div className="space-y-6">
-            <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-4">
+            <section className="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-neutral-400 font-bold">CRM</p>
-                    <h1 className="text-[1.8rem] leading-none font-montserrat font-extrabold text-neutral-900 dark:text-white tracking-tight">
+                    <p className="text-[11px] uppercase tracking-[0.28em] text-neutral-400 font-bold">CRM</p>
+                    <h1 className="text-[1.55rem] leading-none font-montserrat font-extrabold text-neutral-900 dark:text-white tracking-tight">
                         Pipeline comercial
                     </h1>
-                    <p className="text-[13px] text-neutral-500 dark:text-neutral-400 max-w-2xl mt-2">
+                    <p className="text-[12px] text-neutral-500 dark:text-neutral-400 max-w-2xl mt-1.5">
                         Quadro independente do kanban operacional para gestão de leads, histórico de contato e follow-ups.
                     </p>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                     <button
                         onClick={fetchInitialData}
-                        className="px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-[13px] font-bold text-neutral-600 dark:text-neutral-200 hover:border-brand-coral transition-colors flex items-center gap-2"
+                        className="px-3 py-1.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-[11px] font-bold text-neutral-600 dark:text-neutral-200 hover:border-brand-coral transition-colors flex items-center gap-1.5"
                     >
-                        <RefreshCw size={16} />
+                        <RefreshCw size={14} />
                         Atualizar
                     </button>
                     {!isReadOnly && (
                         <button
                             onClick={openNewLeadModal}
-                            className="px-5 py-2.5 rounded-c4 bg-brand-coral text-white text-[13px] font-bold shadow-lg shadow-brand-coral/20 hover:bg-brand-coral/90 transition-colors flex items-center gap-2"
+                            className="px-3.5 py-1.5 rounded-c4 bg-brand-coral text-white text-[11px] font-bold shadow-lg shadow-brand-coral/20 hover:bg-brand-coral/90 transition-colors flex items-center gap-1.5"
                         >
-                            <Plus size={16} />
+                            <Plus size={14} />
                             Novo Lead
                         </button>
                     )}
@@ -589,49 +589,49 @@ const CRM: React.FC = () => {
                 </div>
             )}
 
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 font-bold">Total</p>
-                    <p className="text-[30px] leading-none font-extrabold text-neutral-900 dark:text-white mt-3">{summary.total}</p>
-                    <p className="text-[13px] text-neutral-500 mt-2">Leads após aplicação dos filtros.</p>
+            <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-3 shadow-sm">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-bold">Total</p>
+                    <p className="text-[22px] leading-none font-extrabold text-neutral-900 dark:text-white mt-2">{summary.total}</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">Leads após aplicação dos filtros.</p>
                 </div>
-                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 font-bold">Em aberto</p>
-                    <p className="text-[30px] leading-none font-extrabold text-neutral-900 dark:text-white mt-3">{summary.open}</p>
-                    <p className="text-[13px] text-neutral-500 mt-2">Oportunidades ainda em negociação.</p>
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-3 shadow-sm">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-bold">Em aberto</p>
+                    <p className="text-[22px] leading-none font-extrabold text-neutral-900 dark:text-white mt-2">{summary.open}</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">Oportunidades ainda em negociação.</p>
                 </div>
-                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 font-bold">Ganhas</p>
-                    <p className="text-[30px] leading-none font-extrabold text-emerald-600 mt-3">{summary.won}</p>
-                    <p className="text-[13px] text-neutral-500 mt-2">Leads fechados como proposta aceita.</p>
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-3 shadow-sm">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-bold">Ganhas</p>
+                    <p className="text-[22px] leading-none font-extrabold text-emerald-600 mt-2">{summary.won}</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">Leads fechados como proposta aceita.</p>
                 </div>
-                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-4 shadow-sm">
-                    <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 font-bold">Perdidas</p>
-                    <p className="text-[30px] leading-none font-extrabold text-rose-600 mt-3">{summary.lost}</p>
-                    <p className="text-[13px] text-neutral-500 mt-2">Leads encerrados com perda registrada.</p>
+                <div className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-3 shadow-sm">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-bold">Perdidas</p>
+                    <p className="text-[22px] leading-none font-extrabold text-rose-600 mt-2">{summary.lost}</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">Leads encerrados com perda registrada.</p>
                 </div>
             </section>
 
-            <section className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-4 shadow-sm space-y-4">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-neutral-400 font-bold">
-                    <Filter size={14} />
+            <section className="bg-white dark:bg-neutral-900 rounded-c4 border border-neutral-200 dark:border-neutral-800 p-3 shadow-sm space-y-2.5">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-bold">
+                    <Filter size={12} />
                     Filtros
                 </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                     <label className="relative">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
                         <input
                             value={filters.search}
                             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                             placeholder="Buscar por nome, empresa ou contato"
-                            className="w-full pl-10 pr-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                            className="h-9 w-full pl-8 pr-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                         />
                     </label>
 
                     <select
                         value={filters.owner}
                         onChange={(event) => setFilters((current) => ({ ...current, owner: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     >
                         <option value="">Todos os responsáveis</option>
                         {users.map((user) => (
@@ -644,7 +644,7 @@ const CRM: React.FC = () => {
                     <select
                         value={filters.stage}
                         onChange={(event) => setFilters((current) => ({ ...current, stage: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     >
                         <option value="">Todos os estágios</option>
                         {stages.map((stage) => (
@@ -657,7 +657,7 @@ const CRM: React.FC = () => {
                     <select
                         value={filters.source}
                         onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     >
                         <option value="">Todas as origens</option>
                         <option value="indicacao">Indicação</option>
@@ -672,7 +672,7 @@ const CRM: React.FC = () => {
                     <select
                         value={filters.temperature}
                         onChange={(event) => setFilters((current) => ({ ...current, temperature: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     >
                         <option value="">Todas as temperaturas</option>
                         <option value="frio">Frio</option>
@@ -684,14 +684,14 @@ const CRM: React.FC = () => {
                         type="date"
                         value={filters.dateFrom}
                         onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     />
 
                     <input
                         type="date"
                         value={filters.dateTo}
                         onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))}
-                        className="w-full px-4 py-2.5 rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-[13px] text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
+                        className="h-9 w-full px-3 text-[11px] rounded-c4 border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-white outline-none focus:border-brand-coral transition-colors"
                     />
 
                     <button
@@ -706,7 +706,7 @@ const CRM: React.FC = () => {
                                 dateTo: '',
                             })
                         }
-                        className="px-4 py-2.5 rounded-c4 border border-dashed border-neutral-300 dark:border-neutral-700 text-[13px] font-bold text-neutral-500 hover:text-brand-coral hover:border-brand-coral transition-colors"
+                        className="h-9 px-3 rounded-c4 border border-dashed border-neutral-300 dark:border-neutral-700 text-[11px] font-bold text-neutral-500 hover:text-brand-coral hover:border-brand-coral transition-colors"
                     >
                         Limpar filtros
                     </button>

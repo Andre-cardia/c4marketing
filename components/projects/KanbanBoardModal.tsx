@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Plus, Calendar, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase, Link2 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { X, Plus, Calendar, User, AlertCircle, CheckCircle, PauseCircle, Clock, PlayCircle, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useUserRole } from '../../lib/UserRoleContext';
 import TaskModal from './TaskModal';
@@ -9,6 +8,7 @@ import BookingModal from './BookingModal';
 interface Project {
     id: number;
     company_name: string;
+    company_display_name?: string;
 }
 
 interface Task {
@@ -88,27 +88,14 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
     const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
     const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
     const [showBookingModal, setShowBookingModal] = useState(false);
-    const [searchParams, setSearchParams] = useSearchParams();
 
     const SHARED_CAL_LINK = 'grupo-c4/reuniao-grupo-c4';
 
     useEffect(() => {
         if (isOpen && project) {
-            fetchTasks().then((fetchedTasks) => {
-                const targetTaskId = searchParams.get('task');
-                if (targetTaskId && fetchedTasks) {
-                    const taskToOpen = fetchedTasks.find(t => t.id === targetTaskId);
-                    if (taskToOpen) {
-                        setEditingTask(taskToOpen);
-                        setShowTaskModal(true);
-                        
-                        searchParams.delete('task');
-                        setSearchParams(searchParams, { replace: true });
-                    }
-                }
-            });
+            fetchTasks();
         }
-    }, [isOpen, project, searchParams, setSearchParams]);
+    }, [isOpen, project]);
 
     const fetchTasks = async () => {
         if (!project) return;
@@ -121,7 +108,6 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
 
         if (data) setTasks(data as Task[]);
         setLoading(false);
-        return data as Task[] | null;
     };
 
     const handleCreateTask = () => {
@@ -189,14 +175,8 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
         }
     };
 
-    const handleShareTask = (e: React.MouseEvent, taskId: string) => {
-        e.stopPropagation();
-        const url = `${window.location.origin}/projects?kanban=${project?.id}&task=${taskId}`;
-        navigator.clipboard.writeText(url);
-        alert('Link da tarefa copiado para a área de transferência!');
-    };
-
     if (!isOpen || !project) return null;
+    const displayCompanyName = project.company_display_name || project.company_name;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -208,7 +188,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                         <div className="w-2 h-8 rounded-full bg-brand-coral" />
                         <div>
                             <h2 className="text-lg font-extrabold text-neutral-900 dark:text-white leading-tight">
-                                {project.company_name}
+                                {displayCompanyName}
                             </h2>
                             <p className="text-xs text-neutral-400 font-medium">Quadro de Tarefas</p>
                         </div>
@@ -288,14 +268,6 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                                         onClick={() => handleEditTask(task)}
                                                         className="bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-brand-coral dark:hover:border-brand-coral p-3.5 rounded-c4 cursor-grab active:cursor-grabbing hover:shadow-md hover:shadow-brand-coral/5 transition-all group relative"
                                                     >
-                                                        <button
-                                                            onClick={(e) => handleShareTask(e, task.id)}
-                                                            className="absolute top-2.5 right-7 p-1 text-neutral-400 opacity-0 group-hover:opacity-100 hover:text-brand-coral hover:bg-brand-coral/10 rounded-md transition-all z-10"
-                                                            title="Copiar link da tarefa"
-                                                        >
-                                                            <Link2 size={13} />
-                                                        </button>
-
                                                         {/* Priority dot */}
                                                         {task.priority && (
                                                             <span
@@ -317,7 +289,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                                                         <div className="flex flex-col gap-1.5 mt-2 pt-2.5 border-t border-neutral-200 dark:border-neutral-700">
                                                             <div className="flex items-center gap-1.5 text-brand-coral text-xs font-semibold">
                                                                 <Briefcase size={11} />
-                                                                <span className="truncate">{project.company_name}</span>
+                                                                <span className="truncate">{displayCompanyName}</span>
                                                             </div>
                                                             <div className="flex items-center gap-3 text-xs text-neutral-400">
                                                                 {task.assignee && (
@@ -362,7 +334,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                     onClose={() => setShowTaskModal(false)}
                     projectId={project.id}
                     task={editingTask}
-                    projectName={project.company_name}
+                    projectName={displayCompanyName}
                     onSave={fetchTasks}
                 />
 
@@ -370,7 +342,7 @@ const KanbanBoardModal: React.FC<KanbanBoardModalProps> = ({ isOpen, onClose, pr
                     isOpen={showBookingModal}
                     onClose={() => setShowBookingModal(false)}
                     calLink={SHARED_CAL_LINK}
-                    companyName={project.company_name}
+                    companyName={displayCompanyName}
                 />
             </div>
         </div>
