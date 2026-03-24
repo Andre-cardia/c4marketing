@@ -8,6 +8,8 @@ type ProposalService = {
     id: string;
     price: number;
     details?: string;
+    deliveryTimeline?: string;
+    paymentTerms?: string;
     recurringPrice?: number;
     setupPrice?: number;
 };
@@ -298,6 +300,42 @@ const CreateProposal: React.FC = () => {
                                                                 rows={2}
                                                             />
                                                         </div>
+                                                        {service.billingType === 'one_time' && (
+                                                            <>
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Prazo Estimado de Entrega (Opcional)</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Ex: 30 dias úteis após aprovação"
+                                                                        value={serviceData?.deliveryTimeline || ''}
+                                                                        onChange={e => {
+                                                                            const deliveryTimeline = e.target.value;
+                                                                            setNewProposal(prev => ({
+                                                                                ...prev,
+                                                                                services: prev.services.map(s => s.id === service.id ? { ...s, deliveryTimeline } : s)
+                                                                            }));
+                                                                        }}
+                                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm text-slate-900 bg-white"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Condições de Pagamento (Opcional)</label>
+                                                                    <textarea
+                                                                        placeholder="Ex: 50% na assinatura + 50% na entrega"
+                                                                        value={serviceData?.paymentTerms || ''}
+                                                                        onChange={e => {
+                                                                            const paymentTerms = e.target.value;
+                                                                            setNewProposal(prev => ({
+                                                                                ...prev,
+                                                                                services: prev.services.map(s => s.id === service.id ? { ...s, paymentTerms } : s)
+                                                                            }));
+                                                                        }}
+                                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-brand-coral outline-none text-sm resize-none text-slate-900 bg-white"
+                                                                        rows={2}
+                                                                    />
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
