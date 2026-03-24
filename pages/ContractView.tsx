@@ -340,23 +340,28 @@ const ContractView: React.FC = () => {
                 </div>
 
                 {/* 5. Term and Termination */}
-                <div className="mb-8">
-                    <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">5. Da Vigência e Rescisão</h2>
-                    <p className="mb-2 text-sm">
-                        5.1. O presente contrato tem prazo de <strong>{proposal.contract_duration} meses</strong>, iniciando-se na data de aceite deste instrumento.
-                    </p>
-                    <p className="mb-2 text-sm">
-                        5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem e Agentes de IA), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
-                    </p>
-                    {Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'traffic_management') && (
-                        <p className="mb-2 text-sm">
-                            5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência para o serviço de Gestão de Tráfego, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes deste serviço.
-                        </p>
-                    )}
-                    <p className="mb-2 text-sm">
-                        5.4. Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
-                    </p>
-                </div>
+                {(() => {
+                    const has53 = Array.isArray(proposal.services) && (proposal.services as any[]).some(s => s.id === 'traffic_management');
+                    return (
+                        <div className="mb-8">
+                            <h2 className="text-lg font-bold mb-4 uppercase text-slate-900 border-l-4 border-brand-coral pl-3">5. Da Vigência e Rescisão</h2>
+                            <p className="mb-2 text-sm">
+                                5.1. O presente contrato tem prazo de <strong>{proposal.contract_duration} meses</strong>, iniciando-se na data de aceite deste instrumento.
+                            </p>
+                            <p className="mb-2 text-sm">
+                                5.2. Para serviços recorrentes (Gestão de Tráfego, Hospedagem e Agentes de IA), o contrato renova-se automaticamente por iguais períodos, caso não haja manifestação em contrário com 30 (trinta) dias de antecedência.
+                            </p>
+                            {has53 && (
+                                <p className="mb-2 text-sm">
+                                    5.3. <strong>Da Multa por Fidelidade:</strong> Em caso de rescisão antecipada imotivada por parte da CONTRATANTE antes do término do período de vigência para o serviço de Gestão de Tráfego, será devida multa equivalente a 50% (cinquenta por cento) do valor das mensalidades restantes deste serviço.
+                                </p>
+                            )}
+                            <p className="mb-2 text-sm">
+                                {has53 ? '5.4.' : '5.3.'} Após o período de vigência/fidelidade, o contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias, sem ônus.
+                            </p>
+                        </div>
+                    );
+                })()}
 
                 {/* 6. Intellectual Property */}
                 <div className="mb-8">
