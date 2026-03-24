@@ -261,7 +261,12 @@ const ContractView: React.FC = () => {
                                     <div key={template.id} className="pl-4 border-l-2 border-slate-200">
                                         <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
                                         <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
-                                            {template.content.replace(/^### .*$/gm, '').trim()}
+                                            {template.content
+                                                .replace(/^### .*$/gm, '')          // remove cabeçalhos ###
+                                                .replace(/^\d+\. [A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][^\n]*$/gm, '') // remove linhas de título numeradas: "1. Objeto"
+                                                .replace(/^\d+\.\d+\.\s+/gm, '')    // remove prefixos "1.1. " no início de parágrafos
+                                                .replace(/\n{3,}/g, '\n\n')          // colapsa espaços em branco excessivos
+                                                .trim()}
                                         </div>
                                         {serviceDetail && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm italic text-slate-600">
