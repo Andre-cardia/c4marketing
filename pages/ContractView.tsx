@@ -12,7 +12,7 @@ interface Proposal {
     id: number;
     company_name: string;
     responsible_name: string;
-    cnpj?: string; // Assuming we might have this from acceptance or just use placeholder
+    cnpj?: string;
     cpf?: string;
     monthly_fee: number;
     setup_fee: number;
@@ -20,6 +20,7 @@ interface Proposal {
     created_at: string;
     services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
     accepted_at?: string;
+    deliveryTimeline?: string;
     is_legacy?: boolean;
 }
 
@@ -107,7 +108,7 @@ const ContractView: React.FC = () => {
             if (!proposalData && acceptanceInfo) {
                 console.log('Generating placeholder proposal from acceptance data');
                 proposalData = {
-                    id: 0, // Placeholder ID
+                    id: 0,
                     slug: '',
                     company_name: acceptanceInfo.company_name,
                     responsible_name: acceptanceInfo.name,
@@ -118,8 +119,8 @@ const ContractView: React.FC = () => {
                     contract_duration: 0,
                     created_at: acceptanceInfo.timestamp,
                     accepted_at: acceptanceInfo.timestamp,
-                    services: ["Contrato Restaurado / Legacy"], // Placaholder service
-                    is_legacy: true // Flag to render simplified view
+                    services: ["Contrato Restaurado / Legacy"],
+                    is_legacy: true
                 };
             }
 
@@ -159,7 +160,6 @@ const ContractView: React.FC = () => {
 
         } catch (error) {
             console.error('Error fetching contract data:', error);
-            // Only alert if we really couldn't get ANY data
             alert('Erro ao carregar dados do contrato. Pode ter sido excluído.');
         } finally {
             setLoading(false);
@@ -187,8 +187,6 @@ const ContractView: React.FC = () => {
     if (loading) return <div className="p-8 text-center">Carregando contrato...</div>;
     if (!proposal) return <div className="p-8 text-center">Proposta não encontrada.</div>;
 
-    const today = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-
     return (
         <div className="min-h-screen bg-slate-100 print:bg-white">
             <div className="print:hidden">
@@ -210,7 +208,6 @@ const ContractView: React.FC = () => {
 
             <div id="contract-content" className="max-w-4xl mx-auto bg-white p-12 md:p-16 my-8 shadow-xl print:shadow-none print:my-0 print:p-0 text-slate-900 leading-relaxed text-justify">
 
-                {/* Header */}
                 {/* Header */}
                 <div className="text-center border-b border-slate-200 pb-8 mb-12">
                     <img src={logo} alt="C4 Marketing" className="h-12 mx-auto mb-6" />
@@ -259,14 +256,12 @@ const ContractView: React.FC = () => {
                                     : null;
                                 const serviceDetail = serviceData?.details || null;
 
-                                // Replace delivery timeline placeholder in website template
+                                // Para templates de website, substituir o prazo pelo deliveryTimeline real da proposta
                                 let processedContent = template.content;
                                 if (template.service_id === 'website') {
-                                    const rawTimeline = typeof serviceData === 'object' ? serviceData?.deliveryTimeline : undefined;
-                                    const deliveryTimeline = normalizeWebsiteDeliveryTimeline(rawTimeline) || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
-                                    processedContent = processedContent
-                                        .replace(/\{\{prazo_entrega_website\}\}/g, deliveryTimeline)
-                                        .replace(/30 dias úteis/g, deliveryTimeline);
+                                    const rawTimeline = proposal.deliveryTimeline || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
+                                    const deliveryTimeline = normalizeWebsiteDeliveryTimeline(rawTimeline);
+                                    processedContent = processedContent.replace(/30 dias úteis/g, deliveryTimeline);
                                 }
 
                                 return (
@@ -274,10 +269,10 @@ const ContractView: React.FC = () => {
                                         <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
                                         <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
                                             {processedContent
-                                                .replace(/^### .*$/gm, '')          // remove cabeçalhos ###
-                                                .replace(/^\d+\. [A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][^\n]*$/gm, '') // remove linhas de título numeradas: "1. Objeto"
-                                                .replace(/^\d+\.\d+\.\s+/gm, '')    // remove prefixos "1.1. " no início de parágrafos
-                                                .replace(/\n{3,}/g, '\n\n')          // colapsa espaços em branco excessivos
+                                                .replace(/^### .*$/gm, '')
+                                                .replace(/^\d+\. [A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][^\n]*$/gm, '')
+                                                .replace(/^\d+\.\d+\.\s+/gm, '')
+                                                .replace(/\n{3,}/g, '\n\n')
                                                 .trim()}
                                         </div>
                                         {serviceDetail && (
@@ -348,10 +343,10 @@ const ContractView: React.FC = () => {
                                         {/* Fallback para ai_agents sem paymentTerms customizado */}
                                         {Array.isArray(proposal.services) &&
                                             (proposal.services as any[]).some((s: any) => s.id === 'ai_agents' && !s.paymentTerms) && (
-                                            <p className="mt-1 text-xs text-slate-500 italic">
-                                                * Para o serviço de Agentes de IA, o Setup/Implementação é cobrado no ato do aceite (pagamento único). A mensalidade inclui infraestrutura (VPS, API OpenAI – até 2 milhões de tokens/mês – e API WhatsApp). Caso o volume de tokens ultrapasse o limite mensal incluso, o valor poderá ser reajustado proporcionalmente, com comunicação prévia.
-                                            </p>
-                                        )}
+                                                <p className="mt-1 text-xs text-slate-500 italic">
+                                                    * Para o serviço de Agentes de IA, o Setup/Implementação é cobrado no ato do aceite (pagamento único). A mensalidade inclui infraestrutura (VPS, API OpenAI – até 2 milhões de tokens/mês – e API WhatsApp). Caso o volume de tokens ultrapasse o limite mensal incluso, o valor poderá ser reajustado proporcionalmente, com comunicação prévia.
+                                                </p>
+                                            )}
                                     </div>
                                 )}
                             </>
@@ -440,7 +435,7 @@ const ContractView: React.FC = () => {
                 </div>
 
             </div>
-        </div >
+        </div>
     );
 };
 
