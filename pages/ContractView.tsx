@@ -20,7 +20,6 @@ interface Proposal {
     created_at: string;
     services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
     accepted_at?: string;
-    deliveryTimeline?: string;
     is_legacy?: boolean;
 }
 
@@ -256,11 +255,11 @@ const ContractView: React.FC = () => {
                                     : null;
                                 const serviceDetail = serviceData?.details || null;
 
-                                // Para templates de website, substituir o prazo pelo deliveryTimeline real da proposta
+                                // Para templates de website, substituir o prazo pelo deliveryTimeline real do serviço
                                 let processedContent = template.content;
                                 if (template.service_id === 'website') {
-                                    const rawTimeline = proposal.deliveryTimeline || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
-                                    const deliveryTimeline = normalizeWebsiteDeliveryTimeline(rawTimeline);
+                                    const rawTimeline = serviceData?.deliveryTimeline || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
+                                    const deliveryTimeline = normalizeWebsiteDeliveryTimeline(rawTimeline) || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
                                     processedContent = processedContent.replace(/30 dias úteis/g, deliveryTimeline);
                                 }
 
