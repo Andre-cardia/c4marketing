@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import logo from '../assets/logo.png';
 
+import { WEBSITE_DEFAULT_DELIVERY_TIMELINE, normalizeWebsiteDeliveryTimeline } from '../lib/contractTerms';
 interface Proposal {
     id: number;
     company_name: string;
@@ -19,7 +20,9 @@ interface Proposal {
     created_at: string;
     services?: { id: string; price: number; details?: string }[] | string[];
     accepted_at?: string;
-    is_legacy?: boolean;
+    
+     deliveryTimeline?: string;is_legacy?: boolea
+     n;
 }
 
 interface ContractTemplate {
@@ -256,7 +259,8 @@ const ContractView: React.FC = () => {
                                 const serviceDetail = Array.isArray(proposal.services)
                                     ? (proposal.services as any[]).find(s => s.id === template.service_id)?.details
                                     : null;
-
+                const deliveryTimeline = proposal.deliveryTimeline || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
+                                const normalizedTimeline = normalizeWebsiteDeliveryTimeline(deliveryTimeline);
                                 return (
                                     <div key={template.id} className="pl-4 border-l-2 border-slate-200">
                                         <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
@@ -264,9 +268,10 @@ const ContractView: React.FC = () => {
                                             {template.content
                                                 .replace(/^### .*$/gm, '')          // remove cabeçalhos ###
                                                 .replace(/^\d+\. [A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][^\n]*$/gm, '') // remove linhas de título numeradas: "1. Objeto"
-                                                .replace(/^\d+\.\d+\.\s+/gm, '')    // remove prefixos "1.1. " no início de parágrafos
-                                                .replace(/\n{3,}/g, '\n\n')          // colapsa espaços em branco excessivos
-                                                .trim()}
+                                                                            .replace(/^\d+\.\d+\.\s+/gm, '')
+                                                                                                        .replace(/30 dias\s+[\S]+/g, normalizedTimeline)
+                                                                                                                                    .replace(/\n{3,}/g, '\n\n')
+                                                                                                                                                                .trim()}m()}
                                         </div>
                                         {serviceDetail && (
                                             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm italic text-slate-600">
