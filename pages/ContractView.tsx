@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { normalizeWebsiteDeliveryTimeline, WEBSITE_DEFAULT_DELIVERY_TIMELINE } from '../lib/contractTerms';
 import Header from '../components/Header';
 import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -17,7 +18,7 @@ interface Proposal {
     setup_fee: number;
     contract_duration: number;
     created_at: string;
-    services?: { id: string; price: number; details?: string }[] | string[];
+    services?: { id: string; price: number; details?: string; deliveryTimeline?: string; paymentTerms?: string; recurringPrice?: number; setupPrice?: number }[] | string[];
     accepted_at?: string;
     is_legacy?: boolean;
 }
@@ -253,15 +254,26 @@ const ContractView: React.FC = () => {
                     ) : templates.length > 0 ? (
                         <div className="space-y-6">
                             {templates.map((template, index) => {
-                                const serviceDetail = Array.isArray(proposal.services)
-                                    ? (proposal.services as any[]).find(s => s.id === template.service_id)?.details
+                                const serviceData = Array.isArray(proposal.services)
+                                    ? (proposal.services as any[]).find(s => s.id === template.service_id)
                                     : null;
+                                const serviceDetail = serviceData?.details || null;
+
+                                // Replace delivery timeline placeholder in website template
+                                let processedContent = template.content;
+                                if (template.service_id === 'website') {
+                                    const rawTimeline = typeof serviceData === 'object' ? serviceData?.deliveryTimeline : undefined;
+                                    const deliveryTimeline = normalizeWebsiteDeliveryTimeline(rawTimeline) || WEBSITE_DEFAULT_DELIVERY_TIMELINE;
+                                    processedContent = processedContent
+                                        .replace(/\{\{prazo_entrega_website\}\}/g, deliveryTimeline)
+                                        .replace(/30 dias úteis/g, deliveryTimeline);
+                                }
 
                                 return (
                                     <div key={template.id} className="pl-4 border-l-2 border-slate-200">
                                         <h3 className="font-bold text-md mb-2 text-slate-800 uppercase">2.{index + 2}. {template.title}</h3>
                                         <div className="text-sm whitespace-pre-wrap font-sans text-slate-600 leading-relaxed text-justify">
-                                            {template.content
+                                            {processedContent
                                                 .replace(/^### .*$/gm, '')          // remove cabeçalhos ###
                                                 .replace(/^\d+\. [A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ][^\n]*$/gm, '') // remove linhas de título numeradas: "1. Objeto"
                                                 .replace(/^\d+\.\d+\.\s+/gm, '')    // remove prefixos "1.1. " no início de parágrafos
